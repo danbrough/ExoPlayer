@@ -13,6 +13,8 @@
 // limitations under the License.
 apply from: '../../constants.gradle'
 apply plugin: 'com.android.library'
+apply plugin: 'com.github.dcendents.android-maven'
+group = 'com.github.danbrough.exoplayer'
 
 android {
     compileSdkVersion project.ext.compileSdkVersion
@@ -38,3 +40,4 @@ ext {
     javadocTitle = 'Opus extension'
 }
 apply from: '../../javadoc_library.gradle'
+apply from: '../../publish.gradle'

@@ -1,0 +1,34 @@
+apply from: '../constants.gradle'
+apply plugin: 'com.android.library'
+apply plugin: 'com.github.dcendents.android-maven'
+group='com.github.danbroid.exoplayer'
+
+android {
+    compileSdkVersion project.ext.compileSdkVersion
+    buildToolsVersion project.ext.buildToolsVersion
+
+    defaultConfig {
+        minSdkVersion project.ext.minSdkVersion
+        targetSdkVersion project.ext.targetSdkVersion
+        consumerProguardFiles 'proguard-rules.txt'
+    }
+
+    sourceSets.main {
+        jniLibs.srcDir 'src/main/libs'
+        jni.srcDirs = [] // Disable the automatic ndk-build call by Android Studio.
+    }
+}
+
+dependencies {
+
+    implementation "com.android.support:support-annotations:27.1.0"
+
+    implementation project(modulePrefix + 'library-core')
+    implementation project(modulePrefix + 'library-ui')
+    implementation project(modulePrefix + 'extension-okhttp')
+    implementation('com.squareup.okhttp3:okhttp:3.10.0') {
+        exclude group: 'org.json'
+    }
+
+    //implementation 'com.squareup.okhttp3:okhttp:3.10.0'
+}

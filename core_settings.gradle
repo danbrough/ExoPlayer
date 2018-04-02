@@ -17,6 +17,7 @@ if (gradle.ext.has('exoplayerModulePrefix')) {
     modulePrefix += gradle.ext.exoplayerModulePrefix
 }
 
+include modulePrefix + 'shoutcast'
 include modulePrefix + 'library'
 include modulePrefix + 'library-core'
 include modulePrefix + 'library-dash'

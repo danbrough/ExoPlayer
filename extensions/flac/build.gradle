@@ -37,7 +37,5 @@ dependencies {
     androidTestImplementation project(modulePrefix + 'testutils')
 }
 
-ext {
-    javadocTitle = 'FLAC extension'
-}
-apply from: '../../javadoc_library.gradle'
+
+apply from: '../../publish.gradle'

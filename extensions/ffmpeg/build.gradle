@@ -34,7 +34,4 @@ dependencies {
     implementation project(modulePrefix + 'library-core')
 }
 
-ext {
-    javadocTitle = 'FFmpeg extension'
-}
-apply from: '../../javadoc_library.gradle'
+apply from: '../../publish.gradle'

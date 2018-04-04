@@ -1,4 +1,4 @@
-apply from: '../constants.gradle'
+apply from: '../../constants.gradle'
 apply plugin: 'com.android.library'
 apply plugin: 'com.github.dcendents.android-maven'
 group='com.github.danbroid.exoplayer'
@@ -32,3 +32,8 @@ dependencies {
 
     //implementation 'com.squareup.okhttp3:okhttp:3.10.0'
 }
+ext {
+    releaseArtifact = 'extension-shoutcast'
+    releaseDescription = 'Shoutcast extension for ExoPlayer.'
+}
+apply from: '../../publish.gradle'

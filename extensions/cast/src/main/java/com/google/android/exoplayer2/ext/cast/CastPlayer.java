@@ -120,6 +120,10 @@ public final class CastPlayer implements Player {
   private long pendingSeekPositionMs;
   private boolean waitingForInitialTimeline;
 
+  public RemoteMediaClient getRemoteMediaClient() {
+    return remoteMediaClient;
+  }
+
   /**
    * @param castContext The context from which the cast session is obtained.
    */

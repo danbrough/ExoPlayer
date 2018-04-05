@@ -17,6 +17,7 @@ package com.google.android.exoplayer2.castdemo;
 
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.gms.cast.MediaInfo;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -30,6 +31,11 @@ import java.util.List;
   public static final String MIME_TYPE_HLS = MimeTypes.APPLICATION_M3U8;
   public static final String MIME_TYPE_SS = MimeTypes.APPLICATION_SS;
   public static final String MIME_TYPE_VIDEO_MP4 = MimeTypes.VIDEO_MP4;
+  public static final String MIME_TYPE_AUDIO_MPEG = MimeTypes.AUDIO_MPEG;
+  public static final String MIME_TYPE_AUDIO_AACP = "audio/aacp";
+  public static final String MIME_TYPE_AUDIO_OGG = MimeTypes.AUDIO_VORBIS;
+  public static final String MIME_TYPE_AUDIO_MP3 = "audio/mp3";
+
 
   /**
    * The list of samples available in the cast demo app.
@@ -54,15 +60,21 @@ import java.util.List;
      */
     public final String mimeType;
 
+    public final String icon;
+
+    public Sample(String uri, String name, String mimeType) {
+      this(uri,name,mimeType,null);
+    }
     /**
-     * @param uri See {@link #uri}.
-     * @param name See {@link #name}.
+     * @param uri      See {@link #uri}.
+     * @param name     See {@link #name}.
      * @param mimeType See {@link #mimeType}.
      */
-    public Sample(String uri, String name, String mimeType) {
+    public Sample(String uri, String name, String mimeType,String  icon) {
       this.uri = uri;
       this.name = name;
       this.mimeType = mimeType;
+      this.icon = icon;
     }
 
     @Override
@@ -79,14 +91,43 @@ import java.util.List;
         "DASH (clear,MP4,H264)", MIME_TYPE_DASH));
     samples.add(new Sample("https://commondatastorage.googleapis.com/gtv-videos-bucket/CastVideos/"
         + "hls/TearsOfSteel.m3u8", "Tears of Steel (HLS)", MIME_TYPE_HLS));
-    samples.add(new Sample("https://html5demos.com/assets/dizzy.mp4", "Dizzy (MP4)",
+
+    samples.add(new Sample("https://html5demos.com/assets/dizzy.mp4", "Dizzzzy (MP4)",
         MIME_TYPE_VIDEO_MP4));
+
+    samples.add(new Sample("http://192.168.1.2/music/BB%20King/Why%20I%20Sing%20The%20Blues/B.B.%20King%20-%20Why%20I%20Sing%20The%20Blues.mp3", "BB King (MP3)",
+        MIME_TYPE_AUDIO_MPEG));
+    samples.add(new Sample("https://html5demos.com/assets/dizzy.mp4", "Dizzy2 (MP4)",
+        MIME_TYPE_VIDEO_MP4));
+
+
+    samples.add(new Sample(
+        "http://radionz-ice.streamguys.com/national_aac64",
+        "National Radio-64",
+        MIME_TYPE_AUDIO_MPEG,"https://www.radionz.co.nz/brand-images/rnz-national.jpg"));
+
+
+    samples.add(new Sample(
+        "http://ice1.somafm.com/digitalis-128-aac",
+        "Digitalis-AAC",
+        MIME_TYPE_AUDIO_AACP,"https://api.somafm.com/logos/512/digitalis512.png"));
+
+    samples.add(new Sample(
+        "http://ice3.somafm.com/brfm-128-aac",
+        "BRFM-AACP",
+        MIME_TYPE_AUDIO_AACP,"https://api.somafm.com/logos/512/brfm512.jpg"));
+
+    samples.add(new Sample(
+        "http://colostreaming.com:8094",
+        "wSHE",
+        MIME_TYPE_AUDIO_MP3,"http://www.radioshe.com/images/logo.png"));
 
 
     SAMPLES = Collections.unmodifiableList(samples);
 
   }
 
-  private DemoUtil() {}
+  private DemoUtil() {
+  }
 
 }

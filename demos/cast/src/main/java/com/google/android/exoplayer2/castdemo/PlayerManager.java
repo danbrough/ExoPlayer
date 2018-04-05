@@ -17,8 +17,10 @@ package com.google.android.exoplayer2.castdemo;
 
 import android.content.Context;
 import android.net.Uri;
+import android.support.v4.media.MediaMetadataCompat;
 import android.view.KeyEvent;
 import android.view.View;
+
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.DefaultRenderersFactory;
 import com.google.android.exoplayer2.ExoPlayerFactory;
@@ -49,6 +51,8 @@ import com.google.android.gms.cast.MediaInfo;
 import com.google.android.gms.cast.MediaMetadata;
 import com.google.android.gms.cast.MediaQueueItem;
 import com.google.android.gms.cast.framework.CastContext;
+import com.google.android.gms.common.images.WebImage;
+
 import java.util.ArrayList;
 
 /**
@@ -88,10 +92,10 @@ import java.util.ArrayList;
 
   /**
    * @param queuePositionListener A {@link QueuePositionListener} for queue position changes.
-   * @param localPlayerView The {@link PlayerView} for local playback.
-   * @param castControlView The {@link PlayerControlView} to control remote playback.
-   * @param context A {@link Context}.
-   * @param castContext The {@link CastContext}.
+   * @param localPlayerView       The {@link PlayerView} for local playback.
+   * @param castControlView       The {@link PlayerControlView} to control remote playback.
+   * @param context               A {@link Context}.
+   * @param castContext           The {@link CastContext}.
    */
   public static PlayerManager createPlayerManager(
       QueuePositionListener queuePositionListener,
@@ -210,7 +214,7 @@ import java.util.ArrayList;
    * Moves an item within the queue.
    *
    * @param fromIndex The index of the item to move.
-   * @param toIndex The target index of the item in the queue.
+   * @param toIndex   The target index of the item in the queue.
    * @return Whether the item move was successful.
    */
   public boolean moveItem(int fromIndex, int toIndex) {
@@ -312,7 +316,7 @@ import java.util.ArrayList;
     int playbackState = currentPlayer.getPlaybackState();
     maybeSetCurrentItemAndNotify(
         playbackState != Player.STATE_IDLE && playbackState != Player.STATE_ENDED
-        ? currentPlayer.getCurrentWindowIndex() : C.INDEX_UNSET);
+            ? currentPlayer.getCurrentWindowIndex() : C.INDEX_UNSET);
   }
 
   private void setCurrentPlayer(Player currentPlayer) {
@@ -370,8 +374,8 @@ import java.util.ArrayList;
   /**
    * Starts playback of the item at the given position.
    *
-   * @param itemIndex The index of the item to play.
-   * @param positionMs The position at which playback should start.
+   * @param itemIndex     The index of the item to play.
+   * @param positionMs    The position at which playback should start.
    * @param playWhenReady Whether the player should proceed when ready to do so.
    */
   private void setCurrentItem(int itemIndex, long positionMs, boolean playWhenReady) {
@@ -402,16 +406,22 @@ import java.util.ArrayList;
     switch (sample.mimeType) {
       case DemoUtil.MIME_TYPE_SS:
         return new SsMediaSource.Factory(
-                new DefaultSsChunkSource.Factory(DATA_SOURCE_FACTORY), DATA_SOURCE_FACTORY)
+            new DefaultSsChunkSource.Factory(DATA_SOURCE_FACTORY), DATA_SOURCE_FACTORY)
             .createMediaSource(uri);
       case DemoUtil.MIME_TYPE_DASH:
         return new DashMediaSource.Factory(
-                new DefaultDashChunkSource.Factory(DATA_SOURCE_FACTORY), DATA_SOURCE_FACTORY)
+            new DefaultDashChunkSource.Factory(DATA_SOURCE_FACTORY), DATA_SOURCE_FACTORY)
             .createMediaSource(uri);
       case DemoUtil.MIME_TYPE_HLS:
         return new HlsMediaSource.Factory(DATA_SOURCE_FACTORY).createMediaSource(uri);
       case DemoUtil.MIME_TYPE_VIDEO_MP4:
+      case DemoUtil.MIME_TYPE_AUDIO_MPEG:
+      case DemoUtil.MIME_TYPE_AUDIO_OGG:
+      case DemoUtil.MIME_TYPE_AUDIO_MP3:
+      case DemoUtil.MIME_TYPE_AUDIO_AACP:
         return new ExtractorMediaSource.Factory(DATA_SOURCE_FACTORY).createMediaSource(uri);
+
+
       default: {
         throw new IllegalStateException("Unsupported type: " + sample.mimeType);
       }
@@ -421,10 +431,19 @@ import java.util.ArrayList;
   private static MediaQueueItem buildMediaQueueItem(DemoUtil.Sample sample) {
     MediaMetadata movieMetadata = new MediaMetadata(MediaMetadata.MEDIA_TYPE_MOVIE);
     movieMetadata.putString(MediaMetadata.KEY_TITLE, sample.name);
-    MediaInfo mediaInfo = new MediaInfo.Builder(sample.uri)
-        .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED).setContentType(sample.mimeType)
-        .setMetadata(movieMetadata).build();
-    return new MediaQueueItem.Builder(mediaInfo).build();
+
+    if (sample.icon != null) {
+      WebImage webImage = new WebImage(Uri.parse(sample.icon));
+      movieMetadata.addImage(webImage);
+      movieMetadata.addImage(webImage);
+    }
+
+    MediaInfo.Builder info = new MediaInfo.Builder(sample.uri)
+        .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
+        .setContentType(sample.mimeType)
+        .setMetadata(movieMetadata);
+
+    return new MediaQueueItem.Builder(info.build()).build();
   }
 
 }

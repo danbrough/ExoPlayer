@@ -17,35 +17,34 @@ apply plugin: 'com.github.dcendents.android-maven'
 group = 'com.github.danbrough.exoplayer'
 
 android {
-    compileSdkVersion project.ext.compileSdkVersion
-    buildToolsVersion project.ext.buildToolsVersion
+  compileSdkVersion project.ext.compileSdkVersion
+  buildToolsVersion project.ext.buildToolsVersion
 
-    defaultConfig {
-        minSdkVersion project.ext.minSdkVersion
-        targetSdkVersion project.ext.targetSdkVersion
-    }
-
-    lintOptions {
-        // See: https://github.com/square/okio/issues/58
-        warning 'InvalidPackage'
-    }
+  defaultConfig {
+    minSdkVersion project.ext.minSdkVersion
+    targetSdkVersion project.ext.targetSdkVersion
+    consumerProguardFiles 'proguard-rules.txt'
+  }
 }
 
 dependencies {
-    implementation project(modulePrefix + 'library-core')
-    implementation 'com.android.support:support-annotations:' + supportLibraryVersion
-    implementation('com.squareup.okhttp3:okhttp:3.10.0') {
-        exclude group: 'org.json'
-    }
+  implementation project(modulePrefix + 'library-core')
+  implementation 'com.android.support:support-annotations:' + supportLibraryVersion
+  api('com.squareup.okhttp3:okhttp:3.10.0') {
+    exclude group: 'org.json'
+  }
+
+  //api 'com.squareup.okhttp3:okhttp:3.10.0'
+
 }
 
 ext {
-    javadocTitle = 'OkHttp extension'
+  javadocTitle = 'OkHttp extension'
 }
 apply from: '../../javadoc_library.gradle'
 
 ext {
-    releaseArtifact = 'extension-okhttp'
-    releaseDescription = 'OkHttp extension for ExoPlayer.'
+  releaseArtifact = 'extension-okhttp'
+  releaseDescription = 'OkHttp extension for ExoPlayer.'
 }
 apply from: '../../publish.gradle'

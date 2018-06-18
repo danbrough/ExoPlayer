@@ -17,7 +17,7 @@ if (gradle.ext.has('exoplayerModulePrefix')) {
     modulePrefix += gradle.ext.exoplayerModulePrefix
 }
 
-include modulePrefix + 'shoutcast'
+
 include modulePrefix + 'library'
 include modulePrefix + 'library-core'
 include modulePrefix + 'library-dash'
@@ -36,6 +36,7 @@ include modulePrefix + 'extension-okhttp'
 include modulePrefix + 'extension-opus'
 include modulePrefix + 'extension-vp9'
 include modulePrefix + 'extension-rtmp'
+include modulePrefix + 'extension-shoutcast'
 include modulePrefix + 'extension-leanback'
 include modulePrefix + 'extension-jobdispatcher'
 
@@ -55,6 +56,7 @@ project(modulePrefix + 'extension-cast').projectDir = new File(rootDir, 'extensi
 project(modulePrefix + 'extension-mediasession').projectDir = new File(rootDir, 'extensions/mediasession')
 project(modulePrefix + 'extension-okhttp').projectDir = new File(rootDir, 'extensions/okhttp')
 project(modulePrefix + 'extension-opus').projectDir = new File(rootDir, 'extensions/opus')
+project(modulePrefix + 'extension-shoutcast').projectDir = new File(rootDir, 'extensions/shoutcast')
 project(modulePrefix + 'extension-vp9').projectDir = new File(rootDir, 'extensions/vp9')
 project(modulePrefix + 'extension-rtmp').projectDir = new File(rootDir, 'extensions/rtmp')
 project(modulePrefix + 'extension-leanback').projectDir = new File(rootDir, 'extensions/leanback')

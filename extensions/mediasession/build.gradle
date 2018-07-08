@@ -28,7 +28,8 @@ android {
 
 dependencies {
     implementation project(modulePrefix + 'library-core')
-    implementation 'com.android.support:support-media-compat:' + supportLibraryVersion
+    //implementation 'com.android.support:support-media-compat:' + supportLibraryVersion
+    implementation "androidx.media:media:1.0.0-beta01"
 }
 
 ext {

@@ -25,8 +25,6 @@ import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
-import android.support.annotation.ColorInt;
-import android.support.annotation.Nullable;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
 import android.view.KeyEvent;
@@ -42,6 +40,9 @@ import com.google.android.exoplayer2.util.Util;
 import java.util.Formatter;
 import java.util.Locale;
 import java.util.concurrent.CopyOnWriteArraySet;
+
+import androidx.annotation.ColorInt;
+import androidx.annotation.Nullable;
 
 /**
  * A time bar that shows a current position, buffered position, duration and ad markers.
@@ -435,7 +436,7 @@ public class DefaultTimeBar extends View implements TimeBar {
 
   @Override
   public void setAdGroupTimesMs(@Nullable long[] adGroupTimesMs, @Nullable boolean[] playedAdGroups,
-      int adGroupCount) {
+                                int adGroupCount) {
     Assertions.checkArgument(adGroupCount == 0
         || (adGroupTimesMs != null && playedAdGroups != null));
     this.adGroupCount = adGroupCount;

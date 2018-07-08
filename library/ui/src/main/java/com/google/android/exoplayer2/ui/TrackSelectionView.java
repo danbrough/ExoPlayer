@@ -21,8 +21,6 @@ import android.app.Dialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.res.TypedArray;
-import android.support.annotation.AttrRes;
-import android.support.annotation.Nullable;
 import android.util.AttributeSet;
 import android.util.Pair;
 import android.view.LayoutInflater;
@@ -37,6 +35,9 @@ import com.google.android.exoplayer2.trackselection.DefaultTrackSelector.Selecti
 import com.google.android.exoplayer2.trackselection.MappingTrackSelector;
 import com.google.android.exoplayer2.util.Assertions;
 import java.util.Arrays;
+
+import androidx.annotation.AttrRes;
+import androidx.annotation.Nullable;
 
 /** A view for making track selections. */
 public class TrackSelectionView extends LinearLayout {
@@ -56,7 +57,8 @@ public class TrackSelectionView extends LinearLayout {
   private int rendererIndex;
   private TrackGroupArray trackGroups;
   private boolean isDisabled;
-  private @Nullable SelectionOverride override;
+  private @Nullable
+  SelectionOverride override;
 
   /**
    * Gets a pair consisting of a dialog and the {@link TrackSelectionView} that will be shown by it.

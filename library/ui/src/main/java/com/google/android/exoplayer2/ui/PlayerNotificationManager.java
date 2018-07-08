@@ -27,13 +27,7 @@ import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.os.Handler;
 import android.os.Looper;
-import android.support.annotation.DrawableRes;
-import android.support.annotation.IntDef;
-import android.support.annotation.Nullable;
-import android.support.annotation.StringRes;
-import android.support.v4.app.NotificationCompat;
-import android.support.v4.app.NotificationManagerCompat;
-import android.support.v4.media.app.NotificationCompat.MediaStyle;
+
 import android.support.v4.media.session.MediaSessionCompat;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ControlDispatcher;
@@ -51,6 +45,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.checkerframework.checker.nullness.qual.RequiresNonNull;
+
+import androidx.annotation.DrawableRes;
+import androidx.annotation.IntDef;
+import androidx.annotation.Nullable;
+import androidx.annotation.StringRes;
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
 
 /**
  * A notification manager to start, update and cancel a media style notification reflecting the
@@ -288,7 +289,8 @@ public class PlayerNotificationManager {
   private boolean colorized;
   private int defaults;
   private int color;
-  private @DrawableRes int smallIconResourceId;
+  private @DrawableRes
+  int smallIconResourceId;
   private int visibility;
   private @Priority int priority;
   private boolean ongoing;
@@ -758,7 +760,7 @@ public class PlayerNotificationManager {
       }
     }
     // Create a media style notification.
-    MediaStyle mediaStyle = new MediaStyle();
+    androidx.media.app.NotificationCompat.MediaStyle mediaStyle = new androidx.media.app.NotificationCompat.MediaStyle();
     builder.setStyle(mediaStyle);
     if (mediaSessionToken != null) {
       mediaStyle.setMediaSession(mediaSessionToken);

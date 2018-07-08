@@ -15,8 +15,9 @@
  */
 package com.google.android.exoplayer2.ui;
 
-import android.support.annotation.Nullable;
 import android.view.View;
+
+import androidx.annotation.Nullable;
 
 /**
  * Interface for time bar views that can display a playback position, buffered position, duration
@@ -95,7 +96,7 @@ public interface TimeBar {
    * @param adGroupCount The number of ad groups.
    */
   void setAdGroupTimesMs(@Nullable long[] adGroupTimesMs, @Nullable boolean[] playedAdGroups,
-      int adGroupCount);
+                         int adGroupCount);
 
   /**
    * Listener for scrubbing events.

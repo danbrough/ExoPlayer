@@ -17,10 +17,11 @@ package com.google.android.exoplayer2.ui;
 
 import android.annotation.TargetApi;
 import android.content.Context;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
 import android.util.AttributeSet;
 import com.google.android.exoplayer2.SimpleExoPlayer;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 /** @deprecated Use {@link PlayerView}. */
 @Deprecated

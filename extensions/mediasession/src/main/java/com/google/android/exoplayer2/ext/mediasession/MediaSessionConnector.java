@@ -17,6 +17,8 @@ package com.google.android.exoplayer2.ext.mediasession;
 
 import android.graphics.Bitmap;
 import android.net.Uri;
+
+
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;

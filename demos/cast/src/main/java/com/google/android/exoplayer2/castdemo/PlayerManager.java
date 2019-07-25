@@ -17,9 +17,9 @@ package com.google.android.exoplayer2.castdemo;
 
 import android.content.Context;
 import android.net.Uri;
-import androidx.annotation.Nullable;
 import android.view.KeyEvent;
 import android.view.View;
+import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.DefaultRenderersFactory;
 import com.google.android.exoplayer2.ExoPlayerFactory;
@@ -45,6 +45,7 @@ import com.google.android.exoplayer2.ui.PlayerControlView;
 import com.google.android.exoplayer2.ui.PlayerView;
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory;
 import com.google.android.exoplayer2.util.Assertions;
+import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.gms.cast.MediaInfo;
 import com.google.android.gms.cast.MediaMetadata;
 import com.google.android.gms.cast.MediaQueueItem;
@@ -53,13 +54,19 @@ import java.util.ArrayList;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-/** Manages players and an internal media queue for the demo app. */
+/**
+ * Manages players and an internal media queue for the demo app.
+ */
 /* package */ class PlayerManager implements EventListener, SessionAvailabilityListener {
 
-  /** Listener for events. */
+  /**
+   * Listener for events.
+   */
   interface Listener {
 
-    /** Called when the currently played item of the media queue changes. */
+    /**
+     * Called when the currently played item of the media queue changes.
+     */
     void onQueuePositionChanged(int previousIndex, int newIndex);
   }
 
@@ -125,7 +132,9 @@ import org.json.JSONObject;
     setCurrentItem(itemIndex, C.TIME_UNSET, true);
   }
 
-  /** Returns the index of the currently played item. */
+  /**
+   * Returns the index of the currently played item.
+   */
   public int getCurrentItemIndex() {
     return currentItemIndex;
   }
@@ -143,7 +152,9 @@ import org.json.JSONObject;
     }
   }
 
-  /** Returns the size of the media queue. */
+  /**
+   * Returns the size of the media queue.
+   */
   public int getMediaQueueSize() {
     return mediaQueue.size();
   }
@@ -240,7 +251,9 @@ import org.json.JSONObject;
     }
   }
 
-  /** Releases the manager and the players that it holds. */
+  /**
+   * Releases the manager and the players that it holds.
+   */
   public void release() {
     currentItemIndex = C.INDEX_UNSET;
     mediaQueue.clear();
@@ -376,6 +389,10 @@ import org.json.JSONObject;
         return new DashMediaSource.Factory(DATA_SOURCE_FACTORY).createMediaSource(uri);
       case DemoUtil.MIME_TYPE_HLS:
         return new HlsMediaSource.Factory(DATA_SOURCE_FACTORY).createMediaSource(uri);
+      case MimeTypes.AUDIO_MPEG:
+      case MimeTypes.AUDIO_MPEG_L1:
+      case MimeTypes.AUDIO_MPEG_L2:
+      case MimeTypes.AUDIO_AAC:
       case DemoUtil.MIME_TYPE_VIDEO_MP4:
         return new ProgressiveMediaSource.Factory(DATA_SOURCE_FACTORY).createMediaSource(uri);
       default:
@@ -384,11 +401,11 @@ import org.json.JSONObject;
   }
 
   private static MediaQueueItem buildMediaQueueItem(MediaItem item) {
-    MediaMetadata movieMetadata = new MediaMetadata(MediaMetadata.MEDIA_TYPE_MOVIE);
+    MediaMetadata movieMetadata = new MediaMetadata(MediaMetadata.MEDIA_TYPE_MUSIC_TRACK);
     movieMetadata.putString(MediaMetadata.KEY_TITLE, item.title);
     MediaInfo.Builder mediaInfoBuilder =
         new MediaInfo.Builder(item.media.uri.toString())
-            .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
+            .setStreamType(MediaInfo.STREAM_TYPE_LIVE)
             .setContentType(item.mimeType)
             .setMetadata(movieMetadata);
     if (!item.drmSchemes.isEmpty()) {

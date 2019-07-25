@@ -16,7 +16,6 @@
 package com.google.android.exoplayer2.castdemo;
 
 import androidx.annotation.Nullable;
-import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.util.MimeTypes;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -24,20 +23,33 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** Utility methods and constants for the Cast demo application. */
+/**
+ * Utility methods and constants for the Cast demo application.
+ */
 /* package */ final class DemoUtil {
 
-  /** Represents a media sample. */
+  /**
+   * Represents a media sample.
+   */
   public static final class Sample {
 
-    /** The URI of the media content. */
+    /**
+     * The URI of the media content.
+     */
     public final String uri;
-    /** The name of the sample. */
+    /**
+     * The name of the sample.
+     */
     public final String name;
-    /** The mime type of the sample media content. */
+    /**
+     * The mime type of the sample media content.
+     */
     public final String mimeType;
-    /** Data to configure DRM license acquisition. May be null if content is not DRM-protected. */
-    @Nullable public final DrmConfiguration drmConfiguration;
+    /**
+     * Data to configure DRM license acquisition. May be null if content is not DRM-protected.
+     */
+    @Nullable
+    public final DrmConfiguration drmConfiguration;
 
     public Sample(String uri, String name, String mimeType) {
       this(uri, name, mimeType, /* drmConfiguration= */ null);
@@ -57,17 +69,24 @@ import java.util.UUID;
     }
   }
 
-  /** Holds information required to play DRM-protected content. */
+  /**
+   * Holds information required to play DRM-protected content.
+   */
   public static final class DrmConfiguration {
 
-    /** The {@link UUID} of the DRM scheme that protects the content. */
+    /**
+     * The {@link UUID} of the DRM scheme that protects the content.
+     */
     public final UUID drmSchemeUuid;
     /**
      * The URI from which players should obtain DRM licenses. May be null if the license server URI
      * is provided as part of the media.
      */
-    @Nullable public final String licenseServerUri;
-    /** HTTP request headers to include the in DRM license requests. */
+    @Nullable
+    public final String licenseServerUri;
+    /**
+     * HTTP request headers to include the in DRM license requests.
+     */
     public final Map<String, String> httpRequestHeaders;
 
     public DrmConfiguration(
@@ -85,7 +104,9 @@ import java.util.UUID;
   public static final String MIME_TYPE_SS = MimeTypes.APPLICATION_SS;
   public static final String MIME_TYPE_VIDEO_MP4 = MimeTypes.VIDEO_MP4;
 
-  /** The list of samples available in the cast demo app. */
+  /**
+   * The list of samples available in the cast demo app.
+   */
   public static final List<Sample> SAMPLES;
 
   static {
@@ -107,8 +128,16 @@ import java.util.UUID;
         new Sample(
             "https://html5demos.com/assets/dizzy.mp4", "Clear MP4: Dizzy", MIME_TYPE_VIDEO_MP4));
 
+    samples.add(new Sample("http://radionz-ice.streamguys.com/national_aac64", "National AAC64",
+        MimeTypes.AUDIO_AAC));
+    samples.add(new Sample("https://radionz-ice.streamguys.com/national.mp3", "National Mp3",
+        MimeTypes.AUDIO_MPEG_L2));
+    samples.add(new Sample("http://ice4.somafm.com/digitalis-128-aac", "Digitalis",
+        MimeTypes.AUDIO_AAC));
+
     SAMPLES = Collections.unmodifiableList(samples);
   }
 
-  private DemoUtil() {}
+  private DemoUtil() {
+  }
 }

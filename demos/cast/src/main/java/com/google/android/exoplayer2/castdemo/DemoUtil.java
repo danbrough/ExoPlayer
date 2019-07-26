@@ -134,7 +134,8 @@ import java.util.UUID;
         MimeTypes.AUDIO_MPEG_L2));
     samples.add(new Sample("http://ice4.somafm.com/digitalis-128-aac", "Digitalis",
         MimeTypes.AUDIO_AAC));
-
+    samples.add(new Sample("http://ice4.somafm.com/u80s-128-aac", "UNderground 80S",
+        MimeTypes.AUDIO_AAC));
     SAMPLES = Collections.unmodifiableList(samples);
   }
 

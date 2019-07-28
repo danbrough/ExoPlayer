@@ -380,7 +380,7 @@ import org.json.JSONObject;
         return new DashMediaSource.Factory(DATA_SOURCE_FACTORY).createMediaSource(uri);
       case DemoUtil.MIME_TYPE_HLS:
         return new HlsMediaSource.Factory(DATA_SOURCE_FACTORY).createMediaSource(uri);
-      case MimeTypes.AUDIO_AC3:
+      case MimeTypes.AUDIO_AAC:
       case MimeTypes.AUDIO_MP4:
       case MimeTypes.AUDIO_MPEG:
       case MimeTypes.AUDIO_MPEG_L1:
@@ -393,11 +393,11 @@ import org.json.JSONObject;
   }
 
   private static MediaQueueItem buildMediaQueueItem(MediaItem item) {
-    MediaMetadata movieMetadata = new MediaMetadata(MediaMetadata.MEDIA_TYPE_MOVIE);
+    MediaMetadata movieMetadata = new MediaMetadata(MediaMetadata.MEDIA_TYPE_MUSIC_TRACK);
     movieMetadata.putString(MediaMetadata.KEY_TITLE, item.title);
     MediaInfo.Builder mediaInfoBuilder =
         new MediaInfo.Builder(item.uri.toString())
-            .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
+            .setStreamType(MediaInfo.STREAM_TYPE_LIVE)
             .setContentType(item.mimeType)
             .setMetadata(movieMetadata);
     MediaItem.DrmConfiguration drmConfiguration = item.drmConfiguration;

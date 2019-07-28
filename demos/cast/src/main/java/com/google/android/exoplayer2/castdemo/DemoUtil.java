@@ -45,7 +45,7 @@ import java.util.List;
     ArrayList<MediaItem> samples = new ArrayList<>();
 
     // Clear content.
-    samples.add(
+/*    samples.add(
         new MediaItem.Builder()
             .setUri("https://storage.googleapis.com/wvmedia/clear/h264/tears/tears.mpd")
             .setTitle("Clear DASH: Tears")
@@ -62,7 +62,7 @@ import java.util.List;
             .setUri("https://html5demos.com/assets/dizzy.mp4")
             .setTitle("Clear MP4: Dizzy")
             .setMimeType(MIME_TYPE_VIDEO_MP4)
-            .build());
+            .build());*/
 
     /*
         samples.add(new Sample("http://radionz-ice.streamguys.com/national_aac64", "National AAC64",
@@ -79,15 +79,9 @@ import java.util.List;
         new MediaItem.Builder()
             .setUri("http://radionz-ice.streamguys.com/national_aac64")
             .setTitle("National AAC64")
-            .setMimeType(AUDIO_AAC)
+            .setMimeType("audio/aacp")
             .build());
 
-    samples.add(
-        new MediaItem.Builder()
-            .setUri("http://radionz-ice.streamguys.com/national.mp3")
-            .setTitle("National MP3")
-            .setMimeType(AUDIO_MPEG)
-            .build());
 
     samples.add(
         new MediaItem.Builder()
@@ -102,6 +96,14 @@ import java.util.List;
             .setTitle("Underground 80s")
             .setMimeType(AUDIO_AAC)
             .build());
+
+    samples.add(
+        new MediaItem.Builder()
+            .setUri("http://radionz-ice.streamguys.com/national.mp3")
+            .setTitle("National MP3")
+            .setMimeType(AUDIO_MPEG)
+            .build());
+
     SAMPLES = Collections.unmodifiableList(samples);
   }
 

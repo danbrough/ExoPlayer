@@ -2,6 +2,8 @@
 
 ### dev-v2 (not yet released) ###
 
+* Update `DefaultTrackSelector` to apply a viewport constraint for the default
+  display by default.
 * Add `PlaybackStatsListener` to collect `PlaybackStats` for playbacks analysis
   and analytics reporting (TODO: link to developer guide page/blog post).
 * Add basic DRM support to the Cast demo app.
@@ -38,6 +40,8 @@
   ([#6153](https://github.com/google/ExoPlayer/issues/6153)).
 * Fix `DataSchemeDataSource` re-opening and range requests
   ([#6192](https://github.com/google/ExoPlayer/issues/6192)).
+* Ensure the `SilenceMediaSource` position is in range
+  ([#6229](https://github.com/google/ExoPlayer/issues/6229)).
 * Flac extension: Parse `VORBIS_COMMENT` metadata
   ([#5527](https://github.com/google/ExoPlayer/issues/5527)).
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,18 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.google.android.exoplayer2.ext.vp9;
+@NonNullApi
+package com.google.android.exoplayer2.ext.mediasession;
 
-import com.google.android.exoplayer2.video.VideoDecoderException;
-
-/** Thrown when a libvpx decoder error occurs. */
-public final class VpxDecoderException extends VideoDecoderException {
-
-  /* package */ VpxDecoderException(String message) {
-    super(message);
-  }
-
-  /* package */ VpxDecoderException(String message, Throwable cause) {
-    super(message, cause);
-  }
-}
+import com.google.android.exoplayer2.util.NonNullApi;

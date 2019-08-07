@@ -13,8 +13,6 @@
 // limitations under the License.
 apply from: '../../constants.gradle'
 apply plugin: 'com.android.library'
-apply plugin: 'com.github.dcendents.android-maven'
-group = 'com.github.danbrough.exoplayer'
 
 android {
     compileSdkVersion project.ext.compileSdkVersion
@@ -48,5 +46,7 @@ dependencies {
     testImplementation project(modulePrefix + 'testutils-robolectric')
 }
 
-
-apply from: '../../publish.gradle'
+ext {
+    javadocTitle = 'FLAC extension'
+}
+apply from: '../../javadoc_library.gradle'

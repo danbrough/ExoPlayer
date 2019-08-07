@@ -32,3 +32,6 @@ project.ext {
         modulePrefix += gradle.ext.exoplayerModulePrefix
     }
 }
+
+//apply plugin: 'com.github.dcendents.android-maven'
+group = 'com.github.danbrough.exoplayer'

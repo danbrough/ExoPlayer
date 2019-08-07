@@ -24,6 +24,7 @@ import com.google.android.exoplayer2.extractor.ExtractorOutput;
 import com.google.android.exoplayer2.extractor.ExtractorsFactory;
 import com.google.android.exoplayer2.extractor.PositionHolder;
 import com.google.android.exoplayer2.extractor.TrackOutput;
+import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.MimeTypes;
 import java.io.IOException;
 
@@ -32,17 +33,8 @@ import java.io.IOException;
  */
 public final class WavExtractor implements Extractor {
 
-  /**
-   * Factory for {@link WavExtractor} instances.
-   */
-  public static final ExtractorsFactory FACTORY = new ExtractorsFactory() {
-
-    @Override
-    public Extractor[] createExtractors() {
-      return new Extractor[] {new WavExtractor()};
-    }
-
-  };
+  /** Factory for {@link WavExtractor} instances. */
+  public static final ExtractorsFactory FACTORY = () -> new Extractor[] {new WavExtractor()};
 
   /** Arbitrary maximum input size of 32KB, which is ~170ms of 16-bit stereo PCM audio at 48KHz. */
   private static final int MAX_INPUT_SIZE = 32 * 1024;
@@ -95,9 +87,20 @@ public final class WavExtractor implements Extractor {
     if (!wavHeader.hasDataBounds()) {
       WavHeaderReader.skipToData(input, wavHeader);
       extractorOutput.seekMap(wavHeader);
+    } else if (input.getPosition() == 0) {
+      input.skipFully(wavHeader.getDataStartPosition());
     }
 
-    int bytesAppended = trackOutput.sampleData(input, MAX_INPUT_SIZE - pendingBytes, true);
+    long dataEndPosition = wavHeader.getDataEndPosition();
+    Assertions.checkState(dataEndPosition != C.POSITION_UNSET);
+
+    long bytesLeft = dataEndPosition - input.getPosition();
+    if (bytesLeft <= 0) {
+      return Extractor.RESULT_END_OF_INPUT;
+    }
+
+    int maxBytesToRead = (int) Math.min(MAX_INPUT_SIZE - pendingBytes, bytesLeft);
+    int bytesAppended = trackOutput.sampleData(input, maxBytesToRead, true);
     if (bytesAppended != RESULT_END_OF_INPUT) {
       pendingBytes += bytesAppended;
     }

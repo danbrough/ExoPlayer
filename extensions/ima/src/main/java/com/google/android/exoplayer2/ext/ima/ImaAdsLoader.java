@@ -17,12 +17,13 @@ package com.google.android.exoplayer2.ext.ima;
 
 import android.content.Context;
 import android.net.Uri;
+import android.os.Looper;
 import android.os.SystemClock;
-import android.support.annotation.IntDef;
-import android.support.annotation.Nullable;
-import android.util.Log;
+import androidx.annotation.IntDef;
+import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
+import android.view.View;
 import android.view.ViewGroup;
-import android.webkit.WebView;
 import com.google.ads.interactivemedia.v3.api.Ad;
 import com.google.ads.interactivemedia.v3.api.AdDisplayContainer;
 import com.google.ads.interactivemedia.v3.api.AdError;
@@ -38,14 +39,15 @@ import com.google.ads.interactivemedia.v3.api.AdsManager;
 import com.google.ads.interactivemedia.v3.api.AdsManagerLoadedEvent;
 import com.google.ads.interactivemedia.v3.api.AdsRenderingSettings;
 import com.google.ads.interactivemedia.v3.api.AdsRequest;
+import com.google.ads.interactivemedia.v3.api.CompanionAdSlot;
 import com.google.ads.interactivemedia.v3.api.ImaSdkFactory;
 import com.google.ads.interactivemedia.v3.api.ImaSdkSettings;
+import com.google.ads.interactivemedia.v3.api.UiElement;
 import com.google.ads.interactivemedia.v3.api.player.ContentProgressProvider;
 import com.google.ads.interactivemedia.v3.api.player.VideoAdPlayer;
 import com.google.ads.interactivemedia.v3.api.player.VideoProgressUpdate;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlaybackException;
-import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.ExoPlayerLibraryInfo;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.Timeline;
@@ -53,24 +55,44 @@ import com.google.android.exoplayer2.source.ads.AdPlaybackState;
 import com.google.android.exoplayer2.source.ads.AdPlaybackState.AdState;
 import com.google.android.exoplayer2.source.ads.AdsLoader;
 import com.google.android.exoplayer2.source.ads.AdsMediaSource.AdLoadException;
+import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
 import com.google.android.exoplayer2.upstream.DataSpec;
 import com.google.android.exoplayer2.util.Assertions;
+import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.Util;
 import java.io.IOException;
+import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
- * Loads ads using the IMA SDK. All methods are called on the main thread.
+ * {@link AdsLoader} using the IMA SDK. All methods must be called on the main thread.
+ *
+ * <p>The player instance that will play the loaded ads must be set before playback using {@link
+ * #setPlayer(Player)}. If the ads loader is no longer required, it must be released by calling
+ * {@link #release()}.
+ *
+ * <p>The IMA SDK can take into account video control overlay views when calculating ad viewability.
+ * For more details see {@link AdDisplayContainer#registerVideoControlsOverlay(View)} and {@link
+ * AdViewProvider#getAdOverlayViews()}.
  */
-public final class ImaAdsLoader extends Player.DefaultEventListener implements AdsLoader,
-    VideoAdPlayer, ContentProgressProvider, AdErrorListener, AdsLoadedListener, AdEventListener {
+public final class ImaAdsLoader
+    implements Player.EventListener,
+        AdsLoader,
+        VideoAdPlayer,
+        ContentProgressProvider,
+        AdErrorListener,
+        AdsLoadedListener,
+        AdEventListener {
 
   static {
     ExoPlayerLibraryInfo.registerModule("goog.exo.ima");
@@ -81,10 +103,14 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
 
     private final Context context;
 
-    private @Nullable ImaSdkSettings imaSdkSettings;
-    private @Nullable AdEventListener adEventListener;
+    @Nullable private ImaSdkSettings imaSdkSettings;
+    @Nullable private AdEventListener adEventListener;
+    @Nullable private Set<UiElement> adUiElements;
     private int vastLoadTimeoutMs;
     private int mediaLoadTimeoutMs;
+    private int mediaBitrate;
+    private boolean focusSkipButtonWhenAvailable;
+    private ImaFactory imaFactory;
 
     /**
      * Creates a new builder for {@link ImaAdsLoader}.
@@ -95,6 +121,9 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
       this.context = Assertions.checkNotNull(context);
       vastLoadTimeoutMs = TIMEOUT_UNSET;
       mediaLoadTimeoutMs = TIMEOUT_UNSET;
+      mediaBitrate = BITRATE_UNSET;
+      focusSkipButtonWhenAvailable = true;
+      imaFactory = new DefaultImaFactory();
     }
 
     /**
@@ -124,6 +153,18 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
     }
 
     /**
+     * Sets the ad UI elements to be rendered by the IMA SDK.
+     *
+     * @param adUiElements The ad UI elements to be rendered by the IMA SDK.
+     * @return This builder, for convenience.
+     * @see AdsRenderingSettings#setUiElements(Set)
+     */
+    public Builder setAdUiElements(Set<UiElement> adUiElements) {
+      this.adUiElements = new HashSet<>(Assertions.checkNotNull(adUiElements));
+      return this;
+    }
+
+    /**
      * Sets the VAST load timeout, in milliseconds.
      *
      * @param vastLoadTimeoutMs The VAST load timeout, in milliseconds.
@@ -131,7 +172,7 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
      * @see AdsRequest#setVastLoadTimeout(float)
      */
     public Builder setVastLoadTimeoutMs(int vastLoadTimeoutMs) {
-      Assertions.checkArgument(vastLoadTimeoutMs >= 0);
+      Assertions.checkArgument(vastLoadTimeoutMs > 0);
       this.vastLoadTimeoutMs = vastLoadTimeoutMs;
       return this;
     }
@@ -144,8 +185,41 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
      * @see AdsRenderingSettings#setLoadVideoTimeout(int)
      */
     public Builder setMediaLoadTimeoutMs(int mediaLoadTimeoutMs) {
-      Assertions.checkArgument(mediaLoadTimeoutMs >= 0);
+      Assertions.checkArgument(mediaLoadTimeoutMs > 0);
       this.mediaLoadTimeoutMs = mediaLoadTimeoutMs;
+      return this;
+    }
+
+    /**
+     * Sets the media maximum recommended bitrate for ads, in bps.
+     *
+     * @param bitrate The media maximum recommended bitrate for ads, in bps.
+     * @return This builder, for convenience.
+     * @see AdsRenderingSettings#setBitrateKbps(int)
+     */
+    public Builder setMaxMediaBitrate(int bitrate) {
+      Assertions.checkArgument(bitrate > 0);
+      this.mediaBitrate = bitrate;
+      return this;
+    }
+
+    /**
+     * Sets whether to focus the skip button (when available) on Android TV devices. The default
+     * setting is {@code true}.
+     *
+     * @param focusSkipButtonWhenAvailable Whether to focus the skip button (when available) on
+     *     Android TV devices.
+     * @return This builder, for convenience.
+     * @see AdsRenderingSettings#setFocusSkipButtonWhenAvailable(boolean)
+     */
+    public Builder setFocusSkipButtonWhenAvailable(boolean focusSkipButtonWhenAvailable) {
+      this.focusSkipButtonWhenAvailable = focusSkipButtonWhenAvailable;
+      return this;
+    }
+
+    @VisibleForTesting
+    /* package */ Builder setImaFactory(ImaFactory imaFactory) {
+      this.imaFactory = Assertions.checkNotNull(imaFactory);
       return this;
     }
 
@@ -165,7 +239,11 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
           null,
           vastLoadTimeoutMs,
           mediaLoadTimeoutMs,
-          adEventListener);
+          mediaBitrate,
+          focusSkipButtonWhenAvailable,
+          adUiElements,
+          adEventListener,
+          imaFactory);
     }
 
     /**
@@ -183,7 +261,11 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
           adsResponse,
           vastLoadTimeoutMs,
           mediaLoadTimeoutMs,
-          adEventListener);
+          mediaBitrate,
+          focusSkipButtonWhenAvailable,
+          adUiElements,
+          adEventListener,
+          imaFactory);
     }
   }
 
@@ -210,17 +292,11 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
   /** The maximum duration before an ad break that IMA may start preloading the next ad. */
   private static final long MAXIMUM_PRELOAD_DURATION_MS = 8000;
 
-  /**
-   * The "Skip ad" button rendered in the IMA WebView does not gain focus by default and cannot be
-   * clicked via a keypress event. Workaround this issue by calling focus() on the HTML element in
-   * the WebView directly when an ad starts. See [Internal: b/62371030].
-   */
-  private static final String FOCUS_SKIP_BUTTON_WORKAROUND_JS = "javascript:"
-      + "try{ document.getElementsByClassName(\"videoAdUiSkipButton\")[0].focus(); } catch (e) {}";
-
   private static final int TIMEOUT_UNSET = -1;
+  private static final int BITRATE_UNSET = -1;
 
   /** The state of ad playback. */
+  @Documented
   @Retention(RetentionPolicy.SOURCE)
   @IntDef({IMA_AD_STATE_NONE, IMA_AD_STATE_PLAYING, IMA_AD_STATE_PAUSED})
   private @interface ImaAdState {}
@@ -237,24 +313,28 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
    */
   private static final int IMA_AD_STATE_PAUSED = 2;
 
-  private final @Nullable Uri adTagUri;
-  private final @Nullable String adsResponse;
+  @Nullable private final Uri adTagUri;
+  @Nullable private final String adsResponse;
   private final int vastLoadTimeoutMs;
   private final int mediaLoadTimeoutMs;
-  private final @Nullable AdEventListener adEventListener;
+  private final boolean focusSkipButtonWhenAvailable;
+  private final int mediaBitrate;
+  @Nullable private final Set<UiElement> adUiElements;
+  @Nullable private final AdEventListener adEventListener;
+  private final ImaFactory imaFactory;
   private final Timeline.Period period;
   private final List<VideoAdPlayerCallback> adCallbacks;
-  private final ImaSdkFactory imaSdkFactory;
   private final AdDisplayContainer adDisplayContainer;
   private final com.google.ads.interactivemedia.v3.api.AdsLoader adsLoader;
 
+  @Nullable private Player nextPlayer;
   private Object pendingAdRequestContext;
   private List<String> supportedMimeTypes;
-  private EventListener eventListener;
-  private Player player;
-  private ViewGroup adUiViewGroup;
+  @Nullable private EventListener eventListener;
+  @Nullable private Player player;
   private VideoProgressUpdate lastContentProgress;
   private VideoProgressUpdate lastAdProgress;
+  private int lastVolumePercentage;
 
   private AdsManager adsManager;
   private AdLoadException pendingAdLoadError;
@@ -267,13 +347,9 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
 
   /** The expected ad group index that IMA should load next. */
   private int expectedAdGroupIndex;
-  /**
-   * The index of the current ad group that IMA is loading.
-   */
+  /** The index of the current ad group that IMA is loading. */
   private int adGroupIndex;
-  /**
-   * Whether IMA has sent an ad event to pause content since the last resume content event.
-   */
+  /** Whether IMA has sent an ad event to pause content since the last resume content event. */
   private boolean imaPausedContent;
   /** The current ad playback state. */
   private @ImaAdState int imaAdState;
@@ -285,9 +361,7 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
 
   // Fields tracking the player/loader state.
 
-  /**
-   * Whether the player is playing an ad.
-   */
+  /** Whether the player is playing an ad. */
   private boolean playingAd;
   /**
    * If the player is playing an ad, stores the ad index in its ad group. {@link C#INDEX_UNSET}
@@ -310,13 +384,9 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
    * content progress should increase. {@link C#TIME_UNSET} otherwise.
    */
   private long fakeContentProgressOffsetMs;
-  /**
-   * Stores the pending content position when a seek operation was intercepted to play an ad.
-   */
+  /** Stores the pending content position when a seek operation was intercepted to play an ad. */
   private long pendingContentPositionMs;
-  /**
-   * Whether {@link #getContentProgress()} has sent {@link #pendingContentPositionMs} to IMA.
-   */
+  /** Whether {@link #getContentProgress()} has sent {@link #pendingContentPositionMs} to IMA. */
   private boolean sentPendingContentPositionMs;
 
   /**
@@ -337,7 +407,11 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
         /* adsResponse= */ null,
         /* vastLoadTimeoutMs= */ TIMEOUT_UNSET,
         /* mediaLoadTimeoutMs= */ TIMEOUT_UNSET,
-        /* adEventListener= */ null);
+        /* mediaBitrate= */ BITRATE_UNSET,
+        /* focusSkipButtonWhenAvailable= */ true,
+        /* adUiElements= */ null,
+        /* adEventListener= */ null,
+        /* imaFactory= */ new DefaultImaFactory());
   }
 
   /**
@@ -352,7 +426,7 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
    * @deprecated Use {@link ImaAdsLoader.Builder}.
    */
   @Deprecated
-  public ImaAdsLoader(Context context, Uri adTagUri, ImaSdkSettings imaSdkSettings) {
+  public ImaAdsLoader(Context context, Uri adTagUri, @Nullable ImaSdkSettings imaSdkSettings) {
     this(
         context,
         adTagUri,
@@ -360,7 +434,11 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
         /* adsResponse= */ null,
         /* vastLoadTimeoutMs= */ TIMEOUT_UNSET,
         /* mediaLoadTimeoutMs= */ TIMEOUT_UNSET,
-        /* adEventListener= */ null);
+        /* mediaBitrate= */ BITRATE_UNSET,
+        /* focusSkipButtonWhenAvailable= */ true,
+        /* adUiElements= */ null,
+        /* adEventListener= */ null,
+        /* imaFactory= */ new DefaultImaFactory());
   }
 
   private ImaAdsLoader(
@@ -370,26 +448,36 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
       @Nullable String adsResponse,
       int vastLoadTimeoutMs,
       int mediaLoadTimeoutMs,
-      @Nullable AdEventListener adEventListener) {
+      int mediaBitrate,
+      boolean focusSkipButtonWhenAvailable,
+      @Nullable Set<UiElement> adUiElements,
+      @Nullable AdEventListener adEventListener,
+      ImaFactory imaFactory) {
     Assertions.checkArgument(adTagUri != null || adsResponse != null);
     this.adTagUri = adTagUri;
     this.adsResponse = adsResponse;
     this.vastLoadTimeoutMs = vastLoadTimeoutMs;
     this.mediaLoadTimeoutMs = mediaLoadTimeoutMs;
+    this.mediaBitrate = mediaBitrate;
+    this.focusSkipButtonWhenAvailable = focusSkipButtonWhenAvailable;
+    this.adUiElements = adUiElements;
     this.adEventListener = adEventListener;
-    period = new Timeline.Period();
-    adCallbacks = new ArrayList<>(1);
-    imaSdkFactory = ImaSdkFactory.getInstance();
-    adDisplayContainer = imaSdkFactory.createAdDisplayContainer();
-    adDisplayContainer.setPlayer(this);
+    this.imaFactory = imaFactory;
     if (imaSdkSettings == null) {
-      imaSdkSettings = imaSdkFactory.createImaSdkSettings();
+      imaSdkSettings = imaFactory.createImaSdkSettings();
+      if (DEBUG) {
+        imaSdkSettings.setDebugMode(true);
+      }
     }
     imaSdkSettings.setPlayerType(IMA_SDK_SETTINGS_PLAYER_TYPE);
     imaSdkSettings.setPlayerVersion(IMA_SDK_SETTINGS_PLAYER_VERSION);
-    adsLoader = imaSdkFactory.createAdsLoader(context, imaSdkSettings);
-    adsLoader.addAdErrorListener(this);
-    adsLoader.addAdsLoadedListener(this);
+    period = new Timeline.Period();
+    adCallbacks = new ArrayList<>(/* initialCapacity= */ 1);
+    adDisplayContainer = imaFactory.createAdDisplayContainer();
+    adDisplayContainer.setPlayer(/* videoAdPlayer= */ this);
+    adsLoader = imaFactory.createAdsLoader(context, imaSdkSettings, adDisplayContainer);
+    adsLoader.addAdErrorListener(/* adErrorListener= */ this);
+    adsLoader.addAdsLoadedListener(/* adsLoadedListener= */ this);
     fakeContentProgressElapsedRealtimeMs = C.TIME_UNSET;
     fakeContentProgressOffsetMs = C.TIME_UNSET;
     pendingContentPositionMs = C.TIME_UNSET;
@@ -406,22 +494,49 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
   }
 
   /**
+   * Returns the {@link AdDisplayContainer} used by this loader.
+   *
+   * <p>Note: any video controls overlays registered via {@link
+   * AdDisplayContainer#registerVideoControlsOverlay(View)} will be unregistered automatically when
+   * the media source detaches from this instance. It is therefore necessary to re-register views
+   * each time the ads loader is reused. Alternatively, provide overlay views via the {@link
+   * AdsLoader.AdViewProvider} when creating the media source to benefit from automatic
+   * registration.
+   */
+  public AdDisplayContainer getAdDisplayContainer() {
+    return adDisplayContainer;
+  }
+
+  /**
+   * Sets the slots for displaying companion ads. Individual slots can be created using {@link
+   * ImaSdkFactory#createCompanionAdSlot()}.
+   *
+   * @param companionSlots Slots for displaying companion ads.
+   * @see AdDisplayContainer#setCompanionSlots(Collection)
+   * @deprecated Use {@code getAdDisplayContainer().setCompanionSlots(...)}.
+   */
+  @Deprecated
+  public void setCompanionSlots(Collection<CompanionAdSlot> companionSlots) {
+    adDisplayContainer.setCompanionSlots(companionSlots);
+  }
+
+  /**
    * Requests ads, if they have not already been requested. Must be called on the main thread.
    *
    * <p>Ads will be requested automatically when the player is prepared if this method has not been
    * called, so it is only necessary to call this method if you want to request ads before preparing
    * the player.
    *
-   * @param adUiViewGroup A {@link ViewGroup} on top of the player that will show any ad UI.
+   * @param adViewGroup A {@link ViewGroup} on top of the player that will show any ad UI.
    */
-  public void requestAds(ViewGroup adUiViewGroup) {
+  public void requestAds(ViewGroup adViewGroup) {
     if (adPlaybackState != null || adsManager != null || pendingAdRequestContext != null) {
       // Ads have already been requested.
       return;
     }
-    adDisplayContainer.setAdContainer(adUiViewGroup);
+    adDisplayContainer.setAdContainer(adViewGroup);
     pendingAdRequestContext = new Object();
-    AdsRequest request = imaSdkFactory.createAdsRequest();
+    AdsRequest request = imaFactory.createAdsRequest();
     if (adTagUri != null) {
       request.setAdTagUrl(adTagUri.toString());
     } else /* adsResponse != null */ {
@@ -430,13 +545,20 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
     if (vastLoadTimeoutMs != TIMEOUT_UNSET) {
       request.setVastLoadTimeout(vastLoadTimeoutMs);
     }
-    request.setAdDisplayContainer(adDisplayContainer);
     request.setContentProgressProvider(this);
     request.setUserRequestContext(pendingAdRequestContext);
     adsLoader.requestAds(request);
   }
 
   // AdsLoader implementation.
+
+  @Override
+  public void setPlayer(@Nullable Player player) {
+    Assertions.checkState(Looper.getMainLooper() == Looper.myLooper());
+    Assertions.checkState(
+        player == null || player.getApplicationLooper() == Looper.getMainLooper());
+    nextPlayer = player;
+  }
 
   @Override
   public void setSupportedContentTypes(@C.ContentType int... contentTypes) {
@@ -462,13 +584,20 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
   }
 
   @Override
-  public void attachPlayer(ExoPlayer player, EventListener eventListener, ViewGroup adUiViewGroup) {
-    this.player = player;
+  public void start(EventListener eventListener, AdViewProvider adViewProvider) {
+    Assertions.checkNotNull(
+        nextPlayer, "Set player using adsLoader.setPlayer before preparing the player.");
+    player = nextPlayer;
     this.eventListener = eventListener;
-    this.adUiViewGroup = adUiViewGroup;
+    lastVolumePercentage = 0;
     lastAdProgress = null;
     lastContentProgress = null;
-    adDisplayContainer.setAdContainer(adUiViewGroup);
+    ViewGroup adViewGroup = adViewProvider.getAdViewGroup();
+    adDisplayContainer.setAdContainer(adViewGroup);
+    View[] adOverlayViews = adViewProvider.getAdOverlayViews();
+    for (View view : adOverlayViews) {
+      adDisplayContainer.registerVideoControlsOverlay(view);
+    }
     player.addListener(this);
     maybeNotifyPendingAdLoadError();
     if (adPlaybackState != null) {
@@ -482,24 +611,25 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
       startAdPlayback();
     } else {
       // Ads haven't loaded yet, so request them.
-      requestAds(adUiViewGroup);
+      requestAds(adViewGroup);
     }
   }
 
   @Override
-  public void detachPlayer() {
+  public void stop() {
     if (adsManager != null && imaPausedContent) {
       adPlaybackState =
           adPlaybackState.withAdResumePositionUs(
               playingAd ? C.msToUs(player.getCurrentPosition()) : 0);
       adsManager.pause();
     }
+    lastVolumePercentage = getVolume();
     lastAdProgress = getAdProgress();
     lastContentProgress = getContentProgress();
+    adDisplayContainer.unregisterAllVideoControlsOverlays();
     player.removeListener(this);
     player = null;
     eventListener = null;
-    adUiViewGroup = null;
   }
 
   @Override
@@ -509,6 +639,13 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
       adsManager.destroy();
       adsManager = null;
     }
+    adsLoader.removeAdsLoadedListener(/* adsLoadedListener= */ this);
+    adsLoader.removeAdErrorListener(/* adErrorListener= */ this);
+    imaPausedContent = false;
+    imaAdState = IMA_AD_STATE_NONE;
+    pendingAdLoadError = null;
+    adPlaybackState = AdPlaybackState.NONE;
+    updateAdPlaybackState();
   }
 
   @Override
@@ -558,7 +695,7 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
       Log.d(TAG, "onAdEvent: " + adEventType);
     }
     if (adsManager == null) {
-      Log.w(TAG, "Dropping ad event after release: " + adEvent);
+      Log.w(TAG, "Ignoring AdEvent after release: " + adEvent);
       return;
     }
     try {
@@ -619,7 +756,8 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
       // until MAXIMUM_PRELOAD_DURATION_MS before the ad so that an ad group load error delivered
       // just after an ad group isn't incorrectly attributed to the next ad group.
       int nextAdGroupIndex =
-          adPlaybackState.getAdGroupIndexAfterPositionUs(C.msToUs(contentPositionMs));
+          adPlaybackState.getAdGroupIndexAfterPositionUs(
+              C.msToUs(contentPositionMs), C.msToUs(contentDurationMs));
       if (nextAdGroupIndex != expectedAdGroupIndex && nextAdGroupIndex != C.INDEX_UNSET) {
         long nextAdGroupTimeMs = C.usToMs(adPlaybackState.adGroupTimesUs[nextAdGroupIndex]);
         if (nextAdGroupTimeMs == C.TIME_END_OF_SOURCE) {
@@ -652,8 +790,36 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
   }
 
   @Override
+  public int getVolume() {
+    if (player == null) {
+      return lastVolumePercentage;
+    }
+
+    Player.AudioComponent audioComponent = player.getAudioComponent();
+    if (audioComponent != null) {
+      return (int) (audioComponent.getVolume() * 100);
+    }
+
+    // Check for a selected track using an audio renderer.
+    TrackSelectionArray trackSelections = player.getCurrentTrackSelections();
+    for (int i = 0; i < player.getRendererCount() && i < trackSelections.length; i++) {
+      if (player.getRendererType(i) == C.TRACK_TYPE_AUDIO && trackSelections.get(i) != null) {
+        return 100;
+      }
+    }
+    return 0;
+  }
+
+  @Override
   public void loadAd(String adUriString) {
     try {
+      if (DEBUG) {
+        Log.d(TAG, "loadAd in ad group " + adGroupIndex);
+      }
+      if (adsManager == null) {
+        Log.w(TAG, "Ignoring loadAd after release");
+        return;
+      }
       if (adGroupIndex == C.INDEX_UNSET) {
         Log.w(
             TAG,
@@ -661,9 +827,6 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
                 + expectedAdGroupIndex);
         adGroupIndex = expectedAdGroupIndex;
         adsManager.start();
-      }
-      if (DEBUG) {
-        Log.d(TAG, "loadAd in ad group " + adGroupIndex);
       }
       int adIndexInAdGroup = getAdIndexInAdGroupToLoad(adGroupIndex);
       if (adIndexInAdGroup == C.INDEX_UNSET) {
@@ -692,6 +855,10 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
   public void playAd() {
     if (DEBUG) {
       Log.d(TAG, "playAd");
+    }
+    if (adsManager == null) {
+      Log.w(TAG, "Ignoring playAd after release");
+      return;
     }
     switch (imaAdState) {
       case IMA_AD_STATE_PLAYING:
@@ -736,6 +903,10 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
     if (DEBUG) {
       Log.d(TAG, "stopAd");
     }
+    if (adsManager == null) {
+      Log.w(TAG, "Ignoring stopAd after release");
+      return;
+    }
     if (player == null) {
       // Sometimes messages from IMA arrive after detaching the player. See [Internal: b/63801642].
       Log.w(TAG, "Unexpected stopAd while detached");
@@ -775,10 +946,9 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
   // Player.EventListener implementation.
 
   @Override
-  public void onTimelineChanged(Timeline timeline, Object manifest,
-      @Player.TimelineChangeReason int reason) {
-    if (reason == Player.TIMELINE_CHANGE_REASON_RESET) {
-      // The player is being reset and this source will be released.
+  public void onTimelineChanged(Timeline timeline, @Player.TimelineChangeReason int reason) {
+    if (timeline.isEmpty()) {
+      // The player is being reset or contains no media.
       return;
     }
     Assertions.checkArgument(timeline.getPeriodCount() == 1);
@@ -792,7 +962,7 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
   }
 
   @Override
-  public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
+  public void onPlayerStateChanged(boolean playWhenReady, @Player.State int playbackState) {
     if (adsManager == null) {
       return;
     }
@@ -811,8 +981,6 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
         && playWhenReady) {
       checkForContentComplete();
     } else if (imaAdState != IMA_AD_STATE_NONE && playbackState == Player.STATE_ENDED) {
-      // IMA is waiting for the ad playback to finish so invoke the callback now.
-      // Either CONTENT_RESUME_REQUESTED will be passed next, or playAd will be called again.
       for (int i = 0; i < adCallbacks.size(); i++) {
         adCallbacks.get(i).onEnded();
       }
@@ -865,12 +1033,18 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
   // Internal methods.
 
   private void startAdPlayback() {
-    ImaSdkFactory imaSdkFactory = ImaSdkFactory.getInstance();
-    AdsRenderingSettings adsRenderingSettings = imaSdkFactory.createAdsRenderingSettings();
+    AdsRenderingSettings adsRenderingSettings = imaFactory.createAdsRenderingSettings();
     adsRenderingSettings.setEnablePreloading(ENABLE_PRELOADING);
     adsRenderingSettings.setMimeTypes(supportedMimeTypes);
     if (mediaLoadTimeoutMs != TIMEOUT_UNSET) {
       adsRenderingSettings.setLoadVideoTimeout(mediaLoadTimeoutMs);
+    }
+    if (mediaBitrate != BITRATE_UNSET) {
+      adsRenderingSettings.setBitrateKbps(mediaBitrate / 1000);
+    }
+    adsRenderingSettings.setFocusSkipButtonWhenAvailable(focusSkipButtonWhenAvailable);
+    if (adUiElements != null) {
+      adsRenderingSettings.setUiElements(adUiElements);
     }
 
     // Set up the ad playback state, skipping ads based on the start position as required.
@@ -879,13 +1053,8 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
     long contentPositionMs = player.getCurrentPosition();
     int adGroupIndexForPosition =
         adPlaybackState.getAdGroupIndexForPositionUs(C.msToUs(contentPositionMs));
-    if (adGroupIndexForPosition == 0) {
-      podIndexOffset = 0;
-    } else if (adGroupIndexForPosition == C.INDEX_UNSET) {
-      // There is no preroll and midroll pod indices start at 1.
-      podIndexOffset = -1;
-    } else /* adGroupIndexForPosition > 0 */ {
-      // Skip ad groups before the one at or immediately before the playback position.
+    if (adGroupIndexForPosition > 0 && adGroupIndexForPosition != C.INDEX_UNSET) {
+      // Skip any ad groups before the one at or immediately before the playback position.
       for (int i = 0; i < adGroupIndexForPosition; i++) {
         adPlaybackState = adPlaybackState.withSkippedAdGroup(i);
       }
@@ -895,9 +1064,18 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
       long adGroupBeforeTimeUs = adGroupTimesUs[adGroupIndexForPosition - 1];
       double midpointTimeUs = (adGroupForPositionTimeUs + adGroupBeforeTimeUs) / 2d;
       adsRenderingSettings.setPlayAdsAfterTime(midpointTimeUs / C.MICROS_PER_SECOND);
+    }
 
-      // We're removing one or more ads, which means that the earliest ad (if any) will be a
-      // midroll/postroll. Midroll pod indices start at 1.
+    // IMA indexes any remaining midroll ad pods from 1. A preroll (if present) has index 0.
+    // Store an index offset as we want to index all ads (including skipped ones) from 0.
+    if (adGroupIndexForPosition == 0 && adGroupTimesUs[0] == 0) {
+      // We are playing a preroll.
+      podIndexOffset = 0;
+    } else if (adGroupIndexForPosition == C.INDEX_UNSET) {
+      // There's no ad to play which means there's no preroll.
+      podIndexOffset = -1;
+    } else {
+      // We are playing a midroll and any ads before it were skipped.
       podIndexOffset = adGroupIndexForPosition - 1;
     }
 
@@ -955,11 +1133,6 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
         imaPausedContent = true;
         pauseContentInternal();
         break;
-      case STARTED:
-        if (ad.isSkippable()) {
-          focusSkipButton();
-        }
-        break;
       case TAPPED:
         if (eventListener != null) {
           eventListener.onAdTapped();
@@ -982,6 +1155,7 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
           handleAdGroupLoadError(new IOException(message));
         }
         break;
+      case STARTED:
       case ALL_ADS_COMPLETED:
       default:
         break;
@@ -993,26 +1167,24 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
     int oldPlayingAdIndexInAdGroup = playingAdIndexInAdGroup;
     playingAd = player.isPlayingAd();
     playingAdIndexInAdGroup = playingAd ? player.getCurrentAdIndexInAdGroup() : C.INDEX_UNSET;
-    if (!sentContentComplete) {
-      boolean adFinished = wasPlayingAd && playingAdIndexInAdGroup != oldPlayingAdIndexInAdGroup;
-      if (adFinished) {
-        // IMA is waiting for the ad playback to finish so invoke the callback now.
-        // Either CONTENT_RESUME_REQUESTED will be passed next, or playAd will be called again.
-        for (int i = 0; i < adCallbacks.size(); i++) {
-          adCallbacks.get(i).onEnded();
-        }
-        if (DEBUG) {
-          Log.d(TAG, "VideoAdPlayerCallback.onEnded in onTimelineChanged/onPositionDiscontinuity");
-        }
+    boolean adFinished = wasPlayingAd && playingAdIndexInAdGroup != oldPlayingAdIndexInAdGroup;
+    if (adFinished) {
+      // IMA is waiting for the ad playback to finish so invoke the callback now.
+      // Either CONTENT_RESUME_REQUESTED will be passed next, or playAd will be called again.
+      for (int i = 0; i < adCallbacks.size(); i++) {
+        adCallbacks.get(i).onEnded();
       }
-      if (!wasPlayingAd && playingAd && imaAdState == IMA_AD_STATE_NONE) {
-        int adGroupIndex = player.getCurrentAdGroupIndex();
-        // IMA hasn't called playAd yet, so fake the content position.
-        fakeContentProgressElapsedRealtimeMs = SystemClock.elapsedRealtime();
-        fakeContentProgressOffsetMs = C.usToMs(adPlaybackState.adGroupTimesUs[adGroupIndex]);
-        if (fakeContentProgressOffsetMs == C.TIME_END_OF_SOURCE) {
-          fakeContentProgressOffsetMs = contentDurationMs;
-        }
+      if (DEBUG) {
+        Log.d(TAG, "VideoAdPlayerCallback.onEnded in onTimelineChanged/onPositionDiscontinuity");
+      }
+    }
+    if (!sentContentComplete && !wasPlayingAd && playingAd && imaAdState == IMA_AD_STATE_NONE) {
+      int adGroupIndex = player.getCurrentAdGroupIndex();
+      // IMA hasn't called playAd yet, so fake the content position.
+      fakeContentProgressElapsedRealtimeMs = SystemClock.elapsedRealtime();
+      fakeContentProgressOffsetMs = C.usToMs(adPlaybackState.adGroupTimesUs[adGroupIndex]);
+      if (fakeContentProgressOffsetMs == C.TIME_END_OF_SOURCE) {
+        fakeContentProgressOffsetMs = contentDurationMs;
       }
     }
   }
@@ -1076,12 +1248,18 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
     if (pendingAdLoadError == null) {
       pendingAdLoadError = AdLoadException.createForAdGroup(error, adGroupIndex);
     }
+    pendingContentPositionMs = C.TIME_UNSET;
+    fakeContentProgressElapsedRealtimeMs = C.TIME_UNSET;
   }
 
   private void handleAdPrepareError(int adGroupIndex, int adIndexInAdGroup, Exception exception) {
     if (DEBUG) {
       Log.d(
           TAG, "Prepare error for ad " + adIndexInAdGroup + " in group " + adGroupIndex, exception);
+    }
+    if (adsManager == null) {
+      Log.w(TAG, "Ignoring ad prepare error after release");
+      return;
     }
     if (imaAdState == IMA_AD_STATE_NONE) {
       // Send IMA a content position at the ad group so that it will try to play it, at which point
@@ -1119,6 +1297,10 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
         Log.d(TAG, "adsLoader.contentComplete");
       }
       sentContentComplete = true;
+      // After sending content complete IMA will not poll the content position, so set the expected
+      // ad group index.
+      expectedAdGroupIndex =
+          adPlaybackState.getAdGroupIndexForPositionUs(C.msToUs(contentDurationMs));
     }
   }
 
@@ -1126,15 +1308,6 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
     // Ignore updates while detached. When a player is attached it will receive the latest state.
     if (eventListener != null) {
       eventListener.onAdPlaybackState(adPlaybackState);
-    }
-  }
-
-  private void focusSkipButton() {
-    if (playingAd && adUiViewGroup != null && adUiViewGroup.getChildCount() > 0
-        && adUiViewGroup.getChildAt(0) instanceof WebView) {
-      WebView webView = (WebView) (adUiViewGroup.getChildAt(0));
-      webView.requestFocus();
-      webView.loadUrl(FOCUS_SKIP_BUTTON_WORKAROUND_JS);
     }
   }
 
@@ -1165,7 +1338,7 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
     Log.e(TAG, message, cause);
     // We can't recover from an unexpected error in general, so skip all remaining ads.
     if (adPlaybackState == null) {
-      adPlaybackState = new AdPlaybackState();
+      adPlaybackState = AdPlaybackState.NONE;
     } else {
       for (int i = 0; i < adPlaybackState.adGroupCount; i++) {
         adPlaybackState = adPlaybackState.withSkippedAdGroup(i);
@@ -1204,7 +1377,8 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
   private static boolean isAdGroupLoadError(AdError adError) {
     // TODO: Find out what other errors need to be handled (if any), and whether each one relates to
     // a single ad, ad group or the whole timeline.
-    return adError.getErrorCode() == AdErrorCode.VAST_LINEAR_ASSET_MISMATCH;
+    return adError.getErrorCode() == AdErrorCode.VAST_LINEAR_ASSET_MISMATCH
+        || adError.getErrorCode() == AdErrorCode.UNKNOWN_ERROR;
   }
 
   private static boolean hasMidrollAdGroups(long[] adGroupTimesUs) {
@@ -1216,6 +1390,52 @@ public final class ImaAdsLoader extends Player.DefaultEventListener implements A
     } else {
       // There's at least one midroll ad group, as adGroupTimesUs is never empty.
       return true;
+    }
+  }
+
+  /** Factory for objects provided by the IMA SDK. */
+  @VisibleForTesting
+  /* package */ interface ImaFactory {
+    /** @see ImaSdkSettings */
+    ImaSdkSettings createImaSdkSettings();
+    /** @see com.google.ads.interactivemedia.v3.api.ImaSdkFactory#createAdsRenderingSettings() */
+    AdsRenderingSettings createAdsRenderingSettings();
+    /** @see com.google.ads.interactivemedia.v3.api.ImaSdkFactory#createAdDisplayContainer() */
+    AdDisplayContainer createAdDisplayContainer();
+    /** @see com.google.ads.interactivemedia.v3.api.ImaSdkFactory#createAdsRequest() */
+    AdsRequest createAdsRequest();
+    /** @see ImaSdkFactory#createAdsLoader(Context, ImaSdkSettings, AdDisplayContainer) */
+    com.google.ads.interactivemedia.v3.api.AdsLoader createAdsLoader(
+        Context context, ImaSdkSettings imaSdkSettings, AdDisplayContainer adDisplayContainer);
+  }
+
+  /** Default {@link ImaFactory} for non-test usage, which delegates to {@link ImaSdkFactory}. */
+  private static final class DefaultImaFactory implements ImaFactory {
+    @Override
+    public ImaSdkSettings createImaSdkSettings() {
+      return ImaSdkFactory.getInstance().createImaSdkSettings();
+    }
+
+    @Override
+    public AdsRenderingSettings createAdsRenderingSettings() {
+      return ImaSdkFactory.getInstance().createAdsRenderingSettings();
+    }
+
+    @Override
+    public AdDisplayContainer createAdDisplayContainer() {
+      return ImaSdkFactory.getInstance().createAdDisplayContainer();
+    }
+
+    @Override
+    public AdsRequest createAdsRequest() {
+      return ImaSdkFactory.getInstance().createAdsRequest();
+    }
+
+    @Override
+    public com.google.ads.interactivemedia.v3.api.AdsLoader createAdsLoader(
+        Context context, ImaSdkSettings imaSdkSettings, AdDisplayContainer adDisplayContainer) {
+      return ImaSdkFactory.getInstance()
+          .createAdsLoader(context, imaSdkSettings, adDisplayContainer);
     }
   }
 }

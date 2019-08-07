@@ -18,6 +18,9 @@
     xmlns:tools="http://schemas.android.com/tools"
     package="com.google.android.exoplayer2.ext.opus.test">
 
+  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+  <uses-sdk/>
+
   <application android:debuggable="true"
       android:allowBackup="false"
       tools:ignore="MissingApplicationIcon,HardcodedDebugMode">
@@ -26,6 +29,6 @@
 
   <instrumentation
       android:targetPackage="com.google.android.exoplayer2.ext.opus.test"
-      android:name="android.test.InstrumentationTestRunner"/>
+    android:name="androidx.test.runner.AndroidJUnitRunner"/>
 
 </manifest>

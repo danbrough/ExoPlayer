@@ -23,6 +23,7 @@ import com.google.android.exoplayer2.extractor.mp4.FragmentedMp4Extractor;
 import com.google.android.exoplayer2.extractor.mp4.Mp4Extractor;
 import com.google.android.exoplayer2.extractor.ogg.OggExtractor;
 import com.google.android.exoplayer2.extractor.ts.Ac3Extractor;
+import com.google.android.exoplayer2.extractor.ts.Ac4Extractor;
 import com.google.android.exoplayer2.extractor.ts.AdtsExtractor;
 import com.google.android.exoplayer2.extractor.ts.DefaultTsPayloadReaderFactory;
 import com.google.android.exoplayer2.extractor.ts.PsExtractor;
@@ -47,6 +48,7 @@ import java.lang.reflect.Constructor;
  *   <li>FLV ({@link FlvExtractor})
  *   <li>WAV ({@link WavExtractor})
  *   <li>AC3 ({@link Ac3Extractor})
+ *   <li>AC4 ({@link Ac4Extractor})
  *   <li>AMR ({@link AmrExtractor})
  *   <li>FLAC (only available if the FLAC extension is built and included)
  * </ul>
@@ -72,6 +74,9 @@ public final class DefaultExtractorsFactory implements ExtractorsFactory {
     FLAC_EXTRACTOR_CONSTRUCTOR = flacExtractorConstructor;
   }
 
+  private boolean constantBitrateSeekingEnabled;
+  private @AdtsExtractor.Flags int adtsFlags;
+  private @AmrExtractor.Flags int amrFlags;
   private @MatroskaExtractor.Flags int matroskaFlags;
   private @Mp4Extractor.Flags int mp4Flags;
   private @FragmentedMp4Extractor.Flags int fragmentedMp4Flags;
@@ -81,6 +86,48 @@ public final class DefaultExtractorsFactory implements ExtractorsFactory {
 
   public DefaultExtractorsFactory() {
     tsMode = TsExtractor.MODE_SINGLE_PMT;
+  }
+
+  /**
+   * Convenience method to set whether approximate seeking using constant bitrate assumptions should
+   * be enabled for all extractors that support it. If set to true, the flags required to enable
+   * this functionality will be OR'd with those passed to the setters when creating extractor
+   * instances. If set to false then the flags passed to the setters will be used without
+   * modification.
+   *
+   * @param constantBitrateSeekingEnabled Whether approximate seeking using a constant bitrate
+   *     assumption should be enabled for all extractors that support it.
+   * @return The factory, for convenience.
+   */
+  public synchronized DefaultExtractorsFactory setConstantBitrateSeekingEnabled(
+      boolean constantBitrateSeekingEnabled) {
+    this.constantBitrateSeekingEnabled = constantBitrateSeekingEnabled;
+    return this;
+  }
+
+  /**
+   * Sets flags for {@link AdtsExtractor} instances created by the factory.
+   *
+   * @see AdtsExtractor#AdtsExtractor(int)
+   * @param flags The flags to use.
+   * @return The factory, for convenience.
+   */
+  public synchronized DefaultExtractorsFactory setAdtsExtractorFlags(
+      @AdtsExtractor.Flags int flags) {
+    this.adtsFlags = flags;
+    return this;
+  }
+
+  /**
+   * Sets flags for {@link AmrExtractor} instances created by the factory.
+   *
+   * @see AmrExtractor#AmrExtractor(int)
+   * @param flags The flags to use.
+   * @return The factory, for convenience.
+   */
+  public synchronized DefaultExtractorsFactory setAmrExtractorFlags(@AmrExtractor.Flags int flags) {
+    this.amrFlags = flags;
+    return this;
   }
 
   /**
@@ -161,22 +208,38 @@ public final class DefaultExtractorsFactory implements ExtractorsFactory {
 
   @Override
   public synchronized Extractor[] createExtractors() {
-    Extractor[] extractors = new Extractor[FLAC_EXTRACTOR_CONSTRUCTOR == null ? 12 : 13];
+    Extractor[] extractors = new Extractor[FLAC_EXTRACTOR_CONSTRUCTOR == null ? 13 : 14];
     extractors[0] = new MatroskaExtractor(matroskaFlags);
     extractors[1] = new FragmentedMp4Extractor(fragmentedMp4Flags);
     extractors[2] = new Mp4Extractor(mp4Flags);
-    extractors[3] = new Mp3Extractor(mp3Flags);
-    extractors[4] = new AdtsExtractor();
+    extractors[3] =
+        new Mp3Extractor(
+            mp3Flags
+                | (constantBitrateSeekingEnabled
+                    ? Mp3Extractor.FLAG_ENABLE_CONSTANT_BITRATE_SEEKING
+                    : 0));
+    extractors[4] =
+        new AdtsExtractor(
+            adtsFlags
+                | (constantBitrateSeekingEnabled
+                    ? AdtsExtractor.FLAG_ENABLE_CONSTANT_BITRATE_SEEKING
+                    : 0));
     extractors[5] = new Ac3Extractor();
     extractors[6] = new TsExtractor(tsMode, tsFlags);
     extractors[7] = new FlvExtractor();
     extractors[8] = new OggExtractor();
     extractors[9] = new PsExtractor();
     extractors[10] = new WavExtractor();
-    extractors[11] = new AmrExtractor();
+    extractors[11] =
+        new AmrExtractor(
+            amrFlags
+                | (constantBitrateSeekingEnabled
+                    ? AmrExtractor.FLAG_ENABLE_CONSTANT_BITRATE_SEEKING
+                    : 0));
+    extractors[12] = new Ac4Extractor();
     if (FLAC_EXTRACTOR_CONSTRUCTOR != null) {
       try {
-        extractors[12] = FLAC_EXTRACTOR_CONSTRUCTOR.newInstance();
+        extractors[13] = FLAC_EXTRACTOR_CONSTRUCTOR.newInstance();
       } catch (Exception e) {
         // Should never happen.
         throw new IllegalStateException("Unexpected error creating FLAC extractor", e);

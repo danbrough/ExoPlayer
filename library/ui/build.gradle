@@ -13,43 +13,46 @@
 // limitations under the License.
 apply from: '../../constants.gradle'
 apply plugin: 'com.android.library'
-apply plugin: 'com.github.dcendents.android-maven'
-group = 'com.github.danbrough.exoplayer'
 
 android {
-  compileSdkVersion project.ext.compileSdkVersion
-  buildToolsVersion project.ext.buildToolsVersion
+    compileSdkVersion project.ext.compileSdkVersion
 
-  defaultConfig {
-    minSdkVersion project.ext.minSdkVersion
-    targetSdkVersion project.ext.targetSdkVersion
-  }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
 
-  buildTypes {
-    // Re-enable test coverage when the following issue is fixed:
-    // https://issuetracker.google.com/issues/37019591
-    // debug {
-    //    testCoverageEnabled = true
-    // }
-  }
+    defaultConfig {
+        minSdkVersion project.ext.minSdkVersion
+        targetSdkVersion project.ext.targetSdkVersion
+    }
+
+    buildTypes {
+        // Re-enable test coverage when the following issue is fixed:
+        // https://issuetracker.google.com/issues/37019591
+        // debug {
+        //    testCoverageEnabled = true
+        // }
+    }
+
+    testOptions.unitTests.includeAndroidResources = true
 }
 
 dependencies {
-  implementation project(modulePrefix + 'library-core')
-  implementation "androidx.annotation:annotation:1.0.0-alpha1"
-  implementation "androidx.media:media:1.0.0-beta01"
-  //implementation 'com.android.support:support-media-compat:' + supportLibraryVersion
-  //implementation 'com.android.support:support-annotations:' + supportLibraryVersion
-  compileOnly 'org.checkerframework:checker-qual:' + checkerframeworkVersion
+    implementation project(modulePrefix + 'library-core')
+    implementation 'androidx.media:media:1.0.1'
+    implementation 'androidx.annotation:annotation:1.1.0'
+    compileOnly 'org.checkerframework:checker-qual:' + checkerframeworkVersion
+    testImplementation project(modulePrefix + 'testutils-robolectric')
 }
 
 ext {
-  javadocTitle = 'UI module'
+    javadocTitle = 'UI module'
 }
 apply from: '../../javadoc_library.gradle'
 
 ext {
-  releaseArtifact = 'exoplayer-ui'
-  releaseDescription = 'The ExoPlayer library UI module.'
+    releaseArtifact = 'exoplayer-ui'
+    releaseDescription = 'The ExoPlayer library UI module.'
 }
 apply from: '../../publish.gradle'

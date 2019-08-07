@@ -15,9 +15,11 @@
  */
 package com.google.android.exoplayer2.metadata.id3;
 
+import static com.google.android.exoplayer2.util.Util.castNonNull;
+
 import android.os.Parcel;
 import android.os.Parcelable;
-import android.support.annotation.Nullable;
+import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.util.Util;
 import java.util.Arrays;
 
@@ -43,10 +45,10 @@ public final class GeobFrame extends Id3Frame {
 
   /* package */ GeobFrame(Parcel in) {
     super(ID);
-    mimeType = in.readString();
-    filename = in.readString();
-    description = in.readString();
-    data = in.createByteArray();
+    mimeType = castNonNull(in.readString());
+    filename = castNonNull(in.readString());
+    description = castNonNull(in.readString());
+    data = castNonNull(in.createByteArray());
   }
 
   @Override

@@ -15,10 +15,13 @@
  */
 package com.google.android.exoplayer2.ext.flac;
 
+import androidx.annotation.Nullable;
+import com.google.android.exoplayer2.Format;
+import com.google.android.exoplayer2.ParserException;
 import com.google.android.exoplayer2.decoder.DecoderInputBuffer;
 import com.google.android.exoplayer2.decoder.SimpleDecoder;
 import com.google.android.exoplayer2.decoder.SimpleOutputBuffer;
-import com.google.android.exoplayer2.util.FlacStreamInfo;
+import com.google.android.exoplayer2.util.FlacStreamMetadata;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -37,11 +40,17 @@ import java.util.List;
    *
    * @param numInputBuffers The number of input buffers.
    * @param numOutputBuffers The number of output buffers.
+   * @param maxInputBufferSize The maximum required input buffer size if known, or {@link
+   *     Format#NO_VALUE} otherwise.
    * @param initializationData Codec-specific initialization data. It should contain only one entry
-   *    which is the flac file header.
+   *     which is the flac file header.
    * @throws FlacDecoderException Thrown if an exception occurs when initializing the decoder.
    */
-  public FlacDecoder(int numInputBuffers, int numOutputBuffers, List<byte[]> initializationData)
+  public FlacDecoder(
+      int numInputBuffers,
+      int numOutputBuffers,
+      int maxInputBufferSize,
+      List<byte[]> initializationData)
       throws FlacDecoderException {
     super(new DecoderInputBuffer[numInputBuffers], new SimpleOutputBuffer[numOutputBuffers]);
     if (initializationData.size() != 1) {
@@ -49,19 +58,20 @@ import java.util.List;
     }
     decoderJni = new FlacDecoderJni();
     decoderJni.setData(ByteBuffer.wrap(initializationData.get(0)));
-    FlacStreamInfo streamInfo;
+    FlacStreamMetadata streamMetadata;
     try {
-      streamInfo = decoderJni.decodeMetadata();
+      streamMetadata = decoderJni.decodeStreamMetadata();
+    } catch (ParserException e) {
+      throw new FlacDecoderException("Failed to decode StreamInfo", e);
     } catch (IOException | InterruptedException e) {
       // Never happens.
       throw new IllegalStateException(e);
     }
-    if (streamInfo == null) {
-      throw new FlacDecoderException("Metadata decoding failed");
-    }
 
-    setInitialInputBufferSize(streamInfo.maxFrameSize);
-    maxOutputBufferSize = streamInfo.maxDecodedFrameSize();
+    int initialInputBufferSize =
+        maxInputBufferSize != Format.NO_VALUE ? maxInputBufferSize : streamMetadata.maxFrameSize;
+    setInitialInputBufferSize(initialInputBufferSize);
+    maxOutputBufferSize = streamMetadata.maxDecodedFrameSize();
   }
 
   @Override
@@ -85,6 +95,7 @@ import java.util.List;
   }
 
   @Override
+  @Nullable
   protected FlacDecoderException decode(
       DecoderInputBuffer inputBuffer, SimpleOutputBuffer outputBuffer, boolean reset) {
     if (reset) {

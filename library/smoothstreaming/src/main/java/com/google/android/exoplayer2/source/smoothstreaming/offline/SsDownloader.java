@@ -19,11 +19,11 @@ import android.net.Uri;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.offline.DownloaderConstructorHelper;
 import com.google.android.exoplayer2.offline.SegmentDownloader;
+import com.google.android.exoplayer2.offline.StreamKey;
 import com.google.android.exoplayer2.source.smoothstreaming.manifest.SsManifest;
 import com.google.android.exoplayer2.source.smoothstreaming.manifest.SsManifest.StreamElement;
 import com.google.android.exoplayer2.source.smoothstreaming.manifest.SsManifestParser;
 import com.google.android.exoplayer2.source.smoothstreaming.manifest.SsUtil;
-import com.google.android.exoplayer2.source.smoothstreaming.manifest.StreamKey;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DataSpec;
 import com.google.android.exoplayer2.upstream.ParsingLoadable;
@@ -37,7 +37,7 @@ import java.util.List;
  * <p>Example usage:
  *
  * <pre>{@code
- * SimpleCache cache = new SimpleCache(downloadFolder, new NoOpCacheEvictor());
+ * SimpleCache cache = new SimpleCache(downloadFolder, new NoOpCacheEvictor(), databaseProvider);
  * DefaultHttpDataSourceFactory factory = new DefaultHttpDataSourceFactory("ExoPlayer", null);
  * DownloaderConstructorHelper constructorHelper =
  *     new DownloaderConstructorHelper(cache, factory);
@@ -48,13 +48,13 @@ import java.util.List;
  *         Collections.singletonList(new StreamKey(0, 0)),
  *         constructorHelper);
  * // Perform the download.
- * ssDownloader.download();
+ * ssDownloader.download(progressListener);
  * // Access downloaded data using CacheDataSource
  * CacheDataSource cacheDataSource =
  *     new CacheDataSource(cache, factory.createDataSource(), CacheDataSource.FLAG_BLOCK_ON_CACHE);
  * }</pre>
  */
-public final class SsDownloader extends SegmentDownloader<SsManifest, StreamKey> {
+public final class SsDownloader extends SegmentDownloader<SsManifest> {
 
   /**
    * @param manifestUri The {@link Uri} of the manifest to be downloaded.
@@ -68,11 +68,8 @@ public final class SsDownloader extends SegmentDownloader<SsManifest, StreamKey>
   }
 
   @Override
-  protected SsManifest getManifest(DataSource dataSource, Uri uri) throws IOException {
-    ParsingLoadable<SsManifest> loadable =
-        new ParsingLoadable<>(dataSource, uri, C.DATA_TYPE_MANIFEST, new SsManifestParser());
-    loadable.load();
-    return loadable.getResult();
+  protected SsManifest getManifest(DataSource dataSource, DataSpec dataSpec) throws IOException {
+    return ParsingLoadable.load(dataSource, new SsManifestParser(), dataSpec, C.DATA_TYPE_MANIFEST);
   }
 
   @Override

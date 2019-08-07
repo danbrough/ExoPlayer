@@ -15,6 +15,7 @@
  */
 package com.google.android.exoplayer2.source.dash.offline;
 
+import static com.google.android.exoplayer2.source.dash.offline.DashDownloadTestData.TEST_ID;
 import static com.google.android.exoplayer2.source.dash.offline.DashDownloadTestData.TEST_MPD;
 import static com.google.android.exoplayer2.source.dash.offline.DashDownloadTestData.TEST_MPD_URI;
 import static com.google.android.exoplayer2.testutil.CacheAsserts.assertCacheEmpty;
@@ -23,19 +24,21 @@ import static com.google.android.exoplayer2.testutil.CacheAsserts.assertCachedDa
 import android.app.Notification;
 import android.content.Context;
 import android.content.Intent;
-import android.net.Uri;
-import android.support.annotation.Nullable;
+import androidx.annotation.Nullable;
+import androidx.test.core.app.ApplicationProvider;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import com.google.android.exoplayer2.offline.DefaultDownloadIndex;
+import com.google.android.exoplayer2.offline.DefaultDownloaderFactory;
+import com.google.android.exoplayer2.offline.Download;
 import com.google.android.exoplayer2.offline.DownloadManager;
-import com.google.android.exoplayer2.offline.DownloadManager.TaskState;
+import com.google.android.exoplayer2.offline.DownloadRequest;
 import com.google.android.exoplayer2.offline.DownloadService;
 import com.google.android.exoplayer2.offline.DownloaderConstructorHelper;
-import com.google.android.exoplayer2.scheduler.Requirements;
+import com.google.android.exoplayer2.offline.StreamKey;
 import com.google.android.exoplayer2.scheduler.Scheduler;
-import com.google.android.exoplayer2.source.dash.manifest.RepresentationKey;
 import com.google.android.exoplayer2.testutil.DummyMainThread;
 import com.google.android.exoplayer2.testutil.FakeDataSet;
 import com.google.android.exoplayer2.testutil.FakeDataSource;
-import com.google.android.exoplayer2.testutil.RobolectricUtil;
 import com.google.android.exoplayer2.testutil.TestDownloadManagerListener;
 import com.google.android.exoplayer2.testutil.TestUtil;
 import com.google.android.exoplayer2.upstream.DataSource;
@@ -47,26 +50,24 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.Mockito;
-import org.robolectric.RobolectricTestRunner;
-import org.robolectric.RuntimeEnvironment;
-import org.robolectric.annotation.Config;
+import org.robolectric.annotation.LooperMode;
 
 /** Unit tests for {@link DownloadService}. */
-@RunWith(RobolectricTestRunner.class)
-@Config(shadows = {RobolectricUtil.CustomLooper.class, RobolectricUtil.CustomMessageQueue.class})
+@RunWith(AndroidJUnit4.class)
+@LooperMode(LooperMode.Mode.PAUSED)
 public class DownloadServiceDashTest {
 
   private SimpleCache cache;
   private File tempFolder;
   private FakeDataSet fakeDataSet;
-  private RepresentationKey fakeRepresentationKey1;
-  private RepresentationKey fakeRepresentationKey2;
+  private StreamKey fakeStreamKey1;
+  private StreamKey fakeStreamKey2;
   private Context context;
   private DownloadService dashDownloadService;
   private ConditionVariable pauseDownloadCondition;
@@ -76,20 +77,17 @@ public class DownloadServiceDashTest {
   @Before
   public void setUp() throws IOException {
     dummyMainThread = new DummyMainThread();
-    context = RuntimeEnvironment.application;
+    context = ApplicationProvider.getApplicationContext();
     tempFolder = Util.createTempDirectory(context, "ExoPlayerTest");
     cache = new SimpleCache(tempFolder, new NoOpCacheEvictor());
 
     Runnable pauseAction =
-        new Runnable() {
-          @Override
-          public void run() {
-            if (pauseDownloadCondition != null) {
-              try {
-                pauseDownloadCondition.block();
-              } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-              }
+        () -> {
+          if (pauseDownloadCondition != null) {
+            try {
+              pauseDownloadCondition.block();
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
             }
           }
         };
@@ -107,81 +105,58 @@ public class DownloadServiceDashTest {
             .setRandomData("text_segment_2", 2)
             .setRandomData("text_segment_3", 3);
     final DataSource.Factory fakeDataSourceFactory =
-        new FakeDataSource.Factory(null).setFakeDataSet(fakeDataSet);
-    fakeRepresentationKey1 = new RepresentationKey(0, 0, 0);
-    fakeRepresentationKey2 = new RepresentationKey(0, 1, 0);
+        new FakeDataSource.Factory().setFakeDataSet(fakeDataSet);
+    fakeStreamKey1 = new StreamKey(0, 0, 0);
+    fakeStreamKey2 = new StreamKey(0, 1, 0);
 
-    dummyMainThread.runOnMainThread(
-        new Runnable() {
-          @Override
-          public void run() {
-            File actionFile;
-            try {
-              actionFile = Util.createTempFile(context, "ExoPlayerTest");
-            } catch (IOException e) {
-              throw new RuntimeException(e);
-            }
-            actionFile.delete();
-            final DownloadManager dashDownloadManager =
-                new DownloadManager(
-                    new DownloaderConstructorHelper(cache, fakeDataSourceFactory),
-                    1,
-                    3,
-                    actionFile,
-                    DashDownloadAction.DESERIALIZER);
-            downloadManagerListener =
-                new TestDownloadManagerListener(dashDownloadManager, dummyMainThread);
-            dashDownloadManager.addListener(downloadManagerListener);
-            dashDownloadManager.startDownloads();
+    dummyMainThread.runTestOnMainThread(
+        () -> {
+          DefaultDownloadIndex downloadIndex =
+              new DefaultDownloadIndex(TestUtil.getTestDatabaseProvider());
+          final DownloadManager dashDownloadManager =
+              new DownloadManager(
+                  ApplicationProvider.getApplicationContext(),
+                  downloadIndex,
+                  new DefaultDownloaderFactory(
+                      new DownloaderConstructorHelper(cache, fakeDataSourceFactory)));
+          downloadManagerListener =
+              new TestDownloadManagerListener(dashDownloadManager, dummyMainThread);
+          dashDownloadManager.resumeDownloads();
 
-            dashDownloadService =
-                new DownloadService(/*foregroundNotificationId=*/ 1) {
+          dashDownloadService =
+              new DownloadService(DownloadService.FOREGROUND_NOTIFICATION_ID_NONE) {
+                @Override
+                protected DownloadManager getDownloadManager() {
+                  return dashDownloadManager;
+                }
 
-                  @Override
-                  protected DownloadManager getDownloadManager() {
-                    return dashDownloadManager;
-                  }
+                @Nullable
+                @Override
+                protected Scheduler getScheduler() {
+                  return null;
+                }
 
-                  @Override
-                  protected Notification getForegroundNotification(TaskState[] taskStates) {
-                    return Mockito.mock(Notification.class);
-                  }
-
-                  @Nullable
-                  @Override
-                  protected Scheduler getScheduler() {
-                    return null;
-                  }
-
-                  @Nullable
-                  @Override
-                  protected Requirements getRequirements() {
-                    return null;
-                  }
-                };
-            dashDownloadService.onCreate();
-          }
+                @Override
+                protected Notification getForegroundNotification(List<Download> downloads) {
+                  throw new UnsupportedOperationException();
+                }
+              };
+          dashDownloadService.onCreate();
         });
   }
 
   @After
   public void tearDown() {
-    dummyMainThread.runOnMainThread(
-        new Runnable() {
-          @Override
-          public void run() {
-            dashDownloadService.onDestroy();
-          }
-        });
+    dummyMainThread.runOnMainThread(() -> dashDownloadService.onDestroy());
     Util.recursiveDelete(tempFolder);
     dummyMainThread.release();
   }
 
   @Ignore // b/78877092
   @Test
-  public void testMultipleDownloadAction() throws Throwable {
-    downloadKeys(fakeRepresentationKey1);
-    downloadKeys(fakeRepresentationKey2);
+  public void testMultipleDownloadRequest() throws Throwable {
+    downloadKeys(fakeStreamKey1);
+    downloadKeys(fakeStreamKey2);
 
     downloadManagerListener.blockUntilTasksCompleteAndThrowAnyDownloadError();
 
@@ -191,7 +166,7 @@ public class DownloadServiceDashTest {
   @Ignore // b/78877092
   @Test
   public void testRemoveAction() throws Throwable {
-    downloadKeys(fakeRepresentationKey1, fakeRepresentationKey2);
+    downloadKeys(fakeStreamKey1, fakeStreamKey2);
 
     downloadManagerListener.blockUntilTasksCompleteAndThrowAnyDownloadError();
 
@@ -206,7 +181,7 @@ public class DownloadServiceDashTest {
   @Test
   public void testRemoveBeforeDownloadComplete() throws Throwable {
     pauseDownloadCondition = new ConditionVariable();
-    downloadKeys(fakeRepresentationKey1, fakeRepresentationKey2);
+    downloadKeys(fakeStreamKey1, fakeStreamKey2);
 
     removeAll();
 
@@ -215,30 +190,34 @@ public class DownloadServiceDashTest {
     assertCacheEmpty(cache);
   }
 
-  private void removeAll() throws Throwable {
-    callDownloadServiceOnStart(newAction(TEST_MPD_URI, true, null));
-  }
-
-  private void downloadKeys(RepresentationKey... keys) {
-    callDownloadServiceOnStart(newAction(TEST_MPD_URI, false, null, keys));
-  }
-
-  private void callDownloadServiceOnStart(final DashDownloadAction action) {
+  private void removeAll() {
     dummyMainThread.runOnMainThread(
-        new Runnable() {
-          @Override
-          public void run() {
-            Intent startIntent =
-                DownloadService.buildAddActionIntent(context, DownloadService.class, action, false);
-            dashDownloadService.onStartCommand(startIntent, 0, 0);
-          }
+        () -> {
+          Intent startIntent =
+              DownloadService.buildRemoveDownloadIntent(
+                  context, DownloadService.class, TEST_ID, /* foreground= */ false);
+          dashDownloadService.onStartCommand(startIntent, 0, 0);
         });
   }
 
-  private static DashDownloadAction newAction(
-      Uri uri, boolean isRemoveAction, @Nullable byte[] data, RepresentationKey... keys) {
-    ArrayList<RepresentationKey> keysList = new ArrayList<>();
+  private void downloadKeys(StreamKey... keys) {
+    ArrayList<StreamKey> keysList = new ArrayList<>();
     Collections.addAll(keysList, keys);
-    return new DashDownloadAction(uri, isRemoveAction, data, keysList);
+    DownloadRequest action =
+        new DownloadRequest(
+            TEST_ID,
+            DownloadRequest.TYPE_DASH,
+            TEST_MPD_URI,
+            keysList,
+            /* customCacheKey= */ null,
+            null);
+    dummyMainThread.runOnMainThread(
+        () -> {
+          Intent startIntent =
+              DownloadService.buildAddDownloadIntent(
+                  context, DownloadService.class, action, /* foreground= */ false);
+          dashDownloadService.onStartCommand(startIntent, 0, 0);
+        });
   }
+
 }

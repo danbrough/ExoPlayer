@@ -17,20 +17,17 @@ package com.google.android.exoplayer2.metadata.id3;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.metadata.Metadata;
-import com.google.android.exoplayer2.metadata.MetadataDecoderException;
 import com.google.android.exoplayer2.util.Assertions;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.RobolectricTestRunner;
 
-/**
- * Test for {@link Id3Decoder}.
- */
-@RunWith(RobolectricTestRunner.class)
+/** Test for {@link Id3Decoder}. */
+@RunWith(AndroidJUnit4.class)
 public final class Id3DecoderTest {
 
   private static final byte[] TAG_HEADER = new byte[] {'I', 'D', '3', 4, 0, 0, 0, 0, 0, 0};
@@ -38,7 +35,7 @@ public final class Id3DecoderTest {
   private static final int ID3_TEXT_ENCODING_UTF_8 = 3;
 
   @Test
-  public void testDecodeTxxxFrame() throws MetadataDecoderException {
+  public void testDecodeTxxxFrame() {
     byte[] rawId3 = buildSingleFrameTag("TXXX", new byte[] {3, 0, 109, 100, 105, 97, 108, 111, 103,
         95, 86, 73, 78, 68, 73, 67, 79, 49, 53, 50, 55, 54, 54, 52, 95, 115, 116, 97, 114, 116, 0});
     Id3Decoder decoder = new Id3Decoder();
@@ -65,7 +62,7 @@ public final class Id3DecoderTest {
   }
 
   @Test
-  public void testDecodeTextInformationFrame() throws MetadataDecoderException {
+  public void testDecodeTextInformationFrame() {
     byte[] rawId3 = buildSingleFrameTag("TIT2", new byte[] {3, 72, 101, 108, 108, 111, 32, 87, 111,
         114, 108, 100, 0});
     Id3Decoder decoder = new Id3Decoder();
@@ -92,7 +89,7 @@ public final class Id3DecoderTest {
   }
 
   @Test
-  public void testDecodeWxxxFrame() throws MetadataDecoderException {
+  public void testDecodeWxxxFrame() {
     byte[] rawId3 = buildSingleFrameTag("WXXX", new byte[] {ID3_TEXT_ENCODING_UTF_8, 116, 101, 115,
         116, 0, 104, 116, 116, 112, 115, 58, 47, 47, 116, 101, 115, 116, 46, 99, 111, 109, 47, 97,
         98, 99, 63, 100, 101, 102});
@@ -120,7 +117,7 @@ public final class Id3DecoderTest {
   }
 
   @Test
-  public void testDecodeUrlLinkFrame() throws MetadataDecoderException {
+  public void testDecodeUrlLinkFrame() {
     byte[] rawId3 = buildSingleFrameTag("WCOM", new byte[] {104, 116, 116, 112, 115, 58, 47, 47,
         116, 101, 115, 116, 46, 99, 111, 109, 47, 97, 98, 99, 63, 100, 101, 102});
     Id3Decoder decoder = new Id3Decoder();
@@ -142,7 +139,7 @@ public final class Id3DecoderTest {
   }
 
   @Test
-  public void testDecodePrivFrame() throws MetadataDecoderException {
+  public void testDecodePrivFrame() {
     byte[] rawId3 = buildSingleFrameTag("PRIV", new byte[] {116, 101, 115, 116, 0, 1, 2, 3, 4});
     Id3Decoder decoder = new Id3Decoder();
     Metadata metadata = decoder.decode(rawId3, rawId3.length);
@@ -161,7 +158,7 @@ public final class Id3DecoderTest {
   }
 
   @Test
-  public void testDecodeApicFrame() throws MetadataDecoderException {
+  public void testDecodeApicFrame() {
     byte[] rawId3 = buildSingleFrameTag("APIC", new byte[] {3, 105, 109, 97, 103, 101, 47, 106, 112,
         101, 103, 0, 16, 72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100, 0, 1, 2, 3, 4, 5, 6, 7,
         8, 9, 0});
@@ -177,7 +174,7 @@ public final class Id3DecoderTest {
   }
 
   @Test
-  public void testDecodeCommentFrame() throws MetadataDecoderException {
+  public void testDecodeCommentFrame() {
     byte[] rawId3 = buildSingleFrameTag("COMM", new byte[] {ID3_TEXT_ENCODING_UTF_8, 101, 110, 103,
         100, 101, 115, 99, 114, 105, 112, 116, 105, 111, 110, 0, 116, 101, 120, 116, 0});
     Id3Decoder decoder = new Id3Decoder();
@@ -204,7 +201,7 @@ public final class Id3DecoderTest {
   }
 
   @Test
-  public void testDecodeMultiFrames() throws MetadataDecoderException {
+  public void testDecodeMultiFrames() {
     byte[] rawId3 =
         buildMultiFramesTag(
             new FrameSpec(

@@ -16,7 +16,7 @@
 package com.google.android.exoplayer2.source.dash;
 
 import android.net.Uri;
-import android.support.annotation.Nullable;
+import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.drm.DrmInitData;
@@ -54,7 +54,7 @@ public final class DashUtil {
    */
   public static DashManifest loadManifest(DataSource dataSource, Uri uri)
       throws IOException {
-    return ParsingLoadable.load(dataSource, new DashManifestParser(), uri);
+    return ParsingLoadable.load(dataSource, new DashManifestParser(), uri, C.DATA_TYPE_MANIFEST);
   }
 
   /**

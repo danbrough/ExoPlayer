@@ -15,9 +15,8 @@
  */
 package com.google.android.exoplayer2.ui;
 
-import android.view.View;
-
 import androidx.annotation.Nullable;
+import android.view.View;
 
 /**
  * Interface for time bar views that can display a playback position, buffered position, duration
@@ -86,6 +85,14 @@ public interface TimeBar {
   void setDuration(long duration);
 
   /**
+   * Returns the preferred delay in milliseconds of media time after which the time bar position
+   * should be updated.
+   *
+   * @return Preferred delay, in milliseconds of media time.
+   */
+  long getPreferredUpdateDelay();
+
+  /**
    * Sets the times of ad groups and whether each ad group has been played.
    *
    * @param adGroupTimesMs An array where the first {@code adGroupCount} elements are the times of
@@ -96,7 +103,7 @@ public interface TimeBar {
    * @param adGroupCount The number of ad groups.
    */
   void setAdGroupTimesMs(@Nullable long[] adGroupTimesMs, @Nullable boolean[] playedAdGroups,
-                         int adGroupCount);
+      int adGroupCount);
 
   /**
    * Listener for scrubbing events.
@@ -107,7 +114,7 @@ public interface TimeBar {
      * Called when the user starts moving the scrubber.
      *
      * @param timeBar The time bar.
-     * @param position The position of the scrubber, in milliseconds.
+     * @param position The scrub position in milliseconds.
      */
     void onScrubStart(TimeBar timeBar, long position);
 
@@ -115,7 +122,7 @@ public interface TimeBar {
      * Called when the user moves the scrubber.
      *
      * @param timeBar The time bar.
-     * @param position The position of the scrubber, in milliseconds.
+     * @param position The scrub position in milliseconds.
      */
     void onScrubMove(TimeBar timeBar, long position);
 
@@ -123,11 +130,10 @@ public interface TimeBar {
      * Called when the user stops moving the scrubber.
      *
      * @param timeBar The time bar.
-     * @param position The position of the scrubber, in milliseconds.
+     * @param position The scrub position in milliseconds.
      * @param canceled Whether scrubbing was canceled.
      */
     void onScrubStop(TimeBar timeBar, long position, boolean canceled);
-
   }
 
 }

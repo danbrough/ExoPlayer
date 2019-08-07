@@ -25,6 +25,7 @@ import com.google.android.exoplayer2.ParserException;
 import com.google.android.exoplayer2.drm.DrmInitData;
 import com.google.android.exoplayer2.drm.DrmInitData.SchemeData;
 import com.google.android.exoplayer2.extractor.mp4.PsshAtomUtil;
+import com.google.android.exoplayer2.extractor.mp4.TrackEncryptionBox;
 import com.google.android.exoplayer2.source.smoothstreaming.manifest.SsManifest.ProtectionElement;
 import com.google.android.exoplayer2.source.smoothstreaming.manifest.SsManifest.StreamElement;
 import com.google.android.exoplayer2.upstream.ParsingLoadable;
@@ -213,7 +214,7 @@ public class SsManifestParser implements ParsingLoadable.Parser<SsManifest> {
 
     /**
      * @param xmlParser The underlying {@link XmlPullParser}
-     * @throws ParserException
+     * @throws ParserException If a parsing error occurs.
      */
     protected void parseStartTag(XmlPullParser xmlParser) throws ParserException {
       // Do nothing.
@@ -378,8 +379,12 @@ public class SsManifestParser implements ParsingLoadable.Parser<SsManifest> {
         DrmInitData drmInitData = new DrmInitData(new SchemeData(protectionElement.uuid,
             MimeTypes.VIDEO_MP4, protectionElement.data));
         for (StreamElement streamElement : streamElementArray) {
-          for (int i = 0; i < streamElement.formats.length; i++) {
-            streamElement.formats[i] = streamElement.formats[i].copyWithDrmInitData(drmInitData);
+          int type = streamElement.type;
+          if (type == C.TRACK_TYPE_VIDEO || type == C.TRACK_TYPE_AUDIO) {
+            Format[] formats = streamElement.formats;
+            for (int i = 0; i < formats.length; i++) {
+              formats[i] = formats[i].copyWithDrmInitData(drmInitData);
+            }
           }
         }
       }
@@ -393,8 +398,9 @@ public class SsManifestParser implements ParsingLoadable.Parser<SsManifest> {
 
     public static final String TAG = "Protection";
     public static final String TAG_PROTECTION_HEADER = "ProtectionHeader";
-
     public static final String KEY_SYSTEM_ID = "SystemID";
+
+    private static final int INITIALIZATION_VECTOR_SIZE = 8;
 
     private boolean inProtectionHeader;
     private UUID uuid;
@@ -435,7 +441,44 @@ public class SsManifestParser implements ParsingLoadable.Parser<SsManifest> {
 
     @Override
     public Object build() {
-      return new ProtectionElement(uuid, PsshAtomUtil.buildPsshAtom(uuid, initData));
+      return new ProtectionElement(
+          uuid, PsshAtomUtil.buildPsshAtom(uuid, initData), buildTrackEncryptionBoxes(initData));
+    }
+
+    private static TrackEncryptionBox[] buildTrackEncryptionBoxes(byte[] initData) {
+      return new TrackEncryptionBox[] {
+        new TrackEncryptionBox(
+            /* isEncrypted= */ true,
+            /* schemeType= */ null,
+            INITIALIZATION_VECTOR_SIZE,
+            getProtectionElementKeyId(initData),
+            /* defaultEncryptedBlocks= */ 0,
+            /* defaultClearBlocks= */ 0,
+            /* defaultInitializationVector= */ null)
+      };
+    }
+
+    private static byte[] getProtectionElementKeyId(byte[] initData) {
+      StringBuilder initDataStringBuilder = new StringBuilder();
+      for (int i = 0; i < initData.length; i += 2) {
+        initDataStringBuilder.append((char) initData[i]);
+      }
+      String initDataString = initDataStringBuilder.toString();
+      String keyIdString =
+          initDataString.substring(
+              initDataString.indexOf("<KID>") + 5, initDataString.indexOf("</KID>"));
+      byte[] keyId = Base64.decode(keyIdString, Base64.DEFAULT);
+      swap(keyId, 0, 3);
+      swap(keyId, 1, 2);
+      swap(keyId, 4, 5);
+      swap(keyId, 6, 7);
+      return keyId;
+    }
+
+    private static void swap(byte[] data, int firstPosition, int secondPosition) {
+      byte temp = data[firstPosition];
+      data[firstPosition] = data[secondPosition];
+      data[secondPosition] = temp;
     }
 
     private static String stripCurlyBraces(String uuidString) {
@@ -543,6 +586,7 @@ public class SsManifestParser implements ParsingLoadable.Parser<SsManifest> {
       } else {
         subType = parser.getAttributeValue(null, KEY_SUB_TYPE);
       }
+      putNormalizedAttribute(KEY_SUB_TYPE, subType);
       name = parser.getAttributeValue(null, KEY_NAME);
       url = parseRequiredString(parser, KEY_URL);
       maxWidth = parseInt(parser, KEY_MAX_WIDTH, Format.NO_VALUE);
@@ -602,7 +646,9 @@ public class SsManifestParser implements ParsingLoadable.Parser<SsManifest> {
     private static final String KEY_CHANNELS = "Channels";
     private static final String KEY_FOUR_CC = "FourCC";
     private static final String KEY_TYPE = "Type";
+    private static final String KEY_SUB_TYPE = "Subtype";
     private static final String KEY_LANGUAGE = "Language";
+    private static final String KEY_NAME = "Name";
     private static final String KEY_MAX_WIDTH = "MaxWidth";
     private static final String KEY_MAX_HEIGHT = "MaxHeight";
 
@@ -616,6 +662,7 @@ public class SsManifestParser implements ParsingLoadable.Parser<SsManifest> {
     public void parseStartTag(XmlPullParser parser) throws ParserException {
       int type = (Integer) getNormalizedAttribute(KEY_TYPE);
       String id = parser.getAttributeValue(null, KEY_INDEX);
+      String name = (String) getNormalizedAttribute(KEY_NAME);
       int bitrate = parseRequiredInt(parser, KEY_BITRATE);
       String sampleMimeType = fourCCToMimeType(parseRequiredString(parser, KEY_FOUR_CC));
 
@@ -624,8 +671,20 @@ public class SsManifestParser implements ParsingLoadable.Parser<SsManifest> {
         int height = parseRequiredInt(parser, KEY_MAX_HEIGHT);
         List<byte[]> codecSpecificData = buildCodecSpecificData(
             parser.getAttributeValue(null, KEY_CODEC_PRIVATE_DATA));
-        format = Format.createVideoContainerFormat(id, MimeTypes.VIDEO_MP4, sampleMimeType, null,
-            bitrate, width, height, Format.NO_VALUE, codecSpecificData, 0);
+        format =
+            Format.createVideoContainerFormat(
+                id,
+                name,
+                MimeTypes.VIDEO_MP4,
+                sampleMimeType,
+                /* codecs= */ null,
+                bitrate,
+                width,
+                height,
+                /* frameRate= */ Format.NO_VALUE,
+                codecSpecificData,
+                /* selectionFlags= */ 0,
+                /* roleFlags= */ 0);
       } else if (type == C.TRACK_TYPE_AUDIO) {
         sampleMimeType = sampleMimeType == null ? MimeTypes.AUDIO_AAC : sampleMimeType;
         int channels = parseRequiredInt(parser, KEY_CHANNELS);
@@ -637,15 +696,57 @@ public class SsManifestParser implements ParsingLoadable.Parser<SsManifest> {
               CodecSpecificDataUtil.buildAacLcAudioSpecificConfig(samplingRate, channels));
         }
         String language = (String) getNormalizedAttribute(KEY_LANGUAGE);
-        format = Format.createAudioContainerFormat(id, MimeTypes.AUDIO_MP4, sampleMimeType, null,
-            bitrate, channels, samplingRate, codecSpecificData, 0, language);
+        format =
+            Format.createAudioContainerFormat(
+                id,
+                name,
+                MimeTypes.AUDIO_MP4,
+                sampleMimeType,
+                /* codecs= */ null,
+                bitrate,
+                channels,
+                samplingRate,
+                codecSpecificData,
+                /* selectionFlags= */ 0,
+                /* roleFlags= */ 0,
+                language);
       } else if (type == C.TRACK_TYPE_TEXT) {
+        String subType = (String) getNormalizedAttribute(KEY_SUB_TYPE);
+        @C.RoleFlags int roleFlags = 0;
+        switch (subType) {
+          case "CAPT":
+            roleFlags = C.ROLE_FLAG_CAPTION;
+            break;
+          case "DESC":
+            roleFlags = C.ROLE_FLAG_DESCRIBES_MUSIC_AND_SOUND;
+            break;
+          default:
+            break;
+        }
         String language = (String) getNormalizedAttribute(KEY_LANGUAGE);
-        format = Format.createTextContainerFormat(id, MimeTypes.APPLICATION_MP4, sampleMimeType,
-            null, bitrate, 0, language);
+        format =
+            Format.createTextContainerFormat(
+                id,
+                name,
+                MimeTypes.APPLICATION_MP4,
+                sampleMimeType,
+                /* codecs= */ null,
+                bitrate,
+                /* selectionFlags= */ 0,
+                roleFlags,
+                language);
       } else {
-        format = Format.createContainerFormat(id, MimeTypes.APPLICATION_MP4, sampleMimeType, null,
-            bitrate, 0, null);
+        format =
+            Format.createContainerFormat(
+                id,
+                name,
+                MimeTypes.APPLICATION_MP4,
+                sampleMimeType,
+                /* codecs= */ null,
+                bitrate,
+                /* selectionFlags= */ 0,
+                /* roleFlags= */ 0,
+                /* language= */ null);
       }
     }
 
@@ -675,7 +776,7 @@ public class SsManifestParser implements ParsingLoadable.Parser<SsManifest> {
       } else if (fourCC.equalsIgnoreCase("AAC") || fourCC.equalsIgnoreCase("AACL")
           || fourCC.equalsIgnoreCase("AACH") || fourCC.equalsIgnoreCase("AACP")) {
         return MimeTypes.AUDIO_AAC;
-      } else if (fourCC.equalsIgnoreCase("TTML")) {
+      } else if (fourCC.equalsIgnoreCase("TTML") || fourCC.equalsIgnoreCase("DFXP")) {
         return MimeTypes.APPLICATION_TTML;
       } else if (fourCC.equalsIgnoreCase("ac-3") || fourCC.equalsIgnoreCase("dac3")) {
         return MimeTypes.AUDIO_AC3;

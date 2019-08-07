@@ -13,38 +13,38 @@
 // limitations under the License.
 apply from: '../../constants.gradle'
 apply plugin: 'com.android.library'
-apply plugin: 'com.github.dcendents.android-maven'
-group = 'com.github.danbrough.exoplayer'
 
 android {
-  compileSdkVersion project.ext.compileSdkVersion
-  buildToolsVersion project.ext.buildToolsVersion
+    compileSdkVersion project.ext.compileSdkVersion
 
-  defaultConfig {
-    minSdkVersion project.ext.minSdkVersion
-    targetSdkVersion project.ext.targetSdkVersion
-    consumerProguardFiles 'proguard-rules.txt'
-  }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    defaultConfig {
+        minSdkVersion project.ext.minSdkVersion
+        targetSdkVersion project.ext.targetSdkVersion
+        consumerProguardFiles 'proguard-rules.txt'
+    }
+
+    testOptions.unitTests.includeAndroidResources = true
 }
 
 dependencies {
-  implementation project(modulePrefix + 'library-core')
-  implementation 'com.android.support:support-annotations:' + supportLibraryVersion
-  api('com.squareup.okhttp3:okhttp:3.10.0') {
-    exclude group: 'org.json'
-  }
-
-  //api 'com.squareup.okhttp3:okhttp:3.10.0'
-
+    implementation project(modulePrefix + 'library-core')
+    implementation 'androidx.annotation:annotation:1.1.0'
+    compileOnly 'org.checkerframework:checker-qual:' + checkerframeworkVersion
+    api 'com.squareup.okhttp3:okhttp:3.12.1'
 }
 
 ext {
-  javadocTitle = 'OkHttp extension'
+    javadocTitle = 'OkHttp extension'
 }
 apply from: '../../javadoc_library.gradle'
 
 ext {
-  releaseArtifact = 'extension-okhttp'
-  releaseDescription = 'OkHttp extension for ExoPlayer.'
+    releaseArtifact = 'extension-okhttp'
+    releaseDescription = 'OkHttp extension for ExoPlayer.'
 }
 apply from: '../../publish.gradle'

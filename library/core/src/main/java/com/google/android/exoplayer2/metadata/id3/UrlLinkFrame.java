@@ -15,9 +15,11 @@
  */
 package com.google.android.exoplayer2.metadata.id3;
 
+import static com.google.android.exoplayer2.util.Util.castNonNull;
+
 import android.os.Parcel;
 import android.os.Parcelable;
-import android.support.annotation.Nullable;
+import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.util.Util;
 
 /**
@@ -25,19 +27,19 @@ import com.google.android.exoplayer2.util.Util;
  */
 public final class UrlLinkFrame extends Id3Frame {
 
-  public final String description;
+  @Nullable public final String description;
   public final String url;
 
-  public UrlLinkFrame(String id, String description, String url) {
+  public UrlLinkFrame(String id, @Nullable String description, String url) {
     super(id);
     this.description = description;
     this.url = url;
   }
 
   /* package */ UrlLinkFrame(Parcel in) {
-    super(in.readString());
+    super(castNonNull(in.readString()));
     description = in.readString();
-    url = in.readString();
+    url = castNonNull(in.readString());
   }
 
   @Override

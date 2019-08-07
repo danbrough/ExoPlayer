@@ -22,7 +22,8 @@ import static com.google.android.exoplayer2.extractor.amr.AmrExtractor.frameSize
 import static com.google.common.truth.Truth.assertThat;
 import static junit.framework.Assert.fail;
 
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 import com.google.android.exoplayer2.ParserException;
 import com.google.android.exoplayer2.extractor.Extractor;
 import com.google.android.exoplayer2.extractor.PositionHolder;
@@ -34,10 +35,9 @@ import java.io.IOException;
 import java.util.Random;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.RobolectricTestRunner;
 
 /** Unit test for {@link AmrExtractor}. */
-@RunWith(RobolectricTestRunner.class)
+@RunWith(AndroidJUnit4.class)
 public final class AmrExtractorTest {
 
   private static final Random RANDOM = new Random(1234);
@@ -179,12 +179,26 @@ public final class AmrExtractorTest {
 
   @Test
   public void testExtractingNarrowBandSamples() throws Exception {
-    ExtractorAsserts.assertBehavior(createAmrExtractorFactory(), "amr/sample_nb.amr");
+    ExtractorAsserts.assertBehavior(
+        createAmrExtractorFactory(/* withSeeking= */ false), "amr/sample_nb.amr");
   }
 
   @Test
   public void testExtractingWideBandSamples() throws Exception {
-    ExtractorAsserts.assertBehavior(createAmrExtractorFactory(), "amr/sample_wb.amr");
+    ExtractorAsserts.assertBehavior(
+        createAmrExtractorFactory(/* withSeeking= */ false), "amr/sample_wb.amr");
+  }
+
+  @Test
+  public void testExtractingNarrowBandSamples_withSeeking() throws Exception {
+    ExtractorAsserts.assertBehavior(
+        createAmrExtractorFactory(/* withSeeking= */ true), "amr/sample_nb_cbr.amr");
+  }
+
+  @Test
+  public void testExtractingWideBandSamples_withSeeking() throws Exception {
+    ExtractorAsserts.assertBehavior(
+        createAmrExtractorFactory(/* withSeeking= */ true), "amr/sample_wb_cbr.amr");
   }
 
   private byte[] newWideBandAmrFrameWithType(int frameType) {
@@ -235,11 +249,12 @@ public final class AmrExtractorTest {
   }
 
   @NonNull
-  private static ExtractorAsserts.ExtractorFactory createAmrExtractorFactory() {
-    return new ExtractorAsserts.ExtractorFactory() {
-      @Override
-      public Extractor create() {
+  private static ExtractorAsserts.ExtractorFactory createAmrExtractorFactory(boolean withSeeking) {
+    return () -> {
+      if (!withSeeking) {
         return new AmrExtractor();
+      } else {
+        return new AmrExtractor(AmrExtractor.FLAG_ENABLE_CONSTANT_BITRATE_SEEKING);
       }
     };
   }

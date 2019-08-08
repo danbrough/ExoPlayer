@@ -29,13 +29,15 @@ public final class OpusLibrary {
 
   static {
     ExoPlayerLibraryInfo.registerModule("goog.exo.opus");
-    Log.e("THANG","THIS WORKED");
+    Log.e("THANG", "INIT OPUS");
   }
 
   private static final LibraryLoader LOADER = new LibraryLoader("opusV2JNI");
-  @Nullable private static Class<? extends ExoMediaCrypto> exoMediaCryptoType;
+  @Nullable
+  private static Class<? extends ExoMediaCrypto> exoMediaCryptoType;
 
-  private OpusLibrary() {}
+  private OpusLibrary() {
+  }
 
   /**
    * Override the names of the Opus native libraries. If an application wishes to call this method,
@@ -43,7 +45,7 @@ public final class OpusLibrary {
    * {@link LibopusAudioRenderer} instance.
    *
    * @param exoMediaCryptoType The {@link ExoMediaCrypto} type expected for decoding protected
-   *     content.
+   * content.
    * @param libraries The names of the Opus native libraries.
    */
   public static void setLibraries(
@@ -59,7 +61,9 @@ public final class OpusLibrary {
     return LOADER.isAvailable();
   }
 
-  /** Returns the version of the underlying library if available, or null otherwise. */
+  /**
+   * Returns the version of the underlying library if available, or null otherwise.
+   */
   @Nullable
   public static String getVersion() {
     return isAvailable() ? opusGetVersion() : null;
@@ -75,5 +79,6 @@ public final class OpusLibrary {
   }
 
   public static native String opusGetVersion();
+
   public static native boolean opusIsSecureDecodeSupported();
 }

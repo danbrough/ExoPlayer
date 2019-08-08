@@ -168,5 +168,11 @@
     <orderEntry type="module" module-name="library-core" />
     <orderEntry type="module" module-name="testutils-robolectric" scope="TEST" />
     <orderEntry type="module" module-name="testutils" scope="TEST" />
+    <orderEntry type="module" module-name="library-core" />
+    <orderEntry type="module" module-name="testutils-robolectric" scope="TEST" />
+    <orderEntry type="module" module-name="testutils" scope="TEST" />
+    <orderEntry type="module" module-name="library-core" />
+    <orderEntry type="module" module-name="testutils-robolectric" scope="TEST" />
+    <orderEntry type="module" module-name="testutils" scope="TEST" />
   </component>
 </module>

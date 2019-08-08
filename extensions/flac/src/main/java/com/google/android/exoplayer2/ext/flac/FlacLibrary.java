@@ -17,6 +17,7 @@ package com.google.android.exoplayer2.ext.flac;
 
 import com.google.android.exoplayer2.ExoPlayerLibraryInfo;
 import com.google.android.exoplayer2.util.LibraryLoader;
+import com.google.android.exoplayer2.util.Log;
 
 /**
  * Configures and queries the underlying native library.
@@ -25,6 +26,7 @@ public final class FlacLibrary {
 
   static {
     ExoPlayerLibraryInfo.registerModule("goog.exo.flac");
+    Log.e("THANG","INIT FLAC");
   }
 
   private static final LibraryLoader LOADER = new LibraryLoader("flacJNI");

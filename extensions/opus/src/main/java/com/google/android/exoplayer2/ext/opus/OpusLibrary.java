@@ -15,6 +15,7 @@
  */
 package com.google.android.exoplayer2.ext.opus;
 
+import android.util.Log;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.ExoPlayerLibraryInfo;
 import com.google.android.exoplayer2.drm.ExoMediaCrypto;
@@ -28,6 +29,7 @@ public final class OpusLibrary {
 
   static {
     ExoPlayerLibraryInfo.registerModule("goog.exo.opus");
+    Log.e("THANG","THIS WORKED");
   }
 
   private static final LibraryLoader LOADER = new LibraryLoader("opusV2JNI");

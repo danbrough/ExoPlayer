@@ -95,10 +95,12 @@ public final class DataSpec {
   public final @HttpMethod int httpMethod;
 
   /**
-   * The HTTP request body, null otherwise. If the body is non-null, then httpBody.length will be
-   * non-zero.
+   * The HTTP body, null otherwise. If the body is non-null, then httpBody.length will be non-zero.
    */
-  @Nullable public final byte[] httpBody;
+  public final @Nullable byte[] httpBody;
+
+  /** @deprecated Use {@link #httpBody} instead. */
+  @Deprecated public final @Nullable byte[] postBody;
 
   /**
    * The absolute position of the data in the full stream.
@@ -119,7 +121,7 @@ public final class DataSpec {
    * A key that uniquely identifies the original stream. Used for cache indexing. May be null if the
    * data spec is not intended to be used in conjunction with a cache.
    */
-  @Nullable public final String key;
+  public final @Nullable String key;
   /** Request {@link Flags flags}. */
   public final @Flags int flags;
 
@@ -249,6 +251,7 @@ public final class DataSpec {
     this.uri = uri;
     this.httpMethod = httpMethod;
     this.httpBody = (httpBody != null && httpBody.length != 0) ? httpBody : null;
+    this.postBody = this.httpBody;
     this.absoluteStreamPosition = absoluteStreamPosition;
     this.position = position;
     this.length = length;

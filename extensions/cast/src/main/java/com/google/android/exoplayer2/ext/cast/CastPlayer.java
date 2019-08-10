@@ -98,7 +98,7 @@ public final class CastPlayer extends BasePlayer {
   private CastTimeline currentTimeline;
   private TrackGroupArray currentTrackGroups;
   private TrackSelectionArray currentTrackSelection;
-  @Player.State private int playbackState;
+  private int playbackState;
   private int repeatMode;
   private int currentWindowIndex;
   private boolean playWhenReady;
@@ -323,7 +323,6 @@ public final class CastPlayer extends BasePlayer {
   }
 
   @Override
-  @Player.State
   public int getPlaybackState() {
     return playbackState;
   }
@@ -461,6 +460,11 @@ public final class CastPlayer extends BasePlayer {
   }
 
   @Override
+  @Nullable public Object getCurrentManifest() {
+    return null;
+  }
+
+  @Override
   public int getCurrentPeriodIndex() {
     return getCurrentWindowIndex();
   }
@@ -587,7 +591,8 @@ public final class CastPlayer extends BasePlayer {
       waitingForInitialTimeline = false;
       notificationsBatch.add(
           new ListenerNotificationTask(
-              listener -> listener.onTimelineChanged(currentTimeline, reason)));
+              listener ->
+                  listener.onTimelineChanged(currentTimeline, /* manifest= */ null, reason)));
     }
   }
 

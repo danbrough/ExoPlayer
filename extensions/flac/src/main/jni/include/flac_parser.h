@@ -61,9 +61,7 @@ class FLACParser {
 
   bool areVorbisCommentsValid() const { return mVorbisCommentsValid; }
 
-  const std::vector<std::string>& getVorbisComments() const {
-    return mVorbisComments;
-  }
+  std::vector<std::string> getVorbisComments() { return mVorbisComments; }
 
   bool arePicturesValid() const { return mPicturesValid; }
 

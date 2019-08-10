@@ -313,14 +313,14 @@ public final class ImaAdsLoader
    */
   private static final int IMA_AD_STATE_PAUSED = 2;
 
-  @Nullable private final Uri adTagUri;
-  @Nullable private final String adsResponse;
+  private final @Nullable Uri adTagUri;
+  private final @Nullable String adsResponse;
   private final int vastLoadTimeoutMs;
   private final int mediaLoadTimeoutMs;
   private final boolean focusSkipButtonWhenAvailable;
   private final int mediaBitrate;
-  @Nullable private final Set<UiElement> adUiElements;
-  @Nullable private final AdEventListener adEventListener;
+  private final @Nullable Set<UiElement> adUiElements;
+  private final @Nullable AdEventListener adEventListener;
   private final ImaFactory imaFactory;
   private final Timeline.Period period;
   private final List<VideoAdPlayerCallback> adCallbacks;
@@ -426,7 +426,7 @@ public final class ImaAdsLoader
    * @deprecated Use {@link ImaAdsLoader.Builder}.
    */
   @Deprecated
-  public ImaAdsLoader(Context context, Uri adTagUri, @Nullable ImaSdkSettings imaSdkSettings) {
+  public ImaAdsLoader(Context context, Uri adTagUri, ImaSdkSettings imaSdkSettings) {
     this(
         context,
         adTagUri,
@@ -946,7 +946,8 @@ public final class ImaAdsLoader
   // Player.EventListener implementation.
 
   @Override
-  public void onTimelineChanged(Timeline timeline, @Player.TimelineChangeReason int reason) {
+  public void onTimelineChanged(
+      Timeline timeline, @Nullable Object manifest, @Player.TimelineChangeReason int reason) {
     if (timeline.isEmpty()) {
       // The player is being reset or contains no media.
       return;
@@ -962,7 +963,7 @@ public final class ImaAdsLoader
   }
 
   @Override
-  public void onPlayerStateChanged(boolean playWhenReady, @Player.State int playbackState) {
+  public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
     if (adsManager == null) {
       return;
     }

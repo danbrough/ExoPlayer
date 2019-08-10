@@ -17,6 +17,7 @@ package com.google.android.exoplayer2.extractor.mp4;
 
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.util.ParsableByteArray;
+import com.google.android.exoplayer2.util.Util;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -50,334 +51,334 @@ import java.util.List;
   public static final int EXTENDS_TO_END_SIZE = 0;
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_ftyp = 0x66747970;
+  public static final int TYPE_ftyp = Util.getIntegerCodeForString("ftyp");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_avc1 = 0x61766331;
+  public static final int TYPE_avc1 = Util.getIntegerCodeForString("avc1");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_avc3 = 0x61766333;
+  public static final int TYPE_avc3 = Util.getIntegerCodeForString("avc3");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_avcC = 0x61766343;
+  public static final int TYPE_avcC = Util.getIntegerCodeForString("avcC");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_hvc1 = 0x68766331;
+  public static final int TYPE_hvc1 = Util.getIntegerCodeForString("hvc1");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_hev1 = 0x68657631;
+  public static final int TYPE_hev1 = Util.getIntegerCodeForString("hev1");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_hvcC = 0x68766343;
+  public static final int TYPE_hvcC = Util.getIntegerCodeForString("hvcC");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_vp08 = 0x76703038;
+  public static final int TYPE_vp08 = Util.getIntegerCodeForString("vp08");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_vp09 = 0x76703039;
+  public static final int TYPE_vp09 = Util.getIntegerCodeForString("vp09");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_vpcC = 0x76706343;
+  public static final int TYPE_vpcC = Util.getIntegerCodeForString("vpcC");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_av01 = 0x61763031;
+  public static final int TYPE_av01 = Util.getIntegerCodeForString("av01");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_av1C = 0x61763143;
+  public static final int TYPE_av1C = Util.getIntegerCodeForString("av1C");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_dvav = 0x64766176;
+  public static final int TYPE_dvav = Util.getIntegerCodeForString("dvav");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_dva1 = 0x64766131;
+  public static final int TYPE_dva1 = Util.getIntegerCodeForString("dva1");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_dvhe = 0x64766865;
+  public static final int TYPE_dvhe = Util.getIntegerCodeForString("dvhe");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_dvh1 = 0x64766831;
+  public static final int TYPE_dvh1 = Util.getIntegerCodeForString("dvh1");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_dvcC = 0x64766343;
+  public static final int TYPE_dvcC = Util.getIntegerCodeForString("dvcC");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_dvvC = 0x64767643;
+  public static final int TYPE_dvvC = Util.getIntegerCodeForString("dvvC");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_s263 = 0x73323633;
+  public static final int TYPE_s263 = Util.getIntegerCodeForString("s263");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_d263 = 0x64323633;
+  public static final int TYPE_d263 = Util.getIntegerCodeForString("d263");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_mdat = 0x6d646174;
+  public static final int TYPE_mdat = Util.getIntegerCodeForString("mdat");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_mp4a = 0x6d703461;
+  public static final int TYPE_mp4a = Util.getIntegerCodeForString("mp4a");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE__mp3 = 0x2e6d7033;
+  public static final int TYPE__mp3 = Util.getIntegerCodeForString(".mp3");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_wave = 0x77617665;
+  public static final int TYPE_wave = Util.getIntegerCodeForString("wave");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_lpcm = 0x6c70636d;
+  public static final int TYPE_lpcm = Util.getIntegerCodeForString("lpcm");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_sowt = 0x736f7774;
+  public static final int TYPE_sowt = Util.getIntegerCodeForString("sowt");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_ac_3 = 0x61632d33;
+  public static final int TYPE_ac_3 = Util.getIntegerCodeForString("ac-3");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_dac3 = 0x64616333;
+  public static final int TYPE_dac3 = Util.getIntegerCodeForString("dac3");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_ec_3 = 0x65632d33;
+  public static final int TYPE_ec_3 = Util.getIntegerCodeForString("ec-3");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_dec3 = 0x64656333;
+  public static final int TYPE_dec3 = Util.getIntegerCodeForString("dec3");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_ac_4 = 0x61632d34;
+  public static final int TYPE_ac_4 = Util.getIntegerCodeForString("ac-4");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_dac4 = 0x64616334;
+  public static final int TYPE_dac4 = Util.getIntegerCodeForString("dac4");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_dtsc = 0x64747363;
+  public static final int TYPE_dtsc = Util.getIntegerCodeForString("dtsc");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_dtsh = 0x64747368;
+  public static final int TYPE_dtsh = Util.getIntegerCodeForString("dtsh");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_dtsl = 0x6474736c;
+  public static final int TYPE_dtsl = Util.getIntegerCodeForString("dtsl");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_dtse = 0x64747365;
+  public static final int TYPE_dtse = Util.getIntegerCodeForString("dtse");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_ddts = 0x64647473;
+  public static final int TYPE_ddts = Util.getIntegerCodeForString("ddts");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_tfdt = 0x74666474;
+  public static final int TYPE_tfdt = Util.getIntegerCodeForString("tfdt");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_tfhd = 0x74666864;
+  public static final int TYPE_tfhd = Util.getIntegerCodeForString("tfhd");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_trex = 0x74726578;
+  public static final int TYPE_trex = Util.getIntegerCodeForString("trex");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_trun = 0x7472756e;
+  public static final int TYPE_trun = Util.getIntegerCodeForString("trun");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_sidx = 0x73696478;
+  public static final int TYPE_sidx = Util.getIntegerCodeForString("sidx");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_moov = 0x6d6f6f76;
+  public static final int TYPE_moov = Util.getIntegerCodeForString("moov");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_mvhd = 0x6d766864;
+  public static final int TYPE_mvhd = Util.getIntegerCodeForString("mvhd");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_trak = 0x7472616b;
+  public static final int TYPE_trak = Util.getIntegerCodeForString("trak");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_mdia = 0x6d646961;
+  public static final int TYPE_mdia = Util.getIntegerCodeForString("mdia");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_minf = 0x6d696e66;
+  public static final int TYPE_minf = Util.getIntegerCodeForString("minf");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_stbl = 0x7374626c;
+  public static final int TYPE_stbl = Util.getIntegerCodeForString("stbl");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_esds = 0x65736473;
+  public static final int TYPE_esds = Util.getIntegerCodeForString("esds");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_moof = 0x6d6f6f66;
+  public static final int TYPE_moof = Util.getIntegerCodeForString("moof");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_traf = 0x74726166;
+  public static final int TYPE_traf = Util.getIntegerCodeForString("traf");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_mvex = 0x6d766578;
+  public static final int TYPE_mvex = Util.getIntegerCodeForString("mvex");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_mehd = 0x6d656864;
+  public static final int TYPE_mehd = Util.getIntegerCodeForString("mehd");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_tkhd = 0x746b6864;
+  public static final int TYPE_tkhd = Util.getIntegerCodeForString("tkhd");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_edts = 0x65647473;
+  public static final int TYPE_edts = Util.getIntegerCodeForString("edts");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_elst = 0x656c7374;
+  public static final int TYPE_elst = Util.getIntegerCodeForString("elst");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_mdhd = 0x6d646864;
+  public static final int TYPE_mdhd = Util.getIntegerCodeForString("mdhd");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_hdlr = 0x68646c72;
+  public static final int TYPE_hdlr = Util.getIntegerCodeForString("hdlr");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_stsd = 0x73747364;
+  public static final int TYPE_stsd = Util.getIntegerCodeForString("stsd");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_pssh = 0x70737368;
+  public static final int TYPE_pssh = Util.getIntegerCodeForString("pssh");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_sinf = 0x73696e66;
+  public static final int TYPE_sinf = Util.getIntegerCodeForString("sinf");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_schm = 0x7363686d;
+  public static final int TYPE_schm = Util.getIntegerCodeForString("schm");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_schi = 0x73636869;
+  public static final int TYPE_schi = Util.getIntegerCodeForString("schi");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_tenc = 0x74656e63;
+  public static final int TYPE_tenc = Util.getIntegerCodeForString("tenc");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_encv = 0x656e6376;
+  public static final int TYPE_encv = Util.getIntegerCodeForString("encv");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_enca = 0x656e6361;
+  public static final int TYPE_enca = Util.getIntegerCodeForString("enca");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_frma = 0x66726d61;
+  public static final int TYPE_frma = Util.getIntegerCodeForString("frma");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_saiz = 0x7361697a;
+  public static final int TYPE_saiz = Util.getIntegerCodeForString("saiz");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_saio = 0x7361696f;
+  public static final int TYPE_saio = Util.getIntegerCodeForString("saio");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_sbgp = 0x73626770;
+  public static final int TYPE_sbgp = Util.getIntegerCodeForString("sbgp");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_sgpd = 0x73677064;
+  public static final int TYPE_sgpd = Util.getIntegerCodeForString("sgpd");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_uuid = 0x75756964;
+  public static final int TYPE_uuid = Util.getIntegerCodeForString("uuid");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_senc = 0x73656e63;
+  public static final int TYPE_senc = Util.getIntegerCodeForString("senc");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_pasp = 0x70617370;
+  public static final int TYPE_pasp = Util.getIntegerCodeForString("pasp");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_TTML = 0x54544d4c;
+  public static final int TYPE_TTML = Util.getIntegerCodeForString("TTML");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_vmhd = 0x766d6864;
+  public static final int TYPE_vmhd = Util.getIntegerCodeForString("vmhd");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_mp4v = 0x6d703476;
+  public static final int TYPE_mp4v = Util.getIntegerCodeForString("mp4v");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_stts = 0x73747473;
+  public static final int TYPE_stts = Util.getIntegerCodeForString("stts");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_stss = 0x73747373;
+  public static final int TYPE_stss = Util.getIntegerCodeForString("stss");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_ctts = 0x63747473;
+  public static final int TYPE_ctts = Util.getIntegerCodeForString("ctts");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_stsc = 0x73747363;
+  public static final int TYPE_stsc = Util.getIntegerCodeForString("stsc");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_stsz = 0x7374737a;
+  public static final int TYPE_stsz = Util.getIntegerCodeForString("stsz");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_stz2 = 0x73747a32;
+  public static final int TYPE_stz2 = Util.getIntegerCodeForString("stz2");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_stco = 0x7374636f;
+  public static final int TYPE_stco = Util.getIntegerCodeForString("stco");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_co64 = 0x636f3634;
+  public static final int TYPE_co64 = Util.getIntegerCodeForString("co64");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_tx3g = 0x74783367;
+  public static final int TYPE_tx3g = Util.getIntegerCodeForString("tx3g");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_wvtt = 0x77767474;
+  public static final int TYPE_wvtt = Util.getIntegerCodeForString("wvtt");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_stpp = 0x73747070;
+  public static final int TYPE_stpp = Util.getIntegerCodeForString("stpp");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_c608 = 0x63363038;
+  public static final int TYPE_c608 = Util.getIntegerCodeForString("c608");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_samr = 0x73616d72;
+  public static final int TYPE_samr = Util.getIntegerCodeForString("samr");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_sawb = 0x73617762;
+  public static final int TYPE_sawb = Util.getIntegerCodeForString("sawb");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_udta = 0x75647461;
+  public static final int TYPE_udta = Util.getIntegerCodeForString("udta");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_meta = 0x6d657461;
+  public static final int TYPE_meta = Util.getIntegerCodeForString("meta");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_keys = 0x6b657973;
+  public static final int TYPE_keys = Util.getIntegerCodeForString("keys");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_ilst = 0x696c7374;
+  public static final int TYPE_ilst = Util.getIntegerCodeForString("ilst");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_mean = 0x6d65616e;
+  public static final int TYPE_mean = Util.getIntegerCodeForString("mean");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_name = 0x6e616d65;
+  public static final int TYPE_name = Util.getIntegerCodeForString("name");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_data = 0x64617461;
+  public static final int TYPE_data = Util.getIntegerCodeForString("data");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_emsg = 0x656d7367;
+  public static final int TYPE_emsg = Util.getIntegerCodeForString("emsg");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_st3d = 0x73743364;
+  public static final int TYPE_st3d = Util.getIntegerCodeForString("st3d");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_sv3d = 0x73763364;
+  public static final int TYPE_sv3d = Util.getIntegerCodeForString("sv3d");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_proj = 0x70726f6a;
+  public static final int TYPE_proj = Util.getIntegerCodeForString("proj");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_camm = 0x63616d6d;
+  public static final int TYPE_camm = Util.getIntegerCodeForString("camm");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_alac = 0x616c6163;
+  public static final int TYPE_alac = Util.getIntegerCodeForString("alac");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_alaw = 0x616c6177;
+  public static final int TYPE_alaw = Util.getIntegerCodeForString("alaw");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_ulaw = 0x756c6177;
+  public static final int TYPE_ulaw = Util.getIntegerCodeForString("ulaw");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_Opus = 0x4f707573;
+  public static final int TYPE_Opus = Util.getIntegerCodeForString("Opus");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_dOps = 0x644f7073;
+  public static final int TYPE_dOps = Util.getIntegerCodeForString("dOps");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_fLaC = 0x664c6143;
+  public static final int TYPE_fLaC = Util.getIntegerCodeForString("fLaC");
 
   @SuppressWarnings("ConstantCaseForConstants")
-  public static final int TYPE_dfLa = 0x64664c61;
+  public static final int TYPE_dfLa = Util.getIntegerCodeForString("dfLa");
 
   public final int type;
 
@@ -458,8 +459,7 @@ import java.util.List;
      * @param type The leaf type.
      * @return The child leaf of the given type, or null if no such child exists.
      */
-    @Nullable
-    public LeafAtom getLeafAtomOfType(int type) {
+    public @Nullable LeafAtom getLeafAtomOfType(int type) {
       int childrenSize = leafChildren.size();
       for (int i = 0; i < childrenSize; i++) {
         LeafAtom atom = leafChildren.get(i);
@@ -479,8 +479,7 @@ import java.util.List;
      * @param type The container type.
      * @return The child container of the given type, or null if no such child exists.
      */
-    @Nullable
-    public ContainerAtom getContainerAtomOfType(int type) {
+    public @Nullable ContainerAtom getContainerAtomOfType(int type) {
       int childrenSize = containerChildren.size();
       for (int i = 0; i < childrenSize; i++) {
         ContainerAtom atom = containerChildren.get(i);

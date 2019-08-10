@@ -145,7 +145,7 @@ public class WindowedTrackBitrateEstimatorTest {
             new MediaChunkIterator[] {iterator1, iterator2},
             bitratesArrayToUse);
 
-    assertThat(bitrates).isSameInstanceAs(bitratesArrayToUse);
+    assertThat(bitrates).isSameAs(bitratesArrayToUse);
   }
 
   private static MediaChunk createMediaChunk(int formatBitrate, int actualBitrate) {

@@ -1,33 +1,5 @@
 # Release notes #
 
-### dev-v2 (not yet released) ###
-
-* Update `DefaultTrackSelector` to apply a viewport constraint for the default
-  display by default.
-* Add `PlaybackStatsListener` to collect `PlaybackStats` for playbacks analysis
-  and analytics reporting (TODO: link to developer guide page/blog post).
-* Add basic DRM support to the Cast demo app.
-* Assume that encrypted content requires secure decoders in renderer support
-  checks ([#5568](https://github.com/google/ExoPlayer/issues/5568)).
-* Decoders: Prefer decoders that advertise format support over ones that do not,
-  even if they are listed lower in the `MediaCodecList`.
-* Add a workaround for broken raw audio decoding on Oppo R9
-  ([#5782](https://github.com/google/ExoPlayer/issues/5782)).
-* Add VR player demo.
-* Wrap decoder exceptions in a new `DecoderException` class and report as
-  renderer error.
-* Do not pass the manifest to callbacks of `Player.EventListener` and
-  `SourceInfoRefreshListener` anymore. Instead make it accessible through
-  `Player.getCurrentManifest()` and `Timeline.Window.manifest`. Also rename
-  `SourceInfoRefreshListener` to `MediaSourceCaller`.
-* Set `compileSdkVersion` to 29 to use Android Q APIs.
-* Add `enable` and `disable` methods to `MediaSource` to improve resource
-  management in playlists.
-* Improve text selection logic to always prefer the better language matches
-  over other selection parameters.
-* Remove `AnalyticsCollector.Factory`. Instances can be created directly and
-  the `Player` set later using `AnalyticsCollector.setPlayer`.
-
 ### 2.10.4 ###
 
 * Offline: Add `Scheduler` implementation that uses `WorkManager`.

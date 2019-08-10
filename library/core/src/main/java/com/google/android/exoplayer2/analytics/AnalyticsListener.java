@@ -68,7 +68,7 @@ public interface AnalyticsListener {
      * Media period identifier for the media period this event belongs to, or {@code null} if the
      * event is not associated with a specific media period.
      */
-    @Nullable public final MediaPeriodId mediaPeriodId;
+    public final @Nullable MediaPeriodId mediaPeriodId;
 
     /**
      * Position in the window or ad this event belongs to at the time of the event, in milliseconds.
@@ -127,10 +127,10 @@ public interface AnalyticsListener {
    *
    * @param eventTime The event time.
    * @param playWhenReady Whether the playback will proceed when ready.
-   * @param playbackState The new {@link Player.State playback state}.
+   * @param playbackState One of the {@link Player}.STATE constants.
    */
   default void onPlayerStateChanged(
-      EventTime eventTime, boolean playWhenReady, @Player.State int playbackState) {}
+      EventTime eventTime, boolean playWhenReady, int playbackState) {}
 
   /**
    * Called when the timeline changed.

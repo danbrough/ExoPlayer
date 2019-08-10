@@ -66,9 +66,10 @@ public final class SilenceMediaSource extends BaseMediaSource {
   }
 
   @Override
-  protected void prepareSourceInternal(@Nullable TransferListener mediaTransferListener) {
+  public void prepareSourceInternal(@Nullable TransferListener mediaTransferListener) {
     refreshSourceInfo(
-        new SinglePeriodTimeline(durationUs, /* isSeekable= */ true, /* isDynamic= */ false));
+        new SinglePeriodTimeline(durationUs, /* isSeekable= */ true, /* isDynamic= */ false),
+        /* manifest= */ null);
   }
 
   @Override
@@ -83,7 +84,7 @@ public final class SilenceMediaSource extends BaseMediaSource {
   public void releasePeriod(MediaPeriod mediaPeriod) {}
 
   @Override
-  protected void releaseSourceInternal() {}
+  public void releaseSourceInternal() {}
 
   private static final class SilenceMediaPeriod implements MediaPeriod {
 

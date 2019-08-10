@@ -34,36 +34,23 @@ public final class ErrorStateDrmSession<T extends ExoMediaCrypto> implements Drm
   }
 
   @Override
-  @Nullable
-  public DrmSessionException getError() {
+  public @Nullable DrmSessionException getError() {
     return error;
   }
 
   @Override
-  @Nullable
-  public T getMediaCrypto() {
+  public @Nullable T getMediaCrypto() {
     return null;
   }
 
   @Override
-  @Nullable
-  public Map<String, String> queryKeyStatus() {
+  public @Nullable Map<String, String> queryKeyStatus() {
     return null;
   }
 
   @Override
-  @Nullable
-  public byte[] getOfflineLicenseKeySetId() {
+  public @Nullable byte[] getOfflineLicenseKeySetId() {
     return null;
   }
 
-  @Override
-  public void acquireReference() {
-    // Do nothing.
-  }
-
-  @Override
-  public void releaseReference() {
-    // Do nothing.
-  }
 }

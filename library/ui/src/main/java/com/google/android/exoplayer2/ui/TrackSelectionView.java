@@ -67,7 +67,7 @@ public class TrackSelectionView extends LinearLayout {
   private TrackNameProvider trackNameProvider;
   private CheckedTextView[][] trackViews;
 
-  private @MonotonicNonNull MappedTrackInfo mappedTrackInfo;
+  @MonotonicNonNull private MappedTrackInfo mappedTrackInfo;
   private int rendererIndex;
   private TrackGroupArray trackGroups;
   private boolean isDisabled;

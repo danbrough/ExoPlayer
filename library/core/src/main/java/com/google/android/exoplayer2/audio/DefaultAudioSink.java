@@ -825,12 +825,17 @@ public final class DefaultAudioSink implements AudioSink {
   }
 
   @Override
-  public void setPlaybackParameters(PlaybackParameters playbackParameters) {
+  public PlaybackParameters setPlaybackParameters(PlaybackParameters playbackParameters) {
     if (configuration != null && !configuration.canApplyPlaybackParameters) {
       this.playbackParameters = PlaybackParameters.DEFAULT;
-      return;
+      return this.playbackParameters;
     }
-    PlaybackParameters lastSetPlaybackParameters = getPlaybackParameters();
+    PlaybackParameters lastSetPlaybackParameters =
+        afterDrainPlaybackParameters != null
+            ? afterDrainPlaybackParameters
+            : !playbackParametersCheckpoints.isEmpty()
+                ? playbackParametersCheckpoints.getLast().playbackParameters
+                : this.playbackParameters;
     if (!playbackParameters.equals(lastSetPlaybackParameters)) {
       if (isInitialized()) {
         // Drain the audio processors so we can determine the frame position at which the new
@@ -842,16 +847,12 @@ public final class DefaultAudioSink implements AudioSink {
         this.playbackParameters = playbackParameters;
       }
     }
+    return this.playbackParameters;
   }
 
   @Override
   public PlaybackParameters getPlaybackParameters() {
-    // Mask the already set parameters.
-    return afterDrainPlaybackParameters != null
-        ? afterDrainPlaybackParameters
-        : !playbackParametersCheckpoints.isEmpty()
-            ? playbackParametersCheckpoints.getLast().playbackParameters
-            : playbackParameters;
+    return playbackParameters;
   }
 
   @Override
@@ -1218,6 +1219,7 @@ public final class DefaultAudioSink implements AudioSink {
     audioTrack.setVolume(volume);
   }
 
+  @SuppressWarnings("deprecation")
   private static void setVolumeInternalV3(AudioTrack audioTrack, float volume) {
     audioTrack.setStereoVolume(volume, volume);
   }

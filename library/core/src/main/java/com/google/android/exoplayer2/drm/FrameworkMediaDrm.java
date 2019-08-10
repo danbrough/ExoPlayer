@@ -225,11 +225,6 @@ public final class FrameworkMediaDrm implements ExoMediaDrm<FrameworkMediaCrypto
         adjustUuid(uuid), initData, forceAllowInsecureDecoderComponents);
   }
 
-  @Override
-  public Class<FrameworkMediaCrypto> getExoMediaCryptoType() {
-    return FrameworkMediaCrypto.class;
-  }
-
   private static SchemeData getSchemeData(UUID uuid, List<SchemeData> schemeDatas) {
     if (!C.WIDEVINE_UUID.equals(uuid)) {
       // For non-Widevine CDMs always use the first scheme data.
@@ -244,7 +239,8 @@ public final class FrameworkMediaDrm implements ExoMediaDrm<FrameworkMediaCrypto
       for (int i = 0; i < schemeDatas.size(); i++) {
         SchemeData schemeData = schemeDatas.get(i);
         byte[] schemeDataData = Util.castNonNull(schemeData.data);
-        if (Util.areEqual(schemeData.mimeType, firstSchemeData.mimeType)
+        if (schemeData.requiresSecureDecryption == firstSchemeData.requiresSecureDecryption
+            && Util.areEqual(schemeData.mimeType, firstSchemeData.mimeType)
             && Util.areEqual(schemeData.licenseServerUrl, firstSchemeData.licenseServerUrl)
             && PsshAtomUtil.isPsshAtom(schemeDataData)) {
           concatenatedDataLength += schemeDataData.length;

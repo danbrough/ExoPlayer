@@ -59,8 +59,8 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
   private final MediaSource mediaSource;
 
   @Nullable private MediaPeriodHolder next;
-  private TrackGroupArray trackGroups;
-  private TrackSelectorResult trackSelectorResult;
+  @Nullable private TrackGroupArray trackGroups;
+  @Nullable private TrackSelectorResult trackSelectorResult;
   private long rendererPositionOffsetUs;
 
   /**
@@ -72,8 +72,6 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
    * @param allocator The allocator.
    * @param mediaSource The media source that produced the media period.
    * @param info Information used to identify this media period in its timeline period.
-   * @param emptyTrackSelectorResult A {@link TrackSelectorResult} with empty selections for each
-   *     renderer.
    */
   public MediaPeriodHolder(
       RendererCapabilities[] rendererCapabilities,
@@ -81,16 +79,13 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
       TrackSelector trackSelector,
       Allocator allocator,
       MediaSource mediaSource,
-      MediaPeriodInfo info,
-      TrackSelectorResult emptyTrackSelectorResult) {
+      MediaPeriodInfo info) {
     this.rendererCapabilities = rendererCapabilities;
     this.rendererPositionOffsetUs = rendererPositionOffsetUs;
     this.trackSelector = trackSelector;
     this.mediaSource = mediaSource;
     this.uid = info.id.periodUid;
     this.info = info;
-    this.trackGroups = TrackGroupArray.EMPTY;
-    this.trackSelectorResult = emptyTrackSelectorResult;
     sampleStreams = new SampleStream[rendererCapabilities.length];
     mayRetainStreamFlags = new boolean[rendererCapabilities.length];
     mediaPeriod =
@@ -172,7 +167,8 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
   public void handlePrepared(float playbackSpeed, Timeline timeline) throws ExoPlaybackException {
     prepared = true;
     trackGroups = mediaPeriod.getTrackGroups();
-    TrackSelectorResult selectorResult = selectTracks(playbackSpeed, timeline);
+    TrackSelectorResult selectorResult =
+        Assertions.checkNotNull(selectTracks(playbackSpeed, timeline));
     long newStartPositionUs =
         applyTrackSelection(
             selectorResult, info.startPositionUs, /* forceRecreateStreams= */ false);
@@ -206,20 +202,22 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
   }
 
   /**
-   * Selects tracks for the period. Must only be called if {@link #prepared} is {@code true}.
-   *
-   * <p>The new track selection needs to be applied with {@link
-   * #applyTrackSelection(TrackSelectorResult, long, boolean)} before taking effect.
+   * Selects tracks for the period and returns the new result if the selection changed. Must only be
+   * called if {@link #prepared} is {@code true}.
    *
    * @param playbackSpeed The current playback speed.
    * @param timeline The current {@link Timeline}.
-   * @return The {@link TrackSelectorResult}.
+   * @return The {@link TrackSelectorResult} if the result changed. Or null if nothing changed.
    * @throws ExoPlaybackException If an error occurs during track selection.
    */
+  @Nullable
   public TrackSelectorResult selectTracks(float playbackSpeed, Timeline timeline)
       throws ExoPlaybackException {
     TrackSelectorResult selectorResult =
         trackSelector.selectTracks(rendererCapabilities, getTrackGroups(), info.id, timeline);
+    if (selectorResult.isEquivalent(trackSelectorResult)) {
+      return null;
+    }
     for (TrackSelection trackSelection : selectorResult.selections.getAll()) {
       if (trackSelection != null) {
         trackSelection.onPlaybackSpeed(playbackSpeed);
@@ -305,6 +303,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
   /** Releases the media period. No other method should be called after the release. */
   public void release() {
     disableTrackSelectionsInResult();
+    trackSelectorResult = null;
     releaseMediaPeriod(info.endPositionUs, mediaSource, mediaPeriod);
   }
 
@@ -332,18 +331,25 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
     return next;
   }
 
-  /** Returns the {@link TrackGroupArray} exposed by this media period. */
+  /**
+   * Returns the {@link TrackGroupArray} exposed by this media period. Must only be called if {@link
+   * #prepared} is {@code true}.
+   */
   public TrackGroupArray getTrackGroups() {
-    return trackGroups;
+    return Assertions.checkNotNull(trackGroups);
   }
 
-  /** Returns the {@link TrackSelectorResult} which is currently applied. */
+  /**
+   * Returns the {@link TrackSelectorResult} which is currently applied. Must only be called if
+   * {@link #prepared} is {@code true}.
+   */
   public TrackSelectorResult getTrackSelectorResult() {
-    return trackSelectorResult;
+    return Assertions.checkNotNull(trackSelectorResult);
   }
 
   private void enableTrackSelectionsInResult() {
-    if (!isLoadingMediaPeriod()) {
+    TrackSelectorResult trackSelectorResult = this.trackSelectorResult;
+    if (!isLoadingMediaPeriod() || trackSelectorResult == null) {
       return;
     }
     for (int i = 0; i < trackSelectorResult.length; i++) {
@@ -356,7 +362,8 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
   }
 
   private void disableTrackSelectionsInResult() {
-    if (!isLoadingMediaPeriod()) {
+    TrackSelectorResult trackSelectorResult = this.trackSelectorResult;
+    if (!isLoadingMediaPeriod() || trackSelectorResult == null) {
       return;
     }
     for (int i = 0; i < trackSelectorResult.length; i++) {
@@ -387,6 +394,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
    */
   private void associateNoSampleRenderersWithEmptySampleStream(
       @NullableType SampleStream[] sampleStreams) {
+    TrackSelectorResult trackSelectorResult = Assertions.checkNotNull(this.trackSelectorResult);
     for (int i = 0; i < rendererCapabilities.length; i++) {
       if (rendererCapabilities[i].getTrackType() == C.TRACK_TYPE_NONE
           && trackSelectorResult.isRendererEnabled(i)) {

@@ -190,7 +190,7 @@ public class DefaultTimeBar extends View implements TimeBar {
   private final Paint adMarkerPaint;
   private final Paint playedAdMarkerPaint;
   private final Paint scrubberPaint;
-  @Nullable private final Drawable scrubberDrawable;
+  private final @Nullable Drawable scrubberDrawable;
   private final int barHeight;
   private final int touchTargetHeight;
   private final int adMarkerWidth;
@@ -217,8 +217,8 @@ public class DefaultTimeBar extends View implements TimeBar {
   private long position;
   private long bufferedPosition;
   private int adGroupCount;
-  @Nullable private long[] adGroupTimesMs;
-  @Nullable private boolean[] playedAdGroups;
+  private @Nullable long[] adGroupTimesMs;
+  private @Nullable boolean[] playedAdGroups;
 
   public DefaultTimeBar(Context context) {
     this(context, null);

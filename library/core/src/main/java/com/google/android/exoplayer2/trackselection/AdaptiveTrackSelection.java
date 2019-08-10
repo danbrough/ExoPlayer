@@ -39,7 +39,7 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
   /** Factory for {@link AdaptiveTrackSelection} instances. */
   public static class Factory implements TrackSelection.Factory {
 
-    @Nullable private final BandwidthMeter bandwidthMeter;
+    private final @Nullable BandwidthMeter bandwidthMeter;
     private final int minDurationForQualityIncreaseMs;
     private final int maxDurationForQualityDecreaseMs;
     private final int minDurationToRetainAfterDiscardMs;
@@ -49,6 +49,7 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
     private final Clock clock;
 
     private TrackBitrateEstimator trackBitrateEstimator;
+    private boolean blockFixedTrackSelectionBandwidth;
 
     /** Creates an adaptive track selection factory with default parameters. */
     public Factory() {
@@ -217,6 +218,15 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
       this.trackBitrateEstimator = trackBitrateEstimator;
     }
 
+    /**
+     * Enables blocking of the total fixed track selection bandwidth.
+     *
+     * <p>This method is experimental, and will be renamed or removed in a future release.
+     */
+    public final void experimental_enableBlockFixedTrackSelectionBandwidth() {
+      this.blockFixedTrackSelectionBandwidth = true;
+    }
+
     @Override
     public final @NullableType TrackSelection[] createTrackSelections(
         @NullableType Definition[] definitions, BandwidthMeter bandwidthMeter) {
@@ -224,11 +234,20 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
         bandwidthMeter = this.bandwidthMeter;
       }
       TrackSelection[] selections = new TrackSelection[definitions.length];
+      List<AdaptiveTrackSelection> adaptiveSelections = new ArrayList<>();
       int totalFixedBandwidth = 0;
       for (int i = 0; i < definitions.length; i++) {
         Definition definition = definitions[i];
-        if (definition != null && definition.tracks.length == 1) {
-          // Make fixed selections first to know their total bandwidth.
+        if (definition == null) {
+          continue;
+        }
+        if (definition.tracks.length > 1) {
+          AdaptiveTrackSelection adaptiveSelection =
+              createAdaptiveTrackSelection(definition.group, bandwidthMeter, definition.tracks);
+          adaptiveSelection.experimental_setTrackBitrateEstimator(trackBitrateEstimator);
+          adaptiveSelections.add(adaptiveSelection);
+          selections[i] = adaptiveSelection;
+        } else {
           selections[i] =
               new FixedTrackSelection(
                   definition.group, definition.tracks[0], definition.reason, definition.data);
@@ -238,16 +257,9 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
           }
         }
       }
-      List<AdaptiveTrackSelection> adaptiveSelections = new ArrayList<>();
-      for (int i = 0; i < definitions.length; i++) {
-        Definition definition = definitions[i];
-        if (definition != null && definition.tracks.length > 1) {
-          AdaptiveTrackSelection adaptiveSelection =
-              createAdaptiveTrackSelection(
-                  definition.group, bandwidthMeter, definition.tracks, totalFixedBandwidth);
-          adaptiveSelection.experimental_setTrackBitrateEstimator(trackBitrateEstimator);
-          adaptiveSelections.add(adaptiveSelection);
-          selections[i] = adaptiveSelection;
+      if (blockFixedTrackSelectionBandwidth) {
+        for (int i = 0; i < adaptiveSelections.size(); i++) {
+          adaptiveSelections.get(i).experimental_setNonAllocatableBandwidth(totalFixedBandwidth);
         }
       }
       if (adaptiveSelections.size() > 1) {
@@ -276,19 +288,14 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
      * @param group The {@link TrackGroup}.
      * @param bandwidthMeter A {@link BandwidthMeter} which can be used to select tracks.
      * @param tracks The indices of the selected tracks in the track group.
-     * @param totalFixedTrackBandwidth The total bandwidth used by all non-adaptive tracks, in bits
-     *     per second.
      * @return An {@link AdaptiveTrackSelection} for the specified tracks.
      */
     protected AdaptiveTrackSelection createAdaptiveTrackSelection(
-        TrackGroup group,
-        BandwidthMeter bandwidthMeter,
-        int[] tracks,
-        int totalFixedTrackBandwidth) {
+        TrackGroup group, BandwidthMeter bandwidthMeter, int[] tracks) {
       return new AdaptiveTrackSelection(
           group,
           tracks,
-          new DefaultBandwidthProvider(bandwidthMeter, bandwidthFraction, totalFixedTrackBandwidth),
+          new DefaultBandwidthProvider(bandwidthMeter, bandwidthFraction),
           minDurationForQualityIncreaseMs,
           maxDurationForQualityDecreaseMs,
           minDurationToRetainAfterDiscardMs,
@@ -334,7 +341,6 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
         group,
         tracks,
         bandwidthMeter,
-        /* reservedBandwidth= */ 0,
         DEFAULT_MIN_DURATION_FOR_QUALITY_INCREASE_MS,
         DEFAULT_MAX_DURATION_FOR_QUALITY_DECREASE_MS,
         DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS,
@@ -349,8 +355,6 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
    * @param tracks The indices of the selected tracks within the {@link TrackGroup}. Must not be
    *     empty. May be in any order.
    * @param bandwidthMeter Provides an estimate of the currently available bandwidth.
-   * @param reservedBandwidth The reserved bandwidth, which shouldn't be considered available for
-   *     use, in bits per second.
    * @param minDurationForQualityIncreaseMs The minimum duration of buffered data required for the
    *     selected track to switch to one of higher quality.
    * @param maxDurationForQualityDecreaseMs The maximum duration of buffered data required for the
@@ -377,7 +381,6 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
       TrackGroup group,
       int[] tracks,
       BandwidthMeter bandwidthMeter,
-      long reservedBandwidth,
       long minDurationForQualityIncreaseMs,
       long maxDurationForQualityDecreaseMs,
       long minDurationToRetainAfterDiscardMs,
@@ -388,7 +391,7 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
     this(
         group,
         tracks,
-        new DefaultBandwidthProvider(bandwidthMeter, bandwidthFraction, reservedBandwidth),
+        new DefaultBandwidthProvider(bandwidthMeter, bandwidthFraction),
         minDurationForQualityIncreaseMs,
         maxDurationForQualityDecreaseMs,
         minDurationToRetainAfterDiscardMs,
@@ -440,6 +443,18 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
    */
   public void experimental_setTrackBitrateEstimator(TrackBitrateEstimator trackBitrateEstimator) {
     this.trackBitrateEstimator = trackBitrateEstimator;
+  }
+
+  /**
+   * Sets the non-allocatable bandwidth, which shouldn't be considered available.
+   *
+   * <p>This method is experimental, and will be renamed or removed in a future release.
+   *
+   * @param nonAllocatableBandwidth The non-allocatable bandwidth in bits per second.
+   */
+  public void experimental_setNonAllocatableBandwidth(long nonAllocatableBandwidth) {
+    ((DefaultBandwidthProvider) bandwidthProvider)
+        .experimental_setNonAllocatableBandwidth(nonAllocatableBandwidth);
   }
 
   /**
@@ -522,8 +537,7 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
   }
 
   @Override
-  @Nullable
-  public Object getSelectionData() {
+  public @Nullable Object getSelectionData() {
     return null;
   }
 
@@ -651,21 +665,20 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
 
     private final BandwidthMeter bandwidthMeter;
     private final float bandwidthFraction;
-    private final long reservedBandwidth;
+
+    private long nonAllocatableBandwidth;
 
     @Nullable private long[][] allocationCheckpoints;
 
-    /* package */ DefaultBandwidthProvider(
-        BandwidthMeter bandwidthMeter, float bandwidthFraction, long reservedBandwidth) {
+    /* package */ DefaultBandwidthProvider(BandwidthMeter bandwidthMeter, float bandwidthFraction) {
       this.bandwidthMeter = bandwidthMeter;
       this.bandwidthFraction = bandwidthFraction;
-      this.reservedBandwidth = reservedBandwidth;
     }
 
     @Override
     public long getAllocatedBandwidth() {
       long totalBandwidth = (long) (bandwidthMeter.getBitrateEstimate() * bandwidthFraction);
-      long allocatableBandwidth = Math.max(0L, totalBandwidth - reservedBandwidth);
+      long allocatableBandwidth = Math.max(0L, totalBandwidth - nonAllocatableBandwidth);
       if (allocationCheckpoints == null) {
         return allocatableBandwidth;
       }
@@ -679,6 +692,10 @@ public class AdaptiveTrackSelection extends BaseTrackSelection {
       float fractionBetweenCheckpoints =
           (float) (allocatableBandwidth - previous[0]) / (next[0] - previous[0]);
       return previous[1] + (long) (fractionBetweenCheckpoints * (next[1] - previous[1]));
+    }
+
+    /* package */ void experimental_setNonAllocatableBandwidth(long nonAllocatableBandwidth) {
+      this.nonAllocatableBandwidth = nonAllocatableBandwidth;
     }
 
     /* package */ void experimental_setBandwidthAllocationCheckpoints(

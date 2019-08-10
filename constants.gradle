@@ -20,13 +20,11 @@ project.ext {
     compileSdkVersion = 29
     dexmakerVersion = '2.21.0'
     mockitoVersion = '2.25.0'
-    robolectricVersion = '4.3'
+    robolectricVersion = '4.2'
     autoValueVersion = '1.6'
-    autoServiceVersion = '1.0-rc4'
     checkerframeworkVersion = '2.5.0'
     jsr305Version = '3.0.2'
     androidXTestVersion = '1.1.0'
-    truthVersion = '0.44'
     modulePrefix = ':'
     if (gradle.ext.has('exoplayerModulePrefix')) {
         modulePrefix += gradle.ext.exoplayerModulePrefix

@@ -31,14 +31,11 @@ import com.google.android.exoplayer2.upstream.Loader.LoadErrorAction;
 import com.google.android.exoplayer2.upstream.Loader.Loadable;
 import com.google.android.exoplayer2.upstream.StatsDataSource;
 import com.google.android.exoplayer2.upstream.TransferListener;
-import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.Util;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import org.checkerframework.checker.nullness.compatqual.NullableType;
-import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
 /**
  * A {@link MediaPeriod} with a single sample.
@@ -53,7 +50,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
   private final DataSpec dataSpec;
   private final DataSource.Factory dataSourceFactory;
-  @Nullable private final TransferListener transferListener;
+  private final @Nullable TransferListener transferListener;
   private final LoadErrorHandlingPolicy loadErrorHandlingPolicy;
   private final EventDispatcher eventDispatcher;
   private final TrackGroupArray tracks;
@@ -67,7 +64,8 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
   /* package */ boolean notifiedReadingStarted;
   /* package */ boolean loadingFinished;
-  /* package */ byte @MonotonicNonNull [] sampleData;
+  /* package */ boolean loadingSucceeded;
+  /* package */ byte[] sampleData;
   /* package */ int sampleSize;
 
   public SingleSampleMediaPeriod(
@@ -114,12 +112,8 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   }
 
   @Override
-  public long selectTracks(
-      @NullableType TrackSelection[] selections,
-      boolean[] mayRetainStreamFlags,
-      @NullableType SampleStream[] streams,
-      boolean[] streamResetFlags,
-      long positionUs) {
+  public long selectTracks(TrackSelection[] selections, boolean[] mayRetainStreamFlags,
+      SampleStream[] streams, boolean[] streamResetFlags, long positionUs) {
     for (int i = 0; i < selections.length; i++) {
       if (streams[i] != null && (selections[i] == null || !mayRetainStreamFlags[i])) {
         sampleStreams.remove(streams[i]);
@@ -210,8 +204,9 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   public void onLoadCompleted(SourceLoadable loadable, long elapsedRealtimeMs,
       long loadDurationMs) {
     sampleSize = (int) loadable.dataSource.getBytesRead();
-    sampleData = Assertions.checkNotNull(loadable.sampleData);
+    sampleData = loadable.sampleData;
     loadingFinished = true;
+    loadingSucceeded = true;
     eventDispatcher.loadCompleted(
         loadable.dataSpec,
         loadable.dataSource.getLastOpenedUri(),
@@ -330,7 +325,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
         streamState = STREAM_STATE_SEND_SAMPLE;
         return C.RESULT_FORMAT_READ;
       } else if (loadingFinished) {
-        if (sampleData != null) {
+        if (loadingSucceeded) {
           buffer.addFlag(C.BUFFER_FLAG_KEY_FRAME);
           buffer.timeUs = 0;
           if (buffer.isFlagsOnly()) {
@@ -376,7 +371,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
     private final StatsDataSource dataSource;
 
-    @Nullable private byte[] sampleData;
+    private byte[] sampleData;
 
     public SourceLoadable(DataSpec dataSpec, DataSource dataSource) {
       this.dataSpec = dataSpec;

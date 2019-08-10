@@ -102,7 +102,7 @@ public final class ExoPlayerFactory {
    * @param context A {@link Context}.
    */
   public static SimpleExoPlayer newSimpleInstance(Context context) {
-    return newSimpleInstance(context, new DefaultTrackSelector(context));
+    return newSimpleInstance(context, new DefaultTrackSelector());
   }
 
   /**
@@ -244,7 +244,7 @@ public final class ExoPlayerFactory {
         loadControl,
         drmSessionManager,
         bandwidthMeter,
-        new AnalyticsCollector(Clock.DEFAULT),
+        new AnalyticsCollector.Factory(),
         Util.getLooper());
   }
 
@@ -257,8 +257,8 @@ public final class ExoPlayerFactory {
    * @param loadControl The {@link LoadControl} that will be used by the instance.
    * @param drmSessionManager An optional {@link DrmSessionManager}. May be null if the instance
    *     will not be used for DRM protected playbacks.
-   * @param analyticsCollector The {@link AnalyticsCollector} that will collect and forward all
-   *     player events.
+   * @param analyticsCollectorFactory A factory for creating the {@link AnalyticsCollector} that
+   *     will collect and forward all player events.
    */
   public static SimpleExoPlayer newSimpleInstance(
       Context context,
@@ -266,14 +266,14 @@ public final class ExoPlayerFactory {
       TrackSelector trackSelector,
       LoadControl loadControl,
       @Nullable DrmSessionManager<FrameworkMediaCrypto> drmSessionManager,
-      AnalyticsCollector analyticsCollector) {
+      AnalyticsCollector.Factory analyticsCollectorFactory) {
     return newSimpleInstance(
         context,
         renderersFactory,
         trackSelector,
         loadControl,
         drmSessionManager,
-        analyticsCollector,
+        analyticsCollectorFactory,
         Util.getLooper());
   }
 
@@ -302,7 +302,7 @@ public final class ExoPlayerFactory {
         trackSelector,
         loadControl,
         drmSessionManager,
-        new AnalyticsCollector(Clock.DEFAULT),
+        new AnalyticsCollector.Factory(),
         looper);
   }
 
@@ -315,8 +315,8 @@ public final class ExoPlayerFactory {
    * @param loadControl The {@link LoadControl} that will be used by the instance.
    * @param drmSessionManager An optional {@link DrmSessionManager}. May be null if the instance
    *     will not be used for DRM protected playbacks.
-   * @param analyticsCollector The {@link AnalyticsCollector} that will collect and forward all
-   *     player events.
+   * @param analyticsCollectorFactory A factory for creating the {@link AnalyticsCollector} that
+   *     will collect and forward all player events.
    * @param looper The {@link Looper} which must be used for all calls to the player and which is
    *     used to call listeners on.
    */
@@ -326,7 +326,7 @@ public final class ExoPlayerFactory {
       TrackSelector trackSelector,
       LoadControl loadControl,
       @Nullable DrmSessionManager<FrameworkMediaCrypto> drmSessionManager,
-      AnalyticsCollector analyticsCollector,
+      AnalyticsCollector.Factory analyticsCollectorFactory,
       Looper looper) {
     return newSimpleInstance(
         context,
@@ -335,7 +335,7 @@ public final class ExoPlayerFactory {
         loadControl,
         drmSessionManager,
         getDefaultBandwidthMeter(context),
-        analyticsCollector,
+        analyticsCollectorFactory,
         looper);
   }
 
@@ -348,8 +348,8 @@ public final class ExoPlayerFactory {
    * @param loadControl The {@link LoadControl} that will be used by the instance.
    * @param drmSessionManager An optional {@link DrmSessionManager}. May be null if the instance
    *     will not be used for DRM protected playbacks.
-   * @param analyticsCollector The {@link AnalyticsCollector} that will collect and forward all
-   *     player events.
+   * @param analyticsCollectorFactory A factory for creating the {@link AnalyticsCollector} that
+   *     will collect and forward all player events.
    * @param looper The {@link Looper} which must be used for all calls to the player and which is
    *     used to call listeners on.
    */
@@ -360,7 +360,7 @@ public final class ExoPlayerFactory {
       LoadControl loadControl,
       @Nullable DrmSessionManager<FrameworkMediaCrypto> drmSessionManager,
       BandwidthMeter bandwidthMeter,
-      AnalyticsCollector analyticsCollector,
+      AnalyticsCollector.Factory analyticsCollectorFactory,
       Looper looper) {
     return new SimpleExoPlayer(
         context,
@@ -369,7 +369,7 @@ public final class ExoPlayerFactory {
         loadControl,
         drmSessionManager,
         bandwidthMeter,
-        analyticsCollector,
+        analyticsCollectorFactory,
         looper);
   }
 

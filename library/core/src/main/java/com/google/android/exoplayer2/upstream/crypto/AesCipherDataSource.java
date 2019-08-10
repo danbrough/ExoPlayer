@@ -15,8 +15,6 @@
  */
 package com.google.android.exoplayer2.upstream.crypto;
 
-import static com.google.android.exoplayer2.util.Util.castNonNull;
-
 import android.net.Uri;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
@@ -36,7 +34,7 @@ public final class AesCipherDataSource implements DataSource {
   private final DataSource upstream;
   private final byte[] secretKey;
 
-  @Nullable private AesFlushingCipher cipher;
+  private @Nullable AesFlushingCipher cipher;
 
   public AesCipherDataSource(byte[] secretKey, DataSource upstream) {
     this.upstream = upstream;
@@ -66,13 +64,12 @@ public final class AesCipherDataSource implements DataSource {
     if (read == C.RESULT_END_OF_INPUT) {
       return C.RESULT_END_OF_INPUT;
     }
-    castNonNull(cipher).updateInPlace(data, offset, read);
+    cipher.updateInPlace(data, offset, read);
     return read;
   }
 
   @Override
-  @Nullable
-  public Uri getUri() {
+  public @Nullable Uri getUri() {
     return upstream.getUri();
   }
 

@@ -15,7 +15,6 @@
  */
 package com.google.android.exoplayer2.source;
 
-import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.SeekParameters;
 import com.google.android.exoplayer2.trackselection.TrackSelection;
@@ -24,7 +23,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
-import org.checkerframework.checker.nullness.compatqual.NullableType;
 
 /**
  * Merges multiple {@link MediaPeriod}s.
@@ -37,8 +35,9 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
   private final CompositeSequenceableLoaderFactory compositeSequenceableLoaderFactory;
   private final ArrayList<MediaPeriod> childrenPendingPreparation;
 
-  @Nullable private Callback callback;
-  @Nullable private TrackGroupArray trackGroups;
+  private Callback callback;
+  private TrackGroupArray trackGroups;
+
   private MediaPeriod[] enabledPeriods;
   private SequenceableLoader compositeSequenceableLoader;
 
@@ -50,7 +49,6 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
     compositeSequenceableLoader =
         compositeSequenceableLoaderFactory.createCompositeSequenceableLoader();
     streamPeriodIndices = new IdentityHashMap<>();
-    enabledPeriods = new MediaPeriod[0];
   }
 
   @Override
@@ -71,16 +69,12 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
 
   @Override
   public TrackGroupArray getTrackGroups() {
-    return Assertions.checkNotNull(trackGroups);
+    return trackGroups;
   }
 
   @Override
-  public long selectTracks(
-      @NullableType TrackSelection[] selections,
-      boolean[] mayRetainStreamFlags,
-      @NullableType SampleStream[] streams,
-      boolean[] streamResetFlags,
-      long positionUs) {
+  public long selectTracks(TrackSelection[] selections, boolean[] mayRetainStreamFlags,
+      SampleStream[] streams, boolean[] streamResetFlags, long positionUs) {
     // Map each selection and stream onto a child period index.
     int[] streamChildIndices = new int[selections.length];
     int[] selectionChildIndices = new int[selections.length];
@@ -100,9 +94,9 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
     }
     streamPeriodIndices.clear();
     // Select tracks for each child, copying the resulting streams back into a new streams array.
-    @NullableType SampleStream[] newStreams = new SampleStream[selections.length];
-    @NullableType SampleStream[] childStreams = new SampleStream[selections.length];
-    @NullableType TrackSelection[] childSelections = new TrackSelection[selections.length];
+    SampleStream[] newStreams = new SampleStream[selections.length];
+    SampleStream[] childStreams = new SampleStream[selections.length];
+    TrackSelection[] childSelections = new TrackSelection[selections.length];
     ArrayList<MediaPeriod> enabledPeriodsList = new ArrayList<>(periods.length);
     for (int i = 0; i < periods.length; i++) {
       for (int j = 0; j < selections.length; j++) {
@@ -120,10 +114,10 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
       for (int j = 0; j < selections.length; j++) {
         if (selectionChildIndices[j] == i) {
           // Assert that the child provided a stream for the selection.
-          SampleStream childStream = Assertions.checkNotNull(childStreams[j]);
+          Assertions.checkState(childStreams[j] != null);
           newStreams[j] = childStreams[j];
           periodEnabled = true;
-          streamPeriodIndices.put(childStream, i);
+          streamPeriodIndices.put(childStreams[j], i);
         } else if (streamChildIndices[j] == i) {
           // Assert that the child cleared any previous stream.
           Assertions.checkState(childStreams[j] == null);
@@ -214,8 +208,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
 
   @Override
   public long getAdjustedSeekPositionUs(long positionUs, SeekParameters seekParameters) {
-    MediaPeriod queryPeriod = enabledPeriods.length > 0 ? enabledPeriods[0] : periods[0];
-    return queryPeriod.getAdjustedSeekPositionUs(positionUs, seekParameters);
+    return enabledPeriods[0].getAdjustedSeekPositionUs(positionUs, seekParameters);
   }
 
   // MediaPeriod.Callback implementation
@@ -240,12 +233,12 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
       }
     }
     trackGroups = new TrackGroupArray(trackGroupArray);
-    Assertions.checkNotNull(callback).onPrepared(this);
+    callback.onPrepared(this);
   }
 
   @Override
   public void onContinueLoadingRequested(MediaPeriod ignored) {
-    Assertions.checkNotNull(callback).onContinueLoadingRequested(this);
+    callback.onContinueLoadingRequested(this);
   }
 
 }

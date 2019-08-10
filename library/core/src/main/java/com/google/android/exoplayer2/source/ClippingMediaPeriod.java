@@ -15,7 +15,6 @@
  */
 package com.google.android.exoplayer2.source;
 
-import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.FormatHolder;
@@ -26,7 +25,6 @@ import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.Util;
 import java.io.IOException;
-import org.checkerframework.checker.nullness.compatqual.NullableType;
 
 /**
  * Wraps a {@link MediaPeriod} and clips its {@link SampleStream}s to provide a subsequence of their
@@ -39,8 +37,8 @@ public final class ClippingMediaPeriod implements MediaPeriod, MediaPeriod.Callb
    */
   public final MediaPeriod mediaPeriod;
 
-  @Nullable private MediaPeriod.Callback callback;
-  private @NullableType ClippingSampleStream[] sampleStreams;
+  private MediaPeriod.Callback callback;
+  private ClippingSampleStream[] sampleStreams;
   private long pendingInitialDiscontinuityPositionUs;
   /* package */ long startUs;
   /* package */ long endUs;
@@ -97,14 +95,10 @@ public final class ClippingMediaPeriod implements MediaPeriod, MediaPeriod.Callb
   }
 
   @Override
-  public long selectTracks(
-      @NullableType TrackSelection[] selections,
-      boolean[] mayRetainStreamFlags,
-      @NullableType SampleStream[] streams,
-      boolean[] streamResetFlags,
-      long positionUs) {
+  public long selectTracks(TrackSelection[] selections, boolean[] mayRetainStreamFlags,
+      SampleStream[] streams, boolean[] streamResetFlags, long positionUs) {
     sampleStreams = new ClippingSampleStream[streams.length];
-    @NullableType SampleStream[] childStreams = new SampleStream[streams.length];
+    SampleStream[] childStreams = new SampleStream[streams.length];
     for (int i = 0; i < streams.length; i++) {
       sampleStreams[i] = (ClippingSampleStream) streams[i];
       childStreams[i] = sampleStreams[i] != null ? sampleStreams[i].childStream : null;
@@ -125,7 +119,7 @@ public final class ClippingMediaPeriod implements MediaPeriod, MediaPeriod.Callb
     for (int i = 0; i < streams.length; i++) {
       if (childStreams[i] == null) {
         sampleStreams[i] = null;
-      } else if (sampleStreams[i] == null || sampleStreams[i].childStream != childStreams[i]) {
+      } else if (streams[i] == null || sampleStreams[i].childStream != childStreams[i]) {
         sampleStreams[i] = new ClippingSampleStream(childStreams[i]);
       }
       streams[i] = sampleStreams[i];
@@ -215,12 +209,12 @@ public final class ClippingMediaPeriod implements MediaPeriod, MediaPeriod.Callb
 
   @Override
   public void onPrepared(MediaPeriod mediaPeriod) {
-    Assertions.checkNotNull(callback).onPrepared(this);
+    callback.onPrepared(this);
   }
 
   @Override
   public void onContinueLoadingRequested(MediaPeriod source) {
-    Assertions.checkNotNull(callback).onContinueLoadingRequested(this);
+    callback.onContinueLoadingRequested(this);
   }
 
   /* package */ boolean isPendingInitialDiscontinuity() {
@@ -244,8 +238,7 @@ public final class ClippingMediaPeriod implements MediaPeriod, MediaPeriod.Callb
     }
   }
 
-  private static boolean shouldKeepInitialDiscontinuity(
-      long startUs, @NullableType TrackSelection[] selections) {
+  private static boolean shouldKeepInitialDiscontinuity(long startUs, TrackSelection[] selections) {
     // If the clipping start position is non-zero, the clipping sample streams will adjust
     // timestamps on buffers they read from the unclipped sample streams. These adjusted buffer
     // timestamps can be negative, because sample streams provide buffers starting at a key-frame,
@@ -307,7 +300,7 @@ public final class ClippingMediaPeriod implements MediaPeriod, MediaPeriod.Callb
       }
       int result = childStream.readData(formatHolder, buffer, requireFormat);
       if (result == C.RESULT_FORMAT_READ) {
-        Format format = Assertions.checkNotNull(formatHolder.format);
+        Format format = formatHolder.format;
         if (format.encoderDelay != 0 || format.encoderPadding != 0) {
           // Clear gapless playback metadata if the start/end points don't match the media.
           int encoderDelay = startUs != 0 ? 0 : format.encoderDelay;
@@ -335,5 +328,7 @@ public final class ClippingMediaPeriod implements MediaPeriod, MediaPeriod.Callb
       }
       return childStream.skipData(positionUs);
     }
+
   }
+
 }

@@ -19,7 +19,6 @@ import android.text.Layout;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.text.Cue;
 import com.google.android.exoplayer2.text.SimpleSubtitleDecoder;
-import com.google.android.exoplayer2.text.Subtitle;
 import com.google.android.exoplayer2.text.SubtitleDecoderException;
 import com.google.android.exoplayer2.util.ColorParser;
 import com.google.android.exoplayer2.util.Log;
@@ -103,7 +102,7 @@ public final class TtmlDecoder extends SimpleSubtitleDecoder {
   }
 
   @Override
-  protected Subtitle decode(byte[] bytes, int length, boolean reset)
+  protected TtmlSubtitle decode(byte[] bytes, int length, boolean reset)
       throws SubtitleDecoderException {
     try {
       XmlPullParser xmlParser = xmlParserFactory.newPullParser();

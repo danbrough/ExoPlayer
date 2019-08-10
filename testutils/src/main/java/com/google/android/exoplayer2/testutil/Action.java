@@ -665,8 +665,7 @@ public abstract class Action {
         player.addListener(
             new Player.EventListener() {
               @Override
-              public void onPlayerStateChanged(
-                  boolean playWhenReady, @Player.State int playbackState) {
+              public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
                 if (targetPlaybackState == playbackState) {
                   player.removeListener(this);
                   nextAction.schedule(player, trackSelector, surface, handler);

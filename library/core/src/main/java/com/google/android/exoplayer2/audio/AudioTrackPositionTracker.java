@@ -133,10 +133,10 @@ import java.lang.reflect.Method;
   private final Listener listener;
   private final long[] playheadOffsets;
 
-  @Nullable private AudioTrack audioTrack;
+  private @Nullable AudioTrack audioTrack;
   private int outputPcmFrameSize;
   private int bufferSize;
-  @Nullable private AudioTimestampPoller audioTimestampPoller;
+  private @Nullable AudioTimestampPoller audioTimestampPoller;
   private int outputSampleRate;
   private boolean needsPassthroughWorkarounds;
   private long bufferSizeUs;
@@ -144,7 +144,7 @@ import java.lang.reflect.Method;
   private long smoothedPlayheadOffsetUs;
   private long lastPlayheadSampleTimeUs;
 
-  @Nullable private Method getLatencyMethod;
+  private @Nullable Method getLatencyMethod;
   private long latencyUs;
   private boolean hasData;
 

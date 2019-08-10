@@ -71,10 +71,9 @@ public final class C {
   /** Represents an unset or unknown percentage. */
   public static final int PERCENTAGE_UNSET = -1;
 
-  /** The number of milliseconds in one second. */
-  public static final long MILLIS_PER_SECOND = 1000L;
-
-  /** The number of microseconds in one second. */
+  /**
+   * The number of microseconds in one second.
+   */
   public static final long MICROS_PER_SECOND = 1000000L;
 
   /**
@@ -498,22 +497,8 @@ public final class C {
   /** Indicates that a buffer is (at least partially) encrypted. */
   public static final int BUFFER_FLAG_ENCRYPTED = 1 << 30; // 0x40000000
   /** Indicates that a buffer should be decoded but not rendered. */
+  @SuppressWarnings("NumericOverflow")
   public static final int BUFFER_FLAG_DECODE_ONLY = 1 << 31; // 0x80000000
-
-  /**
-   * Video decoder output modes. Possible modes are {@link #VIDEO_OUTPUT_MODE_NONE}, {@link
-   * #VIDEO_OUTPUT_MODE_YUV} and {@link #VIDEO_OUTPUT_MODE_SURFACE_YUV}.
-   */
-  @Documented
-  @Retention(RetentionPolicy.SOURCE)
-  @IntDef(value = {VIDEO_OUTPUT_MODE_NONE, VIDEO_OUTPUT_MODE_YUV, VIDEO_OUTPUT_MODE_SURFACE_YUV})
-  public @interface VideoOutputMode {}
-  /** Video decoder output mode is not set. */
-  public static final int VIDEO_OUTPUT_MODE_NONE = -1;
-  /** Video decoder output mode that outputs raw 4:2:0 YUV planes. */
-  public static final int VIDEO_OUTPUT_MODE_YUV = 0;
-  /** Video decoder output mode that renders 4:2:0 YUV planes directly to a surface. */
-  public static final int VIDEO_OUTPUT_MODE_SURFACE_YUV = 1;
 
   /**
    * Video scaling modes for {@link MediaCodec}-based {@link Renderer}s. One of {@link

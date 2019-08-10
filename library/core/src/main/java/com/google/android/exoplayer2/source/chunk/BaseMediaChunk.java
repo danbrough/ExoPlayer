@@ -15,7 +15,6 @@
  */
 package com.google.android.exoplayer2.source.chunk;
 
-import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.upstream.DataSource;
@@ -59,7 +58,7 @@ public abstract class BaseMediaChunk extends MediaChunk {
       DataSpec dataSpec,
       Format trackFormat,
       int trackSelectionReason,
-      @Nullable Object trackSelectionData,
+      Object trackSelectionData,
       long startTimeUs,
       long endTimeUs,
       long clippedStartTimeUs,

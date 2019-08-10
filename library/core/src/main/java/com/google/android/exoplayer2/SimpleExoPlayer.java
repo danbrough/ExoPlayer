@@ -144,7 +144,7 @@ public class SimpleExoPlayer extends BasePlayer
         loadControl,
         drmSessionManager,
         bandwidthMeter,
-        new AnalyticsCollector(Clock.DEFAULT),
+        new AnalyticsCollector.Factory(),
         looper);
   }
 
@@ -156,8 +156,8 @@ public class SimpleExoPlayer extends BasePlayer
    * @param drmSessionManager An optional {@link DrmSessionManager}. May be null if the instance
    *     will not be used for DRM protected playbacks.
    * @param bandwidthMeter The {@link BandwidthMeter} that will be used by the instance.
-   * @param analyticsCollector The {@link AnalyticsCollector} that will collect and forward all
-   *     player events.
+   * @param analyticsCollectorFactory A factory for creating the {@link AnalyticsCollector} that
+   *     will collect and forward all player events.
    * @param looper The {@link Looper} which must be used for all calls to the player and which is
    *     used to call listeners on.
    */
@@ -168,7 +168,7 @@ public class SimpleExoPlayer extends BasePlayer
       LoadControl loadControl,
       @Nullable DrmSessionManager<FrameworkMediaCrypto> drmSessionManager,
       BandwidthMeter bandwidthMeter,
-      AnalyticsCollector analyticsCollector,
+      AnalyticsCollector.Factory analyticsCollectorFactory,
       Looper looper) {
     this(
         context,
@@ -177,7 +177,7 @@ public class SimpleExoPlayer extends BasePlayer
         loadControl,
         drmSessionManager,
         bandwidthMeter,
-        analyticsCollector,
+        analyticsCollectorFactory,
         Clock.DEFAULT,
         looper);
   }
@@ -190,8 +190,8 @@ public class SimpleExoPlayer extends BasePlayer
    * @param drmSessionManager An optional {@link DrmSessionManager}. May be null if the instance
    *     will not be used for DRM protected playbacks.
    * @param bandwidthMeter The {@link BandwidthMeter} that will be used by the instance.
-   * @param analyticsCollector The {@link AnalyticsCollector} that will collect and forward all
-   *     player events.
+   * @param analyticsCollectorFactory A factory for creating the {@link AnalyticsCollector} that
+   *     will collect and forward all player events.
    * @param clock The {@link Clock} that will be used by the instance. Should always be {@link
    *     Clock#DEFAULT}, unless the player is being used from a test.
    * @param looper The {@link Looper} which must be used for all calls to the player and which is
@@ -204,11 +204,10 @@ public class SimpleExoPlayer extends BasePlayer
       LoadControl loadControl,
       @Nullable DrmSessionManager<FrameworkMediaCrypto> drmSessionManager,
       BandwidthMeter bandwidthMeter,
-      AnalyticsCollector analyticsCollector,
+      AnalyticsCollector.Factory analyticsCollectorFactory,
       Clock clock,
       Looper looper) {
     this.bandwidthMeter = bandwidthMeter;
-    this.analyticsCollector = analyticsCollector;
     componentListener = new ComponentListener();
     videoListeners = new CopyOnWriteArraySet<>();
     audioListeners = new CopyOnWriteArraySet<>();
@@ -236,7 +235,7 @@ public class SimpleExoPlayer extends BasePlayer
     // Build the player and associated objects.
     player =
         new ExoPlayerImpl(renderers, trackSelector, loadControl, bandwidthMeter, clock, looper);
-    analyticsCollector.setPlayer(player);
+    analyticsCollector = analyticsCollectorFactory.createAnalyticsCollector(player, clock);
     addListener(analyticsCollector);
     addListener(componentListener);
     videoDebugListeners.add(analyticsCollector);
@@ -874,15 +873,13 @@ public class SimpleExoPlayer extends BasePlayer
   }
 
   @Override
-  @Player.State
   public int getPlaybackState() {
     verifyApplicationThread();
     return player.getPlaybackState();
   }
 
   @Override
-  @Nullable
-  public ExoPlaybackException getPlaybackError() {
+  public @Nullable ExoPlaybackException getPlaybackError() {
     verifyApplicationThread();
     return player.getPlaybackError();
   }
@@ -1036,9 +1033,23 @@ public class SimpleExoPlayer extends BasePlayer
   }
 
   @Override
+  @Deprecated
+  @SuppressWarnings("deprecation")
+  public void sendMessages(ExoPlayerMessage... messages) {
+    player.sendMessages(messages);
+  }
+
+  @Override
   public PlayerMessage createMessage(PlayerMessage.Target target) {
     verifyApplicationThread();
     return player.createMessage(target);
+  }
+
+  @Override
+  @Deprecated
+  @SuppressWarnings("deprecation")
+  public void blockingSendMessages(ExoPlayerMessage... messages) {
+    player.blockingSendMessages(messages);
   }
 
   @Override
@@ -1069,6 +1080,13 @@ public class SimpleExoPlayer extends BasePlayer
   public Timeline getCurrentTimeline() {
     verifyApplicationThread();
     return player.getCurrentTimeline();
+  }
+
+  @Override
+  @Nullable
+  public Object getCurrentManifest() {
+    verifyApplicationThread();
+    return player.getCurrentManifest();
   }
 
   @Override

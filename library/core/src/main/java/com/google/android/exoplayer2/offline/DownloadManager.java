@@ -731,7 +731,7 @@ public final class DownloadManager {
           Log.e(TAG, "Failed to set manual stop reason", e);
         }
       } else {
-        @Nullable Download download = getDownload(id, /* loadFromIndex= */ false);
+        Download download = getDownload(id, /* loadFromIndex= */ false);
         if (download != null) {
           setStopReason(download, stopReason);
         } else {
@@ -779,7 +779,7 @@ public final class DownloadManager {
     }
 
     private void addDownload(DownloadRequest request, int stopReason) {
-      @Nullable Download download = getDownload(request.id, /* loadFromIndex= */ true);
+      Download download = getDownload(request.id, /* loadFromIndex= */ true);
       long nowMs = System.currentTimeMillis();
       if (download != null) {
         putDownload(mergeRequest(download, request, stopReason, nowMs));
@@ -798,7 +798,7 @@ public final class DownloadManager {
     }
 
     private void removeDownload(String id) {
-      @Nullable Download download = getDownload(id, /* loadFromIndex= */ true);
+      Download download = getDownload(id, /* loadFromIndex= */ true);
       if (download == null) {
         Log.e(TAG, "Failed to remove nonexistent download: " + id);
         return;
@@ -860,7 +860,7 @@ public final class DownloadManager {
       int accumulatingDownloadTaskCount = 0;
       for (int i = 0; i < downloads.size(); i++) {
         Download download = downloads.get(i);
-        @Nullable Task activeTask = activeTasks.get(download.request.id);
+        Task activeTask = activeTasks.get(download.request.id);
         switch (download.state) {
           case STATE_STOPPED:
             syncStoppedDownload(activeTask);
@@ -999,7 +999,7 @@ public final class DownloadManager {
         return;
       }
 
-      @Nullable Throwable finalError = task.finalError;
+      Throwable finalError = task.finalError;
       if (finalError != null) {
         Log.e(TAG, "Task failed: " + task.request + ", " + isRemove, finalError);
       }
@@ -1176,7 +1176,7 @@ public final class DownloadManager {
     private final boolean isRemove;
     private final int minRetryCount;
 
-    @Nullable private volatile InternalHandler internalHandler;
+    private volatile InternalHandler internalHandler;
     private volatile boolean isCanceled;
     @Nullable private Throwable finalError;
 
@@ -1246,7 +1246,7 @@ public final class DownloadManager {
       } catch (Throwable e) {
         finalError = e;
       }
-      @Nullable Handler internalHandler = this.internalHandler;
+      Handler internalHandler = this.internalHandler;
       if (internalHandler != null) {
         internalHandler.obtainMessage(MSG_TASK_STOPPED, this).sendToTarget();
       }
@@ -1258,7 +1258,7 @@ public final class DownloadManager {
       downloadProgress.percentDownloaded = percentDownloaded;
       if (contentLength != this.contentLength) {
         this.contentLength = contentLength;
-        @Nullable Handler internalHandler = this.internalHandler;
+        Handler internalHandler = this.internalHandler;
         if (internalHandler != null) {
           internalHandler.obtainMessage(MSG_CONTENT_LENGTH_CHANGED, this).sendToTarget();
         }

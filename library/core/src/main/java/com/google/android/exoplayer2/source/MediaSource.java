@@ -18,6 +18,7 @@ package com.google.android.exoplayer2.source;
 import android.os.Handler;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
+import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.Timeline;
 import com.google.android.exoplayer2.upstream.Allocator;
 import com.google.android.exoplayer2.upstream.TransferListener;
@@ -30,9 +31,9 @@ import java.io.IOException;
  * <ul>
  *   <li>To provide the player with a {@link Timeline} defining the structure of its media, and to
  *       provide a new timeline whenever the structure of the media changes. The MediaSource
- *       provides these timelines by calling {@link MediaSourceCaller#onSourceInfoRefreshed} on the
- *       {@link MediaSourceCaller}s passed to {@link #prepareSource(MediaSourceCaller,
- *       TransferListener)}.
+ *       provides these timelines by calling {@link SourceInfoRefreshListener#onSourceInfoRefreshed}
+ *       on the {@link SourceInfoRefreshListener}s passed to {@link
+ *       #prepareSource(SourceInfoRefreshListener, TransferListener)}.
  *   <li>To provide {@link MediaPeriod} instances for the periods in its timeline. MediaPeriods are
  *       obtained by calling {@link #createPeriod(MediaPeriodId, Allocator, long)}, and provide a
  *       way for the player to load and read the media.
@@ -45,21 +46,25 @@ import java.io.IOException;
  */
 public interface MediaSource {
 
-  /** A caller of media sources, which will be notified of source events. */
-  interface MediaSourceCaller {
+  /** Listener for source events. */
+  interface SourceInfoRefreshListener {
 
     /**
-     * Called when the {@link Timeline} has been refreshed.
-     *
-     * <p>Called on the playback thread.
+     * Called when manifest and/or timeline has been refreshed.
+     * <p>
+     * Called on the playback thread.
      *
      * @param source The {@link MediaSource} whose info has been refreshed.
      * @param timeline The source's timeline.
+     * @param manifest The loaded manifest. May be null.
      */
-    void onSourceInfoRefreshed(MediaSource source, Timeline timeline);
+    void onSourceInfoRefreshed(MediaSource source, Timeline timeline, @Nullable Object manifest);
+
   }
 
-  /** Identifier for a {@link MediaPeriod}. */
+  /**
+   * Identifier for a {@link MediaPeriod}.
+   */
   final class MediaPeriodId {
 
     /** The unique id of the timeline period. */
@@ -235,51 +240,37 @@ public interface MediaSource {
   }
 
   /**
-   * Registers a {@link MediaSourceCaller}. Starts source preparation if needed and enables the
-   * source for the creation of {@link MediaPeriod MediaPerods}.
+   * Starts source preparation if not yet started, and adds a listener for timeline and/or manifest
+   * updates.
    *
    * <p>Should not be called directly from application code.
    *
-   * <p>{@link MediaSourceCaller#onSourceInfoRefreshed(MediaSource, Timeline)} will be called once
-   * the source has a {@link Timeline}.
+   * <p>The listener will be also be notified if the source already has a timeline and/or manifest.
    *
-   * <p>For each call to this method, a call to {@link #releaseSource(MediaSourceCaller)} is needed
-   * to remove the caller and to release the source if no longer required.
+   * <p>For each call to this method, a call to {@link #releaseSource(SourceInfoRefreshListener)} is
+   * needed to remove the listener and to release the source if no longer required.
    *
-   * @param caller The {@link MediaSourceCaller} to be registered.
+   * @param listener The listener to be added.
    * @param mediaTransferListener The transfer listener which should be informed of any media data
    *     transfers. May be null if no listener is available. Note that this listener should be only
    *     informed of transfers related to the media loads and not of auxiliary loads for manifests
    *     and other data.
    */
-  void prepareSource(MediaSourceCaller caller, @Nullable TransferListener mediaTransferListener);
+  void prepareSource(
+      SourceInfoRefreshListener listener, @Nullable TransferListener mediaTransferListener);
 
   /**
    * Throws any pending error encountered while loading or refreshing source information.
-   *
-   * <p>Should not be called directly from application code.
-   *
-   * <p>Must only be called after {@link #prepareSource(MediaSourceCaller, TransferListener)}.
+   * <p>
+   * Should not be called directly from application code.
    */
   void maybeThrowSourceInfoRefreshError() throws IOException;
 
   /**
-   * Enables the source for the creation of {@link MediaPeriod MediaPeriods}.
+   * Returns a new {@link MediaPeriod} identified by {@code periodId}. This method may be called
+   * multiple times without an intervening call to {@link #releasePeriod(MediaPeriod)}.
    *
    * <p>Should not be called directly from application code.
-   *
-   * <p>Must only be called after {@link #prepareSource(MediaSourceCaller, TransferListener)}.
-   *
-   * @param caller The {@link MediaSourceCaller} enabling the source.
-   */
-  void enable(MediaSourceCaller caller);
-
-  /**
-   * Returns a new {@link MediaPeriod} identified by {@code periodId}.
-   *
-   * <p>Should not be called directly from application code.
-   *
-   * <p>Must only be called if the source is enabled.
    *
    * @param id The identifier of the period.
    * @param allocator An {@link Allocator} from which to obtain media buffer allocations.
@@ -290,36 +281,20 @@ public interface MediaSource {
 
   /**
    * Releases the period.
-   *
-   * <p>Should not be called directly from application code.
+   * <p>
+   * Should not be called directly from application code.
    *
    * @param mediaPeriod The period to release.
    */
   void releasePeriod(MediaPeriod mediaPeriod);
 
   /**
-   * Disables the source for the creation of {@link MediaPeriod MediaPeriods}. The implementation
-   * should not hold onto limited resources used for the creation of media periods.
+   * Removes a listener for timeline and/or manifest updates and releases the source if no longer
+   * required.
    *
    * <p>Should not be called directly from application code.
    *
-   * <p>Must only be called after all {@link MediaPeriod MediaPeriods} previously created by {@link
-   * #createPeriod(MediaPeriodId, Allocator, long)} have been released by {@link
-   * #releasePeriod(MediaPeriod)}.
-   *
-   * @param caller The {@link MediaSourceCaller} disabling the source.
+   * @param listener The listener to be removed.
    */
-  void disable(MediaSourceCaller caller);
-
-  /**
-   * Unregisters a caller, and disables and releases the source if no longer required.
-   *
-   * <p>Should not be called directly from application code.
-   *
-   * <p>Must only be called if all created {@link MediaPeriod MediaPeriods} have been released by
-   * {@link #releasePeriod(MediaPeriod)}.
-   *
-   * @param caller The {@link MediaSourceCaller} to be unregistered.
-   */
-  void releaseSource(MediaSourceCaller caller);
+  void releaseSource(SourceInfoRefreshListener listener);
 }

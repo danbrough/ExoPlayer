@@ -18,8 +18,6 @@ package com.google.android.exoplayer2.extractor.ts;
 import static com.google.android.exoplayer2.audio.Ac4Util.AC40_SYNCWORD;
 import static com.google.android.exoplayer2.audio.Ac4Util.AC41_SYNCWORD;
 import static com.google.android.exoplayer2.extractor.ts.TsPayloadReader.FLAG_DATA_ALIGNMENT_INDICATOR;
-import static com.google.android.exoplayer2.metadata.id3.Id3Decoder.ID3_HEADER_LENGTH;
-import static com.google.android.exoplayer2.metadata.id3.Id3Decoder.ID3_TAG;
 
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.audio.Ac4Util;
@@ -31,6 +29,7 @@ import com.google.android.exoplayer2.extractor.PositionHolder;
 import com.google.android.exoplayer2.extractor.SeekMap;
 import com.google.android.exoplayer2.extractor.ts.TsPayloadReader.TrackIdGenerator;
 import com.google.android.exoplayer2.util.ParsableByteArray;
+import com.google.android.exoplayer2.util.Util;
 import java.io.IOException;
 
 /** Extracts data from AC-4 bitstreams. */
@@ -54,6 +53,9 @@ public final class Ac4Extractor implements Extractor {
   /** The size of the frame header, in bytes. */
   private static final int FRAME_HEADER_SIZE = 7;
 
+  private static final int ID3_TAG = Util.getIntegerCodeForString("ID3");
+
+  private final long firstSampleTimestampUs;
   private final Ac4Reader reader;
   private final ParsableByteArray sampleData;
 
@@ -61,6 +63,12 @@ public final class Ac4Extractor implements Extractor {
 
   /** Creates a new extractor for AC-4 bitstreams. */
   public Ac4Extractor() {
+    this(/* firstSampleTimestampUs= */ 0);
+  }
+
+  /** Creates a new extractor for AC-4 bitstreams, using the specified first sample timestamp. */
+  public Ac4Extractor(long firstSampleTimestampUs) {
+    this.firstSampleTimestampUs = firstSampleTimestampUs;
     reader = new Ac4Reader();
     sampleData = new ParsableByteArray(READ_BUFFER_SIZE);
   }
@@ -70,10 +78,10 @@ public final class Ac4Extractor implements Extractor {
   @Override
   public boolean sniff(ExtractorInput input) throws IOException, InterruptedException {
     // Skip any ID3 headers.
-    ParsableByteArray scratch = new ParsableByteArray(ID3_HEADER_LENGTH);
+    ParsableByteArray scratch = new ParsableByteArray(10);
     int startPosition = 0;
     while (true) {
-      input.peekFully(scratch.data, /* offset= */ 0, ID3_HEADER_LENGTH);
+      input.peekFully(scratch.data, /* offset= */ 0, /* length= */ 10);
       scratch.setPosition(0);
       if (scratch.readUnsignedInt24() != ID3_TAG) {
         break;
@@ -145,7 +153,7 @@ public final class Ac4Extractor implements Extractor {
 
     if (!startedPacket) {
       // Pass data to the reader as though it's contained within a single infinitely long packet.
-      reader.packetStarted(/* pesTimeUs= */ 0, FLAG_DATA_ALIGNMENT_INDICATOR);
+      reader.packetStarted(firstSampleTimestampUs, FLAG_DATA_ALIGNMENT_INDICATOR);
       startedPacket = true;
     }
     // TODO: Make it possible for the reader to consume the dataSource directly, so that it becomes

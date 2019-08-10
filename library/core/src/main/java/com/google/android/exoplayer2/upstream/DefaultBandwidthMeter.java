@@ -342,7 +342,7 @@ public final class DefaultBandwidthMeter implements BandwidthMeter, TransferList
     totalElapsedTimeMs += sampleElapsedTimeMs;
     totalBytesTransferred += sampleBytesTransferred;
     if (sampleElapsedTimeMs > 0) {
-      float bitsPerSecond = (sampleBytesTransferred * 8000f) / sampleElapsedTimeMs;
+      float bitsPerSecond = (sampleBytesTransferred * 8000) / sampleElapsedTimeMs;
       slidingPercentile.addSample((int) Math.sqrt(sampleBytesTransferred), bitsPerSecond);
       if (totalElapsedTimeMs >= ELAPSED_MILLIS_FOR_ESTIMATE
           || totalBytesTransferred >= BYTES_TRANSFERRED_FOR_ESTIMATE) {
@@ -413,7 +413,7 @@ public final class DefaultBandwidthMeter implements BandwidthMeter, TransferList
    */
   private static class ConnectivityActionReceiver extends BroadcastReceiver {
 
-    private static @MonotonicNonNull ConnectivityActionReceiver staticInstance;
+    @MonotonicNonNull private static ConnectivityActionReceiver staticInstance;
 
     private final Handler mainHandler;
     private final ArrayList<WeakReference<DefaultBandwidthMeter>> bandwidthMeters;

@@ -34,6 +34,7 @@ import com.google.android.exoplayer2.testutil.FakeShuffleOrder;
 import com.google.android.exoplayer2.testutil.FakeTimeline;
 import com.google.android.exoplayer2.testutil.FakeTimeline.TimelineWindowDefinition;
 import com.google.android.exoplayer2.testutil.MediaSourceTestRunner;
+import com.google.android.exoplayer2.testutil.RobolectricUtil;
 import com.google.android.exoplayer2.testutil.TimelineAsserts;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -43,11 +44,11 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.annotation.LooperMode;
+import org.robolectric.annotation.Config;
 
 /** Unit tests for {@link ConcatenatingMediaSource}. */
 @RunWith(AndroidJUnit4.class)
-@LooperMode(LooperMode.Mode.PAUSED)
+@Config(shadows = {RobolectricUtil.CustomLooper.class, RobolectricUtil.CustomMessageQueue.class})
 public final class ConcatenatingMediaSourceTest {
 
   private ConcatenatingMediaSource mediaSource;
@@ -820,7 +821,7 @@ public final class ConcatenatingMediaSourceTest {
     Object childPeriodUid0 = childTimeline.getUidOfPeriod(/* periodIndex= */ 0);
     Object childPeriodUid1 = childTimeline.getUidOfPeriod(/* periodIndex= */ 1);
     assertThat(childSource.getCreatedMediaPeriods())
-        .containsAtLeast(
+        .containsAllOf(
             new MediaPeriodId(childPeriodUid0, /* windowSequenceNumber= */ 0),
             new MediaPeriodId(childPeriodUid0, /* windowSequenceNumber= */ 2),
             new MediaPeriodId(childPeriodUid0, /* windowSequenceNumber= */ 4),
@@ -856,7 +857,7 @@ public final class ConcatenatingMediaSourceTest {
     testRunner.assertPrepareAndReleaseAllPeriods();
     Object childPeriodUid = childTimeline.getUidOfPeriod(/* periodIndex= */ 0);
     assertThat(childSource.getCreatedMediaPeriods())
-        .containsAtLeast(
+        .containsAllOf(
             new MediaPeriodId(childPeriodUid, /* windowSequenceNumber= */ 0),
             new MediaPeriodId(childPeriodUid, /* windowSequenceNumber= */ 1),
             new MediaPeriodId(childPeriodUid, /* windowSequenceNumber= */ 2),

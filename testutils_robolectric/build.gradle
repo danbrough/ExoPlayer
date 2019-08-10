@@ -42,5 +42,4 @@ dependencies {
     api project(modulePrefix + 'testutils')
     implementation project(modulePrefix + 'library-core')
     implementation 'androidx.annotation:annotation:1.1.0'
-    annotationProcessor 'com.google.auto.service:auto-service:' + autoServiceVersion
 }

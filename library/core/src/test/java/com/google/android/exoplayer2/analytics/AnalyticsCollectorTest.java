@@ -48,6 +48,7 @@ import com.google.android.exoplayer2.testutil.ExoPlayerTestRunner.Builder;
 import com.google.android.exoplayer2.testutil.FakeMediaSource;
 import com.google.android.exoplayer2.testutil.FakeRenderer;
 import com.google.android.exoplayer2.testutil.FakeTimeline;
+import com.google.android.exoplayer2.testutil.RobolectricUtil;
 import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
 import com.google.android.exoplayer2.util.Util;
 import com.google.android.exoplayer2.video.VideoRendererEventListener;
@@ -57,12 +58,11 @@ import java.util.Iterator;
 import java.util.List;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.annotation.LooperMode;
-import org.robolectric.annotation.LooperMode.Mode;
+import org.robolectric.annotation.Config;
 
 /** Integration test for {@link AnalyticsCollector}. */
 @RunWith(AndroidJUnit4.class)
-@LooperMode(Mode.PAUSED)
+@Config(shadows = {RobolectricUtil.CustomLooper.class, RobolectricUtil.CustomMessageQueue.class})
 public final class AnalyticsCollectorTest {
 
   private static final int EVENT_PLAYER_STATE_CHANGED = 0;
@@ -322,7 +322,7 @@ public final class AnalyticsCollectorTest {
     assertThat(listener.getEvents(EVENT_SEEK_PROCESSED)).containsExactly(period1);
     List<EventWindowAndPeriodId> loadingEvents = listener.getEvents(EVENT_LOADING_CHANGED);
     assertThat(loadingEvents).hasSize(4);
-    assertThat(loadingEvents).containsAtLeast(period0, period0);
+    assertThat(loadingEvents).containsAllOf(period0, period0);
     assertThat(listener.getEvents(EVENT_TRACKS_CHANGED)).containsExactly(period0, period1);
     assertThat(listener.getEvents(EVENT_LOAD_STARTED))
         .containsExactly(
@@ -907,7 +907,7 @@ public final class AnalyticsCollectorTest {
 
     @Override
     public void onPlayerStateChanged(
-        EventTime eventTime, boolean playWhenReady, @Player.State int playbackState) {
+        EventTime eventTime, boolean playWhenReady, int playbackState) {
       reportedEvents.add(new ReportedEvent(EVENT_PLAYER_STATE_CHANGED, eventTime));
     }
 

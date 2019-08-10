@@ -94,19 +94,11 @@ public abstract class BasePlayer implements Player {
   @Override
   @Nullable
   public final Object getCurrentTag() {
+    int windowIndex = getCurrentWindowIndex();
     Timeline timeline = getCurrentTimeline();
-    return timeline.isEmpty()
+    return windowIndex >= timeline.getWindowCount()
         ? null
-        : timeline.getWindow(getCurrentWindowIndex(), window, /* setTag= */ true).tag;
-  }
-
-  @Override
-  @Nullable
-  public final Object getCurrentManifest() {
-    Timeline timeline = getCurrentTimeline();
-    return timeline.isEmpty()
-        ? null
-        : timeline.getWindow(getCurrentWindowIndex(), window, /* setTag= */ false).manifest;
+        : timeline.getWindow(windowIndex, window, /* setTag= */ true).tag;
   }
 
   @Override

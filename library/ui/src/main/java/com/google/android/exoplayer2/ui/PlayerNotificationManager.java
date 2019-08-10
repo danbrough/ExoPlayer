@@ -1327,7 +1327,7 @@ public class PlayerNotificationManager {
   private class PlayerListener implements Player.EventListener {
 
     @Override
-    public void onPlayerStateChanged(boolean playWhenReady, @Player.State int playbackState) {
+    public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
       if (wasPlayWhenReady != playWhenReady || lastPlaybackState != playbackState) {
         startOrUpdateNotification();
         wasPlayWhenReady = playWhenReady;
@@ -1336,7 +1336,7 @@ public class PlayerNotificationManager {
     }
 
     @Override
-    public void onTimelineChanged(Timeline timeline, int reason) {
+    public void onTimelineChanged(Timeline timeline, @Nullable Object manifest, int reason) {
       startOrUpdateNotification();
     }
 

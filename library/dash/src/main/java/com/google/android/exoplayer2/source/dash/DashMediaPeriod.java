@@ -224,8 +224,9 @@ import java.util.regex.Pattern;
       int totalTracksInPreviousAdaptationSets = 0;
       int tracksInCurrentAdaptationSet =
           manifestAdaptationSets.get(adaptationSetIndices[0]).representations.size();
-      for (int trackIndex : trackIndices) {
-        while (trackIndex >= totalTracksInPreviousAdaptationSets + tracksInCurrentAdaptationSet) {
+      for (int i = 0; i < trackIndices.length; i++) {
+        while (trackIndices[i]
+            >= totalTracksInPreviousAdaptationSets + tracksInCurrentAdaptationSet) {
           currentAdaptationSetIndex++;
           totalTracksInPreviousAdaptationSets += tracksInCurrentAdaptationSet;
           tracksInCurrentAdaptationSet =
@@ -238,7 +239,7 @@ import java.util.regex.Pattern;
             new StreamKey(
                 periodIndex,
                 adaptationSetIndices[currentAdaptationSetIndex],
-                trackIndex - totalTracksInPreviousAdaptationSets));
+                trackIndices[i] - totalTracksInPreviousAdaptationSets));
       }
     }
     return streamKeys;
@@ -532,9 +533,10 @@ import java.util.regex.Pattern;
         int[] adaptationSetIndices = new int[1 + extraAdaptationSetIds.length];
         adaptationSetIndices[0] = i;
         int outputIndex = 1;
-        for (String adaptationSetId : extraAdaptationSetIds) {
+        for (int j = 0; j < extraAdaptationSetIds.length; j++) {
           int extraIndex =
-              idToIndexMap.get(Integer.parseInt(adaptationSetId), /* valueIfKeyNotFound= */ -1);
+              idToIndexMap.get(
+                  Integer.parseInt(extraAdaptationSetIds[j]), /* valueIfKeyNotFound= */ -1);
           if (extraIndex != -1) {
             adaptationSetUsedFlags[extraIndex] = true;
             adaptationSetIndices[outputIndex] = extraIndex;

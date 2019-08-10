@@ -97,7 +97,7 @@ public final class ActionFileUpgradeUtil {
       boolean addNewDownloadAsCompleted,
       long nowMs)
       throws IOException {
-    @Nullable Download download = downloadIndex.getDownload(request.id);
+    Download download = downloadIndex.getDownload(request.id);
     if (download != null) {
       download = DownloadManager.mergeRequest(download, request, download.stopReason, nowMs);
     } else {

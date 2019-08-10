@@ -183,21 +183,18 @@ public interface HttpDataSource extends DataSource {
       return defaultRequestProperties;
     }
 
-    /** @deprecated Use {@link #getDefaultRequestProperties} instead. */
     @Deprecated
     @Override
     public final void setDefaultRequestProperty(String name, String value) {
       defaultRequestProperties.set(name, value);
     }
 
-    /** @deprecated Use {@link #getDefaultRequestProperties} instead. */
     @Deprecated
     @Override
     public final void clearDefaultRequestProperty(String name) {
       defaultRequestProperties.remove(name);
     }
 
-    /** @deprecated Use {@link #getDefaultRequestProperties} instead. */
     @Deprecated
     @Override
     public final void clearAllDefaultRequestProperties() {

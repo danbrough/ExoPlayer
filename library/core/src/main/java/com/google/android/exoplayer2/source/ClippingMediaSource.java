@@ -15,7 +15,6 @@
  */
 package com.google.android.exoplayer2.source;
 
-
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
@@ -87,8 +86,9 @@ public final class ClippingMediaSource extends CompositeMediaSource<Void> {
   private final ArrayList<ClippingMediaPeriod> mediaPeriods;
   private final Timeline.Window window;
 
-  @Nullable private ClippingTimeline clippingTimeline;
-  @Nullable private IllegalClippingException clippingError;
+  private @Nullable Object manifest;
+  private ClippingTimeline clippingTimeline;
+  private IllegalClippingException clippingError;
   private long periodStartUs;
   private long periodEndUs;
 
@@ -192,7 +192,7 @@ public final class ClippingMediaSource extends CompositeMediaSource<Void> {
   }
 
   @Override
-  protected void prepareSourceInternal(@Nullable TransferListener mediaTransferListener) {
+  public void prepareSourceInternal(@Nullable TransferListener mediaTransferListener) {
     super.prepareSourceInternal(mediaTransferListener);
     prepareChildSource(/* id= */ null, mediaSource);
   }
@@ -222,22 +222,24 @@ public final class ClippingMediaSource extends CompositeMediaSource<Void> {
     Assertions.checkState(mediaPeriods.remove(mediaPeriod));
     mediaSource.releasePeriod(((ClippingMediaPeriod) mediaPeriod).mediaPeriod);
     if (mediaPeriods.isEmpty() && !allowDynamicClippingUpdates) {
-      refreshClippedTimeline(Assertions.checkNotNull(clippingTimeline).timeline);
+      refreshClippedTimeline(clippingTimeline.timeline);
     }
   }
 
   @Override
-  protected void releaseSourceInternal() {
+  public void releaseSourceInternal() {
     super.releaseSourceInternal();
     clippingError = null;
     clippingTimeline = null;
   }
 
   @Override
-  protected void onChildSourceInfoRefreshed(Void id, MediaSource mediaSource, Timeline timeline) {
+  protected void onChildSourceInfoRefreshed(
+      Void id, MediaSource mediaSource, Timeline timeline, @Nullable Object manifest) {
     if (clippingError != null) {
       return;
     }
+    this.manifest = manifest;
     refreshClippedTimeline(timeline);
   }
 
@@ -277,7 +279,7 @@ public final class ClippingMediaSource extends CompositeMediaSource<Void> {
       clippingError = e;
       return;
     }
-    refreshSourceInfo(clippingTimeline);
+    refreshSourceInfo(clippingTimeline, manifest);
   }
 
   @Override

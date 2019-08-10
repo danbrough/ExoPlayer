@@ -42,18 +42,17 @@ public final class DummyDataSource implements DataSource {
   }
 
   @Override
-  public int read(byte[] buffer, int offset, int readLength) {
+  public int read(byte[] buffer, int offset, int readLength) throws IOException {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  @Nullable
-  public Uri getUri() {
+  public @Nullable Uri getUri() {
     return null;
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
     // do nothing.
   }
 }

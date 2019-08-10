@@ -246,7 +246,7 @@ public abstract class SimpleDecoderAudioRenderer extends BaseRenderer implements
    * @return The extent to which the renderer supports the format itself.
    */
   protected abstract int supportsFormatInternal(
-      @Nullable DrmSessionManager<ExoMediaCrypto> drmSessionManager, Format format);
+      DrmSessionManager<ExoMediaCrypto> drmSessionManager, Format format);
 
   /**
    * Returns whether the sink supports the audio format.
@@ -274,7 +274,7 @@ public abstract class SimpleDecoderAudioRenderer extends BaseRenderer implements
       flagsOnlyBuffer.clear();
       int result = readSource(formatHolder, flagsOnlyBuffer, true);
       if (result == C.RESULT_FORMAT_READ) {
-        onInputFormatChanged(formatHolder);
+        onInputFormatChanged(formatHolder.format);
       } else if (result == C.RESULT_BUFFER_READ) {
         // End of stream read having not read a format.
         Assertions.checkState(flagsOnlyBuffer.isEndOfStream());
@@ -341,10 +341,9 @@ public abstract class SimpleDecoderAudioRenderer extends BaseRenderer implements
    * @return The decoder.
    * @throws AudioDecoderException If an error occurred creating a suitable decoder.
    */
-  protected abstract SimpleDecoder<
-          DecoderInputBuffer, ? extends SimpleOutputBuffer, ? extends AudioDecoderException>
-      createDecoder(Format format, @Nullable ExoMediaCrypto mediaCrypto)
-          throws AudioDecoderException;
+  protected abstract SimpleDecoder<DecoderInputBuffer, ? extends SimpleOutputBuffer,
+      ? extends AudioDecoderException> createDecoder(Format format, ExoMediaCrypto mediaCrypto)
+      throws AudioDecoderException;
 
   /**
    * Returns the format of audio buffers output by the decoder. Will not be called until the first
@@ -439,7 +438,7 @@ public abstract class SimpleDecoderAudioRenderer extends BaseRenderer implements
       return false;
     }
     if (result == C.RESULT_FORMAT_READ) {
-      onInputFormatChanged(formatHolder);
+      onInputFormatChanged(formatHolder.format);
       return true;
     }
     if (inputBuffer.isEndOfStream()) {
@@ -518,8 +517,8 @@ public abstract class SimpleDecoderAudioRenderer extends BaseRenderer implements
   }
 
   @Override
-  public void setPlaybackParameters(PlaybackParameters playbackParameters) {
-    audioSink.setPlaybackParameters(playbackParameters);
+  public PlaybackParameters setPlaybackParameters(PlaybackParameters playbackParameters) {
+    return audioSink.setPlaybackParameters(playbackParameters);
   }
 
   @Override
@@ -647,39 +646,43 @@ public abstract class SimpleDecoderAudioRenderer extends BaseRenderer implements
   }
 
   private void setSourceDrmSession(@Nullable DrmSession<ExoMediaCrypto> session) {
-    DrmSession.replaceSessionReferences(sourceDrmSession, session);
+    DrmSession<ExoMediaCrypto> previous = sourceDrmSession;
     sourceDrmSession = session;
+    releaseDrmSessionIfUnused(previous);
   }
 
   private void setDecoderDrmSession(@Nullable DrmSession<ExoMediaCrypto> session) {
-    DrmSession.replaceSessionReferences(decoderDrmSession, session);
+    DrmSession<ExoMediaCrypto> previous = decoderDrmSession;
     decoderDrmSession = session;
+    releaseDrmSessionIfUnused(previous);
   }
 
-  @SuppressWarnings("unchecked")
-  private void onInputFormatChanged(FormatHolder formatHolder) throws ExoPlaybackException {
+  private void releaseDrmSessionIfUnused(@Nullable DrmSession<ExoMediaCrypto> session) {
+    if (session != null && session != decoderDrmSession && session != sourceDrmSession) {
+      drmSessionManager.releaseSession(session);
+    }
+  }
+
+  private void onInputFormatChanged(Format newFormat) throws ExoPlaybackException {
     Format oldFormat = inputFormat;
-    inputFormat = formatHolder.format;
+    inputFormat = newFormat;
 
     boolean drmInitDataChanged = !Util.areEqual(inputFormat.drmInitData, oldFormat == null ? null
         : oldFormat.drmInitData);
     if (drmInitDataChanged) {
       if (inputFormat.drmInitData != null) {
-
-        if (formatHolder.includesDrmSession) {
-          setSourceDrmSession((DrmSession<ExoMediaCrypto>) formatHolder.drmSession);
-        } else {
-          if (drmSessionManager == null) {
-            throw ExoPlaybackException.createForRenderer(
-                new IllegalStateException("Media requires a DrmSessionManager"), getIndex());
-          }
-          DrmSession<ExoMediaCrypto> session =
-              drmSessionManager.acquireSession(Looper.myLooper(), inputFormat.drmInitData);
-          if (sourceDrmSession != null) {
-            sourceDrmSession.releaseReference();
-          }
-          sourceDrmSession = session;
+        if (drmSessionManager == null) {
+          throw ExoPlaybackException.createForRenderer(
+              new IllegalStateException("Media requires a DrmSessionManager"), getIndex());
         }
+        DrmSession<ExoMediaCrypto> session =
+            drmSessionManager.acquireSession(Looper.myLooper(), newFormat.drmInitData);
+        if (session == decoderDrmSession || session == sourceDrmSession) {
+          // We already had this session. The manager must be reference counting, so release it once
+          // to get the count attributed to this renderer back down to 1.
+          drmSessionManager.releaseSession(session);
+        }
+        setSourceDrmSession(session);
       } else {
         setSourceDrmSession(null);
       }
@@ -695,10 +698,10 @@ public abstract class SimpleDecoderAudioRenderer extends BaseRenderer implements
       audioTrackNeedsConfigure = true;
     }
 
-    encoderDelay = inputFormat.encoderDelay;
-    encoderPadding = inputFormat.encoderPadding;
+    encoderDelay = newFormat.encoderDelay;
+    encoderPadding = newFormat.encoderPadding;
 
-    eventDispatcher.inputFormatChanged(inputFormat);
+    eventDispatcher.inputFormatChanged(newFormat);
   }
 
   private void onQueueInputBuffer(DecoderInputBuffer buffer) {

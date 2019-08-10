@@ -38,21 +38,24 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import org.checkerframework.checker.nullness.compatqual.NullableType;
 import org.checkerframework.checker.nullness.qual.EnsuresNonNullIf;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
-/** A {@link DrmSession} that supports playbacks using {@link ExoMediaDrm}. */
+/**
+ * A {@link DrmSession} that supports playbacks using {@link ExoMediaDrm}.
+ */
 @TargetApi(18)
-public class DefaultDrmSession<T extends ExoMediaCrypto> implements DrmSession<T> {
+/* package */ class DefaultDrmSession<T extends ExoMediaCrypto> implements DrmSession<T> {
 
-  /** Manages provisioning requests. */
+  /**
+   * Manages provisioning requests.
+   */
   public interface ProvisioningManager<T extends ExoMediaCrypto> {
 
     /**
-     * Called when a session requires provisioning. The manager <em>may</em> call {@link
-     * #provision()} to have this session perform the provisioning operation. The manager
+     * Called when a session requires provisioning. The manager <em>may</em> call
+     * {@link #provision()} to have this session perform the provisioning operation. The manager
      * <em>will</em> call {@link DefaultDrmSession#onProvisionCompleted()} when provisioning has
      * completed, or {@link DefaultDrmSession#onProvisionError} if provisioning fails.
      *
@@ -67,35 +70,26 @@ public class DefaultDrmSession<T extends ExoMediaCrypto> implements DrmSession<T
      */
     void onProvisionError(Exception error);
 
-    /** Called by a session when it successfully completes a provisioning operation. */
-    void onProvisionCompleted();
-  }
-
-  /** Callback to be notified when the session is released. */
-  public interface ReleaseCallback<T extends ExoMediaCrypto> {
-
     /**
-     * Called immediately after releasing session resources.
-     *
-     * @param session The session.
+     * Called by a session when it successfully completes a provisioning operation.
      */
-    void onSessionReleased(DefaultDrmSession<T> session);
+    void onProvisionCompleted();
+
   }
 
   private static final String TAG = "DefaultDrmSession";
 
   private static final int MSG_PROVISION = 0;
   private static final int MSG_KEYS = 1;
-  private static final int MAX_LICENSE_DURATION_TO_RENEW_SECONDS = 60;
+  private static final int MAX_LICENSE_DURATION_TO_RENEW = 60;
 
   /** The DRM scheme datas, or null if this session uses offline keys. */
-  @Nullable public final List<SchemeData> schemeDatas;
+  public final @Nullable List<SchemeData> schemeDatas;
 
   private final ExoMediaDrm<T> mediaDrm;
   private final ProvisioningManager<T> provisioningManager;
-  private final ReleaseCallback<T> releaseCallback;
   private final @DefaultDrmSessionManager.Mode int mode;
-  @Nullable private final HashMap<String, String> optionalKeyRequestParameters;
+  private final @Nullable HashMap<String, String> optionalKeyRequestParameters;
   private final EventDispatcher<DefaultDrmSessionEventListener> eventDispatcher;
   private final int initialDrmRequestRetryCount;
 
@@ -104,16 +98,16 @@ public class DefaultDrmSession<T extends ExoMediaCrypto> implements DrmSession<T
   /* package */ final PostResponseHandler postResponseHandler;
 
   private @DrmSession.State int state;
-  private int referenceCount;
-  @Nullable private HandlerThread requestHandlerThread;
-  @Nullable private PostRequestHandler postRequestHandler;
-  @Nullable private T mediaCrypto;
-  @Nullable private DrmSessionException lastException;
-  private byte @NullableType [] sessionId;
+  private int openCount;
+  private HandlerThread requestHandlerThread;
+  private PostRequestHandler postRequestHandler;
+  private @Nullable T mediaCrypto;
+  private @Nullable DrmSessionException lastException;
+  private byte @MonotonicNonNull [] sessionId;
   private byte @MonotonicNonNull [] offlineLicenseKeySetId;
 
-  @Nullable private KeyRequest currentKeyRequest;
-  @Nullable private ProvisionRequest currentProvisionRequest;
+  private @Nullable KeyRequest currentKeyRequest;
+  private @Nullable ProvisionRequest currentProvisionRequest;
 
   /**
    * Instantiates a new DRM session.
@@ -121,7 +115,6 @@ public class DefaultDrmSession<T extends ExoMediaCrypto> implements DrmSession<T
    * @param uuid The UUID of the drm scheme.
    * @param mediaDrm The media DRM.
    * @param provisioningManager The manager for provisioning.
-   * @param releaseCallback The {@link ReleaseCallback}.
    * @param schemeDatas DRM scheme datas for this session, or null if an {@code
    *     offlineLicenseKeySetId} is provided.
    * @param mode The DRM mode.
@@ -138,7 +131,6 @@ public class DefaultDrmSession<T extends ExoMediaCrypto> implements DrmSession<T
       UUID uuid,
       ExoMediaDrm<T> mediaDrm,
       ProvisioningManager<T> provisioningManager,
-      ReleaseCallback<T> releaseCallback,
       @Nullable List<SchemeData> schemeDatas,
       @DefaultDrmSessionManager.Mode int mode,
       @Nullable byte[] offlineLicenseKeySetId,
@@ -153,7 +145,6 @@ public class DefaultDrmSession<T extends ExoMediaCrypto> implements DrmSession<T
     }
     this.uuid = uuid;
     this.provisioningManager = provisioningManager;
-    this.releaseCallback = releaseCallback;
     this.mediaDrm = mediaDrm;
     this.mode = mode;
     if (offlineLicenseKeySetId != null) {
@@ -167,7 +158,49 @@ public class DefaultDrmSession<T extends ExoMediaCrypto> implements DrmSession<T
     this.initialDrmRequestRetryCount = initialDrmRequestRetryCount;
     this.eventDispatcher = eventDispatcher;
     state = STATE_OPENING;
+
     postResponseHandler = new PostResponseHandler(playbackLooper);
+    requestHandlerThread = new HandlerThread("DrmRequestHandler");
+    requestHandlerThread.start();
+    postRequestHandler = new PostRequestHandler(requestHandlerThread.getLooper());
+  }
+
+  // Life cycle.
+
+  public void acquire() {
+    if (++openCount == 1) {
+      if (state == STATE_ERROR) {
+        return;
+      }
+      if (openInternal(true)) {
+        doLicense(true);
+      }
+    }
+  }
+
+  /** @return True if the session is closed and cleaned up, false otherwise. */
+  // Assigning null to various non-null variables for clean-up. Class won't be used after release.
+  @SuppressWarnings("assignment.type.incompatible")
+  public boolean release() {
+    if (--openCount == 0) {
+      state = STATE_RELEASED;
+      postResponseHandler.removeCallbacksAndMessages(null);
+      postRequestHandler.removeCallbacksAndMessages(null);
+      postRequestHandler = null;
+      requestHandlerThread.quit();
+      requestHandlerThread = null;
+      mediaCrypto = null;
+      lastException = null;
+      currentKeyRequest = null;
+      currentProvisionRequest = null;
+      if (sessionId != null) {
+        mediaDrm.closeSession(sessionId);
+        sessionId = null;
+        eventDispatcher.dispatch(DefaultDrmSessionEventListener::onDrmSessionReleased);
+      }
+      return true;
+    }
+    return false;
   }
 
   public boolean hasSessionId(byte[] sessionId) {
@@ -188,11 +221,7 @@ public class DefaultDrmSession<T extends ExoMediaCrypto> implements DrmSession<T
 
   public void provision() {
     currentProvisionRequest = mediaDrm.getProvisionRequest();
-    Util.castNonNull(postRequestHandler)
-        .post(
-            MSG_PROVISION,
-            Assertions.checkNotNull(currentProvisionRequest),
-            /* allowRetry= */ true);
+    postRequestHandler.post(MSG_PROVISION, currentProvisionRequest, /* allowRetry= */ true);
   }
 
   public void onProvisionCompleted() {
@@ -224,51 +253,13 @@ public class DefaultDrmSession<T extends ExoMediaCrypto> implements DrmSession<T
   }
 
   @Override
-  @Nullable
-  public Map<String, String> queryKeyStatus() {
+  public @Nullable Map<String, String> queryKeyStatus() {
     return sessionId == null ? null : mediaDrm.queryKeyStatus(sessionId);
   }
 
   @Override
-  @Nullable
-  public byte[] getOfflineLicenseKeySetId() {
+  public @Nullable byte[] getOfflineLicenseKeySetId() {
     return offlineLicenseKeySetId;
-  }
-
-  @Override
-  public void acquireReference() {
-    if (++referenceCount == 1) {
-      Assertions.checkState(state == STATE_OPENING);
-      requestHandlerThread = new HandlerThread("DrmRequestHandler");
-      requestHandlerThread.start();
-      postRequestHandler = new PostRequestHandler(requestHandlerThread.getLooper());
-      if (openInternal(true)) {
-        doLicense(true);
-      }
-    }
-  }
-
-  @Override
-  public void releaseReference() {
-    if (--referenceCount == 0) {
-      // Assigning null to various non-null variables for clean-up.
-      state = STATE_RELEASED;
-      Util.castNonNull(postResponseHandler).removeCallbacksAndMessages(null);
-      Util.castNonNull(postRequestHandler).removeCallbacksAndMessages(null);
-      postRequestHandler = null;
-      Util.castNonNull(requestHandlerThread).quit();
-      requestHandlerThread = null;
-      mediaCrypto = null;
-      lastException = null;
-      currentKeyRequest = null;
-      currentProvisionRequest = null;
-      if (sessionId != null) {
-        mediaDrm.closeSession(sessionId);
-        sessionId = null;
-        eventDispatcher.dispatch(DefaultDrmSessionEventListener::onDrmSessionReleased);
-      }
-      releaseCallback.onSessionReleased(this);
-    }
   }
 
   // Internal methods.
@@ -289,10 +280,9 @@ public class DefaultDrmSession<T extends ExoMediaCrypto> implements DrmSession<T
 
     try {
       sessionId = mediaDrm.openSession();
-      mediaCrypto = mediaDrm.createMediaCrypto(sessionId);
       eventDispatcher.dispatch(DefaultDrmSessionEventListener::onDrmSessionAcquired);
+      mediaCrypto = mediaDrm.createMediaCrypto(sessionId);
       state = STATE_OPENED;
-      Assertions.checkNotNull(sessionId);
       return true;
     } catch (NotProvisionedException e) {
       if (allowProvisioning) {
@@ -331,7 +321,6 @@ public class DefaultDrmSession<T extends ExoMediaCrypto> implements DrmSession<T
 
   @RequiresNonNull("sessionId")
   private void doLicense(boolean allowRetry) {
-    byte[] sessionId = Util.castNonNull(this.sessionId);
     switch (mode) {
       case DefaultDrmSessionManager.MODE_PLAYBACK:
       case DefaultDrmSessionManager.MODE_QUERY:
@@ -340,12 +329,9 @@ public class DefaultDrmSession<T extends ExoMediaCrypto> implements DrmSession<T
         } else if (state == STATE_OPENED_WITH_KEYS || restoreKeys()) {
           long licenseDurationRemainingSec = getLicenseDurationRemainingSec();
           if (mode == DefaultDrmSessionManager.MODE_PLAYBACK
-              && licenseDurationRemainingSec <= MAX_LICENSE_DURATION_TO_RENEW_SECONDS) {
-            Log.d(
-                TAG,
-                "Offline license has expired or will expire soon. "
-                    + "Remaining seconds: "
-                    + licenseDurationRemainingSec);
+              && licenseDurationRemainingSec <= MAX_LICENSE_DURATION_TO_RENEW) {
+            Log.d(TAG, "Offline license has expired or will expire soon. "
+                + "Remaining seconds: " + licenseDurationRemainingSec);
             postKeyRequest(sessionId, ExoMediaDrm.KEY_TYPE_OFFLINE, allowRetry);
           } else if (licenseDurationRemainingSec <= 0) {
             onError(new KeysExpiredException());
@@ -367,7 +353,6 @@ public class DefaultDrmSession<T extends ExoMediaCrypto> implements DrmSession<T
         break;
       case DefaultDrmSessionManager.MODE_RELEASE:
         Assertions.checkNotNull(offlineLicenseKeySetId);
-        Assertions.checkNotNull(this.sessionId);
         // It's not necessary to restore the key (and open a session to do that) before releasing it
         // but this serves as a good sanity/fast-failure check.
         if (restoreKeys()) {
@@ -404,8 +389,7 @@ public class DefaultDrmSession<T extends ExoMediaCrypto> implements DrmSession<T
     try {
       currentKeyRequest =
           mediaDrm.getKeyRequest(scope, schemeDatas, type, optionalKeyRequestParameters);
-      Util.castNonNull(postRequestHandler)
-          .post(MSG_KEYS, Assertions.checkNotNull(currentKeyRequest), allowRetry);
+      postRequestHandler.post(MSG_KEYS, currentKeyRequest, allowRetry);
     } catch (Exception e) {
       onKeysError(e);
     }
@@ -431,10 +415,8 @@ public class DefaultDrmSession<T extends ExoMediaCrypto> implements DrmSession<T
       } else {
         byte[] keySetId = mediaDrm.provideKeyResponse(sessionId, responseData);
         if ((mode == DefaultDrmSessionManager.MODE_DOWNLOAD
-                || (mode == DefaultDrmSessionManager.MODE_PLAYBACK
-                    && offlineLicenseKeySetId != null))
-            && keySetId != null
-            && keySetId.length != 0) {
+            || (mode == DefaultDrmSessionManager.MODE_PLAYBACK && offlineLicenseKeySetId != null))
+            && keySetId != null && keySetId.length != 0) {
           offlineLicenseKeySetId = keySetId;
         }
         state = STATE_OPENED_WITH_KEYS;
@@ -498,8 +480,10 @@ public class DefaultDrmSession<T extends ExoMediaCrypto> implements DrmSession<T
           break;
         default:
           break;
+
       }
     }
+
   }
 
   @SuppressLint("HandlerLeak")
@@ -516,6 +500,7 @@ public class DefaultDrmSession<T extends ExoMediaCrypto> implements DrmSession<T
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public void handleMessage(Message msg) {
       Object request = msg.obj;
       Object response;
@@ -557,5 +542,6 @@ public class DefaultDrmSession<T extends ExoMediaCrypto> implements DrmSession<T
     private long getRetryDelayMillis(int errorCount) {
       return Math.min((errorCount - 1) * 1000, 5000);
     }
+
   }
 }

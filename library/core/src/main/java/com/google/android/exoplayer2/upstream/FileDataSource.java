@@ -15,12 +15,9 @@
  */
 package com.google.android.exoplayer2.upstream;
 
-import static com.google.android.exoplayer2.util.Util.castNonNull;
-
 import android.net.Uri;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
-import com.google.android.exoplayer2.util.Assertions;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -39,8 +36,8 @@ public final class FileDataSource extends BaseDataSource {
 
   }
 
-  @Nullable private RandomAccessFile file;
-  @Nullable private Uri uri;
+  private @Nullable RandomAccessFile file;
+  private @Nullable Uri uri;
   private long bytesRemaining;
   private boolean opened;
 
@@ -48,16 +45,24 @@ public final class FileDataSource extends BaseDataSource {
     super(/* isNetwork= */ false);
   }
 
+  /**
+   * @param listener An optional listener.
+   * @deprecated Use {@link #FileDataSource()} and {@link #addTransferListener(TransferListener)}
+   */
+  @Deprecated
+  public FileDataSource(@Nullable TransferListener listener) {
+    this();
+    if (listener != null) {
+      addTransferListener(listener);
+    }
+  }
+
   @Override
   public long open(DataSpec dataSpec) throws FileDataSourceException {
     try {
-      Uri uri = dataSpec.uri;
-      this.uri = uri;
-
+      uri = dataSpec.uri;
       transferInitializing(dataSpec);
-      RandomAccessFile file = new RandomAccessFile(Assertions.checkNotNull(uri.getPath()), "r");
-      this.file = file;
-
+      file = new RandomAccessFile(dataSpec.uri.getPath(), "r");
       file.seek(dataSpec.position);
       bytesRemaining = dataSpec.length == C.LENGTH_UNSET ? file.length() - dataSpec.position
           : dataSpec.length;
@@ -83,8 +88,7 @@ public final class FileDataSource extends BaseDataSource {
     } else {
       int bytesRead;
       try {
-        bytesRead =
-            castNonNull(file).read(buffer, offset, (int) Math.min(bytesRemaining, readLength));
+        bytesRead = file.read(buffer, offset, (int) Math.min(bytesRemaining, readLength));
       } catch (IOException e) {
         throw new FileDataSourceException(e);
       }
@@ -99,8 +103,7 @@ public final class FileDataSource extends BaseDataSource {
   }
 
   @Override
-  @Nullable
-  public Uri getUri() {
+  public @Nullable Uri getUri() {
     return uri;
   }
 

@@ -285,7 +285,7 @@ public class PlayerControlView extends FrameLayout {
   }
 
   public PlayerControlView(Context context, @Nullable AttributeSet attrs) {
-    this(context, attrs, /* defStyleAttr= */ 0);
+    this(context, attrs, 0);
   }
 
   public PlayerControlView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
@@ -494,10 +494,9 @@ public class PlayerControlView extends FrameLayout {
   /**
    * Sets the {@link VisibilityListener}.
    *
-   * @param listener The listener to be notified about visibility changes, or null to remove the
-   *     current listener.
+   * @param listener The listener to be notified about visibility changes.
    */
-  public void setVisibilityListener(@Nullable VisibilityListener listener) {
+  public void setVisibilityListener(VisibilityListener listener) {
     this.visibilityListener = listener;
   }
 
@@ -513,8 +512,7 @@ public class PlayerControlView extends FrameLayout {
   /**
    * Sets the {@link PlaybackPreparer}.
    *
-   * @param playbackPreparer The {@link PlaybackPreparer}, or null to remove the current playback
-   *     preparer.
+   * @param playbackPreparer The {@link PlaybackPreparer}.
    */
   public void setPlaybackPreparer(@Nullable PlaybackPreparer playbackPreparer) {
     this.playbackPreparer = playbackPreparer;
@@ -1190,7 +1188,7 @@ public class PlayerControlView extends FrameLayout {
     }
 
     @Override
-    public void onPlayerStateChanged(boolean playWhenReady, @Player.State int playbackState) {
+    public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
       updatePlayPauseButton();
       updateProgress();
     }
@@ -1214,7 +1212,8 @@ public class PlayerControlView extends FrameLayout {
     }
 
     @Override
-    public void onTimelineChanged(Timeline timeline, @Player.TimelineChangeReason int reason) {
+    public void onTimelineChanged(
+        Timeline timeline, @Nullable Object manifest, @Player.TimelineChangeReason int reason) {
       updateNavigation();
       updateTimeline();
     }

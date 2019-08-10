@@ -34,7 +34,6 @@ import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.Format;
-import com.google.android.exoplayer2.FormatHolder;
 import com.google.android.exoplayer2.PlayerMessage.Target;
 import com.google.android.exoplayer2.decoder.DecoderInputBuffer;
 import com.google.android.exoplayer2.drm.DrmInitData;
@@ -92,23 +91,6 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
    */
   private static final float INITIAL_FORMAT_MAX_INPUT_SIZE_SCALE_FACTOR = 1.5f;
 
-  /** A {@link DecoderException} with additional surface information. */
-  public static final class VideoDecoderException extends DecoderException {
-
-    /** The {@link System#identityHashCode(Object)} of the surface when the exception occurred. */
-    public final int surfaceIdentityHashCode;
-
-    /** Whether the surface was valid when the exception occurred. */
-    public final boolean isSurfaceValid;
-
-    public VideoDecoderException(
-        Throwable cause, @Nullable MediaCodecInfo codecInfo, @Nullable Surface surface) {
-      super(cause, codecInfo);
-      surfaceIdentityHashCode = System.identityHashCode(surface);
-      isSurfaceValid = surface == null || surface.isValid();
-    }
-  }
-
   private static boolean evaluatedDeviceNeedsSetOutputSurfaceWorkaround;
   private static boolean deviceNeedsSetOutputSurfaceWorkaround;
 
@@ -155,7 +137,7 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
   private long lastInputTimeUs;
   private long outputStreamOffsetUs;
   private int pendingOutputStreamOffsetCount;
-  @Nullable private VideoFrameMetadataListener frameMetadataListener;
+  private @Nullable VideoFrameMetadataListener frameMetadataListener;
 
   /**
    * @param context A context.
@@ -315,33 +297,27 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
     if (!MimeTypes.isVideo(mimeType)) {
       return FORMAT_UNSUPPORTED_TYPE;
     }
+    boolean requiresSecureDecryption = false;
     DrmInitData drmInitData = format.drmInitData;
-    // Assume encrypted content requires secure decoders.
-    boolean requiresSecureDecryption = drmInitData != null;
+    if (drmInitData != null) {
+      for (int i = 0; i < drmInitData.schemeDataCount; i++) {
+        requiresSecureDecryption |= drmInitData.get(i).requiresSecureDecryption;
+      }
+    }
     List<MediaCodecInfo> decoderInfos =
-        getDecoderInfos(
-            mediaCodecSelector,
-            format,
-            requiresSecureDecryption,
-            /* requiresTunnelingDecoder= */ false);
-    if (requiresSecureDecryption && decoderInfos.isEmpty()) {
-      // No secure decoders are available. Fall back to non-secure decoders.
-      decoderInfos =
-          getDecoderInfos(
-              mediaCodecSelector,
-              format,
-              /* requiresSecureDecoder= */ false,
-              /* requiresTunnelingDecoder= */ false);
-    }
+        getDecoderInfos(mediaCodecSelector, format, requiresSecureDecryption);
     if (decoderInfos.isEmpty()) {
-      return FORMAT_UNSUPPORTED_SUBTYPE;
+      return requiresSecureDecryption
+              && !mediaCodecSelector
+                  .getDecoderInfos(
+                      format.sampleMimeType,
+                      /* requiresSecureDecoder= */ false,
+                      /* requiresTunnelingDecoder= */ false)
+                  .isEmpty()
+          ? FORMAT_UNSUPPORTED_DRM
+          : FORMAT_UNSUPPORTED_SUBTYPE;
     }
-    boolean supportsFormatDrm =
-        format.drmInitData == null
-            || FrameworkMediaCrypto.class.equals(format.exoMediaCryptoType)
-            || (format.exoMediaCryptoType == null
-                && supportsFormatDrm(drmSessionManager, format.drmInitData));
-    if (!supportsFormatDrm) {
+    if (!supportsFormatDrm(drmSessionManager, drmInitData)) {
       return FORMAT_UNSUPPORTED_DRM;
     }
     // Check capabilities for the first decoder in the list, which takes priority.
@@ -354,9 +330,8 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
     int tunnelingSupport = TUNNELING_NOT_SUPPORTED;
     if (isFormatSupported) {
       List<MediaCodecInfo> tunnelingDecoderInfos =
-          getDecoderInfos(
-              mediaCodecSelector,
-              format,
+          mediaCodecSelector.getDecoderInfos(
+              format.sampleMimeType,
               requiresSecureDecryption,
               /* requiresTunnelingDecoder= */ true);
       if (!tunnelingDecoderInfos.isEmpty()) {
@@ -375,35 +350,8 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
   protected List<MediaCodecInfo> getDecoderInfos(
       MediaCodecSelector mediaCodecSelector, Format format, boolean requiresSecureDecoder)
       throws DecoderQueryException {
-    return getDecoderInfos(mediaCodecSelector, format, requiresSecureDecoder, tunneling);
-  }
-
-  private static List<MediaCodecInfo> getDecoderInfos(
-      MediaCodecSelector mediaCodecSelector,
-      Format format,
-      boolean requiresSecureDecoder,
-      boolean requiresTunnelingDecoder)
-      throws DecoderQueryException {
     List<MediaCodecInfo> decoderInfos =
-        mediaCodecSelector.getDecoderInfos(
-            format.sampleMimeType, requiresSecureDecoder, requiresTunnelingDecoder);
-    decoderInfos = MediaCodecUtil.getDecoderInfosSortedByFormatSupport(decoderInfos, format);
-    if (MimeTypes.VIDEO_DOLBY_VISION.equals(format.sampleMimeType)) {
-      // Fallback to primary decoders for H.265/HEVC or H.264/AVC for the relevant DV profiles.
-      Pair<Integer, Integer> codecProfileAndLevel = MediaCodecUtil.getCodecProfileAndLevel(format);
-      if (codecProfileAndLevel != null) {
-        int profile = codecProfileAndLevel.first;
-        if (profile == 4 || profile == 8) {
-          decoderInfos.addAll(
-              mediaCodecSelector.getDecoderInfos(
-                  MimeTypes.VIDEO_H265, requiresSecureDecoder, requiresTunnelingDecoder));
-        } else if (profile == 9) {
-          decoderInfos.addAll(
-              mediaCodecSelector.getDecoderInfos(
-                  MimeTypes.VIDEO_H264, requiresSecureDecoder, requiresTunnelingDecoder));
-        }
-      }
-    }
+        mediaCodecSelector.getDecoderInfos(format.sampleMimeType, requiresSecureDecoder, tunneling);
     return Collections.unmodifiableList(decoderInfos);
   }
 
@@ -684,9 +632,8 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
   }
 
   @Override
-  protected void onInputFormatChanged(FormatHolder formatHolder) throws ExoPlaybackException {
-    super.onInputFormatChanged(formatHolder);
-    Format newFormat = formatHolder.format;
+  protected void onInputFormatChanged(Format newFormat) throws ExoPlaybackException {
+    super.onInputFormatChanged(newFormat);
     eventDispatcher.inputFormatChanged(newFormat);
     pendingPixelWidthHeightRatio = newFormat.pixelWidthHeightRatio;
     pendingRotationDegrees = newFormat.rotationDegrees;
@@ -1197,7 +1144,8 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
     if (MimeTypes.VIDEO_DOLBY_VISION.equals(format.sampleMimeType)) {
       // Some phones require the profile to be set on the codec.
       // See https://github.com/google/ExoPlayer/pull/5438.
-      Pair<Integer, Integer> codecProfileAndLevel = MediaCodecUtil.getCodecProfileAndLevel(format);
+      Pair<Integer, Integer> codecProfileAndLevel =
+          MediaCodecUtil.getCodecProfileAndLevel(format.codecs);
       if (codecProfileAndLevel != null) {
         MediaFormatUtil.maybeSetInteger(
             mediaFormat, MediaFormat.KEY_PROFILE, codecProfileAndLevel.first);
@@ -1282,12 +1230,6 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
       }
     }
     return new CodecMaxValues(maxWidth, maxHeight, maxInputSize);
-  }
-
-  @Override
-  protected DecoderException createDecoderException(
-      Throwable cause, @Nullable MediaCodecInfo codecInfo) {
-    return new VideoDecoderException(cause, codecInfo, surface);
   }
 
   /**
@@ -1632,10 +1574,6 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
       }
     }
     return deviceNeedsSetOutputSurfaceWorkaround;
-  }
-
-  protected Surface getSurface() {
-    return surface;
   }
 
   protected static final class CodecMaxValues {

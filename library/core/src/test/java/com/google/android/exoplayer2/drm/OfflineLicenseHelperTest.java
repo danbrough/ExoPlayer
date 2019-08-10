@@ -25,6 +25,7 @@ import android.util.Pair;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.drm.DrmInitData.SchemeData;
+import com.google.android.exoplayer2.testutil.RobolectricUtil;
 import java.util.HashMap;
 import org.junit.After;
 import org.junit.Before;
@@ -32,11 +33,11 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.robolectric.annotation.LooperMode;
+import org.robolectric.annotation.Config;
 
 /** Tests {@link OfflineLicenseHelper}. */
 @RunWith(AndroidJUnit4.class)
-@LooperMode(LooperMode.Mode.PAUSED)
+@Config(shadows = {RobolectricUtil.CustomLooper.class, RobolectricUtil.CustomMessageQueue.class})
 public class OfflineLicenseHelperTest {
 
   private OfflineLicenseHelper<?> offlineLicenseHelper;

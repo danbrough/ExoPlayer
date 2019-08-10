@@ -311,7 +311,7 @@ public final class Loader implements LoaderErrorThrower {
     private final T loadable;
     private final long startTimeMs;
 
-    @Nullable private Loader.Callback<T> callback;
+    private @Nullable Loader.Callback<T> callback;
     private IOException currentError;
     private int errorCount;
 

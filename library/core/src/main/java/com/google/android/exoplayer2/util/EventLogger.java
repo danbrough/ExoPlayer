@@ -54,7 +54,7 @@ public class EventLogger implements AnalyticsListener {
     TIME_FORMAT.setGroupingUsed(false);
   }
 
-  @Nullable private final MappingTrackSelector trackSelector;
+  private final @Nullable MappingTrackSelector trackSelector;
   private final String tag;
   private final Timeline.Window window;
   private final Timeline.Period period;
@@ -93,8 +93,7 @@ public class EventLogger implements AnalyticsListener {
   }
 
   @Override
-  public void onPlayerStateChanged(
-      EventTime eventTime, boolean playWhenReady, @Player.State int state) {
+  public void onPlayerStateChanged(EventTime eventTime, boolean playWhenReady, int state) {
     logd(eventTime, "state", playWhenReady + ", " + getStateString(state));
   }
 

@@ -59,10 +59,6 @@ android {
 
 dependencies {
     implementation 'androidx.annotation:annotation:1.1.0'
-<<<<<<< HEAD
-    compileOnly 'com.google.code.findbugs:jsr305:' + jsr305Version
-=======
->>>>>>> upstream
     compileOnly 'org.checkerframework:checker-qual:' + checkerframeworkVersion
     compileOnly 'org.checkerframework:checker-compat-qual:' + checkerframeworkVersion
     // Uncomment to enable Kotlin non-null strict mode. See [internal: b/138703808].

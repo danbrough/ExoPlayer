@@ -17,8 +17,6 @@ package com.google.android.exoplayer2.castdemo;
 
 import android.content.Context;
 import android.os.Bundle;
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.core.graphics.ColorUtils;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -41,9 +39,11 @@ import com.google.android.exoplayer2.SimpleExoPlayer;
 import com.google.android.exoplayer2.ext.cast.MediaItem;
 import com.google.android.exoplayer2.ui.PlayerControlView;
 import com.google.android.exoplayer2.ui.PlayerView;
+import com.google.android.gms.cast.CastMediaControlIntent;
 import com.google.android.gms.cast.framework.CastButtonFactory;
 import com.google.android.gms.cast.framework.CastContext;
 import com.google.android.gms.dynamite.DynamiteModule;
+import java.util.Collections;
 
 /**
  * An activity that plays video using {@link SimpleExoPlayer} and supports casting using ExoPlayer's
@@ -52,12 +52,18 @@ import com.google.android.gms.dynamite.DynamiteModule;
 public class MainActivity extends AppCompatActivity
     implements OnClickListener, PlayerManager.Listener {
 
+  private final MediaItem.Builder mediaItemBuilder;
+
   private PlayerView localPlayerView;
   private PlayerControlView castControlView;
   private PlayerManager playerManager;
   private RecyclerView mediaQueueList;
   private MediaQueueListAdapter mediaQueueListAdapter;
   private CastContext castContext;
+
+  public MainActivity() {
+    mediaItemBuilder = new MediaItem.Builder();
+  }
 
   // Activity lifecycle methods.
 
@@ -112,13 +118,20 @@ public class MainActivity extends AppCompatActivity
       // There is no Cast context to work with. Do nothing.
       return;
     }
-    playerManager =
-        new PlayerManager(
-            /* listener= */ this,
-            localPlayerView,
-            castControlView,
-            /* context= */ this,
-            castContext);
+    String applicationId = castContext.getCastOptions().getReceiverApplicationId();
+    switch (applicationId) {
+      case CastMediaControlIntent.DEFAULT_MEDIA_RECEIVER_APPLICATION_ID:
+        playerManager =
+            new DefaultReceiverPlayerManager(
+                /* listener= */ this,
+                localPlayerView,
+                castControlView,
+                /* context= */ this,
+                castContext);
+        break;
+      default:
+        throw new IllegalStateException("Illegal receiver app id: " + applicationId);
+    }
     mediaQueueList.setAdapter(mediaQueueListAdapter);
   }
 
@@ -166,21 +179,16 @@ public class MainActivity extends AppCompatActivity
   }
 
   @Override
-  public void onUnsupportedTrack(int trackType) {
-    if (trackType == C.TRACK_TYPE_AUDIO) {
-      showToast(R.string.error_unsupported_audio);
-    } else if (trackType == C.TRACK_TYPE_VIDEO) {
-      showToast(R.string.error_unsupported_video);
-    } else {
-      // Do nothing.
-    }
+  public void onQueueContentsExternallyChanged() {
+    mediaQueueListAdapter.notifyDataSetChanged();
+  }
+
+  @Override
+  public void onPlayerError() {
+    Toast.makeText(getApplicationContext(), R.string.player_error_msg, Toast.LENGTH_LONG).show();
   }
 
   // Internal methods.
-
-  private void showToast(int messageId) {
-    Toast.makeText(getApplicationContext(), messageId, Toast.LENGTH_LONG).show();
-  }
 
   private View buildSampleListView() {
     View dialogList = getLayoutInflater().inflate(R.layout.sample_list, null);
@@ -188,7 +196,19 @@ public class MainActivity extends AppCompatActivity
     sampleList.setAdapter(new SampleListAdapter(this));
     sampleList.setOnItemClickListener(
         (parent, view, position, id) -> {
-          playerManager.addItem(DemoUtil.SAMPLES.get(position));
+          DemoUtil.Sample sample = DemoUtil.SAMPLES.get(position);
+          mediaItemBuilder
+              .clear()
+              .setMedia(sample.uri)
+              .setTitle(sample.name)
+              .setMimeType(sample.mimeType);
+          if (sample.drmSchemeUuid != null) {
+            mediaItemBuilder.setDrmSchemes(
+                Collections.singletonList(
+                    new MediaItem.DrmScheme(
+                        sample.drmSchemeUuid, new MediaItem.UriBundle(sample.licenseServerUri))));
+          }
+          playerManager.addItem(mediaItemBuilder.build());
           mediaQueueListAdapter.notifyItemInserted(playerManager.getMediaQueueSize() - 1);
         });
     return dialogList;
@@ -211,10 +231,8 @@ public class MainActivity extends AppCompatActivity
       TextView view = holder.textView;
       view.setText(holder.item.title);
       // TODO: Solve coloring using the theme's ColorStateList.
-      view.setTextColor(
-          ColorUtils.setAlphaComponent(
-              view.getCurrentTextColor(),
-              position == playerManager.getCurrentItemIndex() ? 255 : 100));
+      view.setTextColor(ColorUtils.setAlphaComponent(view.getCurrentTextColor(),
+           position == playerManager.getCurrentItemIndex() ? 255 : 100));
     }
 
     @Override
@@ -294,18 +312,11 @@ public class MainActivity extends AppCompatActivity
     }
   }
 
-  private static final class SampleListAdapter extends ArrayAdapter<MediaItem> {
+  private static final class SampleListAdapter extends ArrayAdapter<DemoUtil.Sample> {
 
     public SampleListAdapter(Context context) {
       super(context, android.R.layout.simple_list_item_1, DemoUtil.SAMPLES);
     }
-
-    @NonNull
-    @Override
-    public View getView(int position, @Nullable View convertView, @NonNull ViewGroup parent) {
-      View view = super.getView(position, convertView, parent);
-      ((TextView) view).setText(getItem(position).title);
-      return view;
-    }
   }
+
 }

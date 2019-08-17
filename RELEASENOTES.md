@@ -31,6 +31,13 @@
   `DefaultTrackSelector` to allow adaptive selections of audio tracks with
   different channel counts
   ([#6257](https://github.com/google/ExoPlayer/issues/6257)).
+* Reset `DefaultBandwidthMeter` to initial values on network change.
+* Increase maximum buffer size for video in `DefaultLoadControl` to ensure high
+  quality video can be loaded up to the full default buffer duration.
+* Replace `ExoPlayerFactory` by `SimpleExoPlayer.Builder` and
+  `ExoPlayer.Builder`.
+* Inject `DrmSessionManager` into the `MediaSources` instead of `Renderers`
+  ([#5619](https://github.com/google/ExoPlayer/issues/5619)).
 
 ### 2.10.4 ###
 

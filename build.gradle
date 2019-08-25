@@ -22,13 +22,14 @@ buildscript {
         classpath 'com.google.android.gms:strict-version-matcher-plugin:1.1.0'
     }
 }
+
 allprojects {
     repositories {
         google()
         jcenter()
     }
     project.ext {
-        exoplayerPublishEnabled = false
+        exoplayerPublishEnabled = true
     }
     if (it.hasProperty('externalBuildDir')) {
         if (!new File(externalBuildDir).isAbsolute()) {
@@ -36,7 +37,10 @@ allprojects {
         }
         buildDir = "${externalBuildDir}/${project.name}"
     }
+
     group = 'com.google.android.exoplayer'
+
+
 }
 
 apply from: 'javadoc_combined.gradle'

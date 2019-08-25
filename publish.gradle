@@ -67,9 +67,3 @@ static void addLicense(File pom) {
     writer.close()
 }
 
-task packageSources(type: Jar, dependsOn: 'classes') {
-    from sourceSets.main.allSource
-    classifier = 'sources'
-}
-
-artifacts { archives packageSources }

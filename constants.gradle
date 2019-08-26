@@ -35,5 +35,5 @@ project.ext {
 }
 
 
-//group = 'com.github.danbrough.exoplayer'
+group = 'com.github.danbrough.exoplayer'
 

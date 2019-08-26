@@ -19,7 +19,7 @@ buildscript {
     dependencies {
         classpath 'com.android.tools.build:gradle:3.5.0'
         classpath 'com.novoda:bintray-release:0.9'
-        classpath 'com.google.android.gms:strict-version-matcher-plugin:1.1.0'
+        classpath 'com.google.android.gms:strict-version-matcher-plugin:1.2.0'
     }
 }
 
@@ -29,7 +29,7 @@ allprojects {
         jcenter()
     }
     project.ext {
-        exoplayerPublishEnabled = true
+        exoplayerPublishEnabled = false
     }
     if (it.hasProperty('externalBuildDir')) {
         if (!new File(externalBuildDir).isAbsolute()) {

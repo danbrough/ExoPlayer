@@ -2,6 +2,9 @@
 
 ### dev-v2 (not yet released) ###
 
+* Surface information provided by methods `isHardwareAccelerated`,
+  `isSoftwareOnly` and `isVendor` added in Android Q in `MediaCodecInfo` class
+  ([#5839](https://github.com/google/ExoPlayer/issues/5839)).
 * Update `DefaultTrackSelector` to apply a viewport constraint for the default
   display by default.
 * Add `PlaybackStatsListener` to collect `PlaybackStats` for playbacks analysis
@@ -46,6 +49,8 @@
   postroll ad ([#6314](https://github.com/google/ExoPlayer/issues/6314)).
 * Fix audio selection issue where languages are compared by bit rate
   ([#6335](https://github.com/google/ExoPlayer/issues/6335)).
+* Add `HttpDataSource.getResponseCode` to provide the status code associated
+  with the most recent HTTP response.
 
 ### 2.10.4 ###
 

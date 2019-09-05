@@ -2,6 +2,12 @@
 
 ### dev-v2 (not yet released) ###
 
+* Add `DataSpec.httpRequestHeaders` to set HTTP request headers when connecting
+  to an HTTP source. `DefaultHttpDataSource`, `CronetDataSource` and
+  `OkHttpDataSource` include headers set in the DataSpec when connecting to the
+  source.
+* Bypass sniffing in `ProgressiveMediaPeriod` in case a single extractor is
+  provided ([#6325](https://github.com/google/ExoPlayer/issues/6325)).
 * Surface information provided by methods `isHardwareAccelerated`,
   `isSoftwareOnly` and `isVendor` added in Android Q in `MediaCodecInfo` class
   ([#5839](https://github.com/google/ExoPlayer/issues/5839)).
@@ -56,6 +62,8 @@
   [#4249](https://github.com/google/ExoPlayer/issues/4249),
   [#4319](https://github.com/google/ExoPlayer/issues/4319),
   [#4337](https://github.com/google/ExoPlayer/issues/4337)).
+* Publish `testutils` module to simplify unit testing with ExoPlayer
+  ([#6267](https://github.com/google/ExoPlayer/issues/6267)).
 
 ### 2.10.4 ###
 

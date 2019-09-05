@@ -271,10 +271,12 @@ public abstract class SimpleDecoderAudioRenderer extends BaseRenderer implements
     // Try and read a format if we don't have one already.
     if (inputFormat == null) {
       // We don't have a format yet, so try and read one.
+      formatHolder.clear();
       flagsOnlyBuffer.clear();
       int result = readSource(formatHolder, flagsOnlyBuffer, true);
       if (result == C.RESULT_FORMAT_READ) {
         onInputFormatChanged(formatHolder);
+        formatHolder.clear();
       } else if (result == C.RESULT_BUFFER_READ) {
         // End of stream read having not read a format.
         Assertions.checkState(flagsOnlyBuffer.isEndOfStream());
@@ -359,6 +361,17 @@ public abstract class SimpleDecoderAudioRenderer extends BaseRenderer implements
         null, null, 0, null);
   }
 
+  /**
+   * Returns whether the existing decoder can be kept for a new format.
+   *
+   * @param oldFormat The previous format.
+   * @param newFormat The new format.
+   * @return True if the existing decoder can be kept.
+   */
+  protected boolean canKeepCodec(Format oldFormat, Format newFormat) {
+    return false;
+  }
+
   private boolean drainOutputBuffer() throws ExoPlaybackException, AudioDecoderException,
       AudioSink.ConfigurationException, AudioSink.InitializationException,
       AudioSink.WriteException {
@@ -432,6 +445,7 @@ public abstract class SimpleDecoderAudioRenderer extends BaseRenderer implements
       // We've already read an encrypted sample into buffer, and are waiting for keys.
       result = C.RESULT_BUFFER_READ;
     } else {
+      formatHolder.clear();
       result = readSource(formatHolder, inputBuffer, false);
     }
 
@@ -440,6 +454,7 @@ public abstract class SimpleDecoderAudioRenderer extends BaseRenderer implements
     }
     if (result == C.RESULT_FORMAT_READ) {
       onInputFormatChanged(formatHolder);
+      formatHolder.clear();
       return true;
     }
     if (inputBuffer.isEndOfStream()) {
@@ -685,14 +700,16 @@ public abstract class SimpleDecoderAudioRenderer extends BaseRenderer implements
       }
     }
 
-    if (decoderReceivedBuffers) {
-      // Signal end of stream and wait for any final output buffers before re-initialization.
-      decoderReinitializationState = REINITIALIZATION_STATE_SIGNAL_END_OF_STREAM;
-    } else {
-      // There aren't any final output buffers, so release the decoder immediately.
-      releaseDecoder();
-      maybeInitDecoder();
-      audioTrackNeedsConfigure = true;
+    if (!canKeepCodec(oldFormat, inputFormat)) {
+      if (decoderReceivedBuffers) {
+        // Signal end of stream and wait for any final output buffers before re-initialization.
+        decoderReinitializationState = REINITIALIZATION_STATE_SIGNAL_END_OF_STREAM;
+      } else {
+        // There aren't any final output buffers, so release the decoder immediately.
+        releaseDecoder();
+        maybeInitDecoder();
+        audioTrackNeedsConfigure = true;
+      }
     }
 
     encoderDelay = inputFormat.encoderDelay;

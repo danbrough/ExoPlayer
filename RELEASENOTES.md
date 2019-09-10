@@ -2,6 +2,8 @@
 
 ### dev-v2 (not yet released) ###
 
+* Add `allowedCapturePolicy` field to `AudioAttributes` wrapper to allow to
+  opt-out of audio recording.
 * Add `DataSpec.httpRequestHeaders` to set HTTP request headers when connecting
   to an HTTP source. `DefaultHttpDataSource`, `CronetDataSource` and
   `OkHttpDataSource` include headers set in the DataSpec when connecting to the
@@ -64,6 +66,10 @@
   [#4337](https://github.com/google/ExoPlayer/issues/4337)).
 * Publish `testutils` module to simplify unit testing with ExoPlayer
   ([#6267](https://github.com/google/ExoPlayer/issues/6267)).
+* Add `uid` to `Timeline.Window` to uniquely identify window instances.
+* Fix decoder selection for E-AC3 JOC streams
+  ([#6398](https://github.com/google/ExoPlayer/issues/6398)).
+* Fix Dolby Vision fallback to AVC and HEVC.
 
 ### 2.10.4 ###
 
@@ -95,6 +101,8 @@
 * Fix issue where playback speeds are not used in adaptive track selections
   after manual selection changes for other renderers
   ([#6256](https://github.com/google/ExoPlayer/issues/6256)).
+* Fix initialization data handling for FLAC in MP4
+  ([#6396](https://github.com/google/ExoPlayer/issues/6396)).
 
 ### 2.10.3 ###
 

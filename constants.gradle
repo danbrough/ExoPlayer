@@ -14,7 +14,7 @@
 project.ext {
     // ExoPlayer version and version code.
     releaseVersion = '2.10.5'
-    releaseVersionCode = 2010004
+    releaseVersionCode = 2010005
     minSdkVersion = 16
     targetSdkVersion = 29
     compileSdkVersion = 29

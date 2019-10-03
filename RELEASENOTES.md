@@ -2,6 +2,20 @@
 
 ### dev-v2 (not yet released) ###
 
+* DRM:
+  * Inject `DrmSessionManager` into the `MediaSources` instead of `Renderers`
+    ([#5619](https://github.com/google/ExoPlayer/issues/5619)).
+  * Add a `DefaultDrmSessionManager.Builder`.
+  * Add support for the use of secure decoders in clear sections of content
+    ([#4867](https://github.com/google/ExoPlayer/issues/4867)).
+  * Add basic DRM support to the Cast demo app.
+  * Add support for custom `LoadErrorHandlingPolicies` in key and provisioning
+    requests ([#6334](https://github.com/google/ExoPlayer/issues/6334)).
+  * Remove `DefaultDrmSessionManager` factory methods that leak `ExoMediaDrm`
+    instances ([#4721](https://github.com/google/ExoPlayer/issues/4721)).
+* Remove the `DataSpec.FLAG_ALLOW_ICY_METADATA` flag. Instead, set the header
+  `IcyHeaders.REQUEST_HEADER_ENABLE_METADATA_NAME` in the `DataSpec`
+  `httpRequestHeaders`.
 * DASH: Support negative @r values in segment timelines
   ([#1787](https://github.com/google/ExoPlayer/issues/1787)).
 * Add `allowedCapturePolicy` field to `AudioAttributes` wrapper to allow to
@@ -19,7 +33,6 @@
   display by default.
 * Add `PlaybackStatsListener` to collect `PlaybackStats` for playbacks analysis
   and analytics reporting (TODO: link to developer guide page/blog post).
-* Add basic DRM support to the Cast demo app.
 * Assume that encrypted content requires secure decoders in renderer support
   checks ([#5568](https://github.com/google/ExoPlayer/issues/5568)).
 * Decoders: Prefer decoders that advertise format support over ones that do not,
@@ -45,8 +58,6 @@
   the `Player` set later using `AnalyticsCollector.setPlayer`.
 * Replace `ExoPlayerFactory` by `SimpleExoPlayer.Builder` and
   `ExoPlayer.Builder`.
-* Inject `DrmSessionManager` into the `MediaSources` instead of `Renderers`
-  ([#5619](https://github.com/google/ExoPlayer/issues/5619)).
 * Fix issue where player errors are thrown too early at playlist transitions
   ([#5407](https://github.com/google/ExoPlayer/issues/5407)).
 * Deprecate `setTag` parameter of `Timeline.getWindow`. Tags will always be set.
@@ -61,6 +72,26 @@
   ([#6161](https://github.com/google/ExoPlayer/issues/6161)).
 * Add demo app to show how to use the Android 10 `SurfaceControl` API with
   ExoPlayer ([#677](https://github.com/google/ExoPlayer/issues/677)).
+* Add automatic `WakeLock` handling to `SimpleExoPlayer` through calling
+  `setEnableWakeLock`, which requires the
+  `android.Manifest.permission#WAKE_LOCK` permission
+  ([#5846](https://github.com/google/ExoPlayer/issues/5846)).
+* Add `Player.onPlaybackSuppressionReasonChanged` to allow listeners to
+  detect playbacks suppressions (e.g. audio focus loss) directly
+  ([#6203](https://github.com/google/ExoPlayer/issues/6203)).
+* VP9 extension:
+  * Rename `VpxVideoSurfaceView` to `VideoDecoderSurfaceView`
+    and move it to the core library.
+  * Move `LibvpxVideoRenderer.MSG_SET_OUTPUT_BUFFER_RENDERER` to
+    `C.MSG_SET_OUTPUT_BUFFER_RENDERER`.
+* Add `Timeline.Window.isLive` to indicate that a window is a live stream
+  ([#2668](https://github.com/google/ExoPlayer/issues/2668) and
+  [#5973](https://github.com/google/ExoPlayer/issues/5973)).
+* Expose the raw ICY metadata through `IcyInfo`
+  ([#6476](https://github.com/google/ExoPlayer/issues/6476)).
+* Fail more explicitly when local-file Uris contain invalid parts (e.g.
+  fragment) ([#6470](https://github.com/google/ExoPlayer/issues/6470)).
+* Add `MediaPeriod.isLoading` to improve `Player.isLoading` state.
 
 ### 2.10.5 (2019-09-20) ###
 

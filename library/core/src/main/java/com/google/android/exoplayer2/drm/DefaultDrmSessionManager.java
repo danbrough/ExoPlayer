@@ -37,6 +37,7 @@ import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -63,7 +64,7 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto>
     private LoadErrorHandlingPolicy loadErrorHandlingPolicy;
 
     /**
-     * Creates a builder with default values.
+     * Creates a builder with default values. The default values are:
      *
      * <ul>
      *   <li>{@link #setKeyRequestParameters keyRequestParameters}: An empty map.
@@ -258,7 +259,9 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto>
    * @param callback Performs key and provisioning requests.
    * @param optionalKeyRequestParameters An optional map of parameters to pass as the last argument
    *     to {@link ExoMediaDrm#getKeyRequest(byte[], List, int, HashMap)}. May be null.
+   * @deprecated Use {@link Builder} instead.
    */
+  @Deprecated
   public DefaultDrmSessionManager(
       UUID uuid,
       ExoMediaDrm<T> exoMediaDrm,
@@ -281,7 +284,9 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto>
    *     to {@link ExoMediaDrm#getKeyRequest(byte[], List, int, HashMap)}. May be null.
    * @param multiSession A boolean that specify whether multiple key session support is enabled.
    *     Default is false.
+   * @deprecated Use {@link Builder} instead.
    */
+  @Deprecated
   public DefaultDrmSessionManager(
       UUID uuid,
       ExoMediaDrm<T> exoMediaDrm,
@@ -307,7 +312,9 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto>
    *     Default is false.
    * @param initialDrmRequestRetryCount The number of times to retry for initial provisioning and
    *     key request before reporting error.
+   * @deprecated Use {@link Builder} instead.
    */
+  @Deprecated
   public DefaultDrmSessionManager(
       UUID uuid,
       ExoMediaDrm<T> exoMediaDrm,
@@ -477,7 +484,8 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto>
     maybeCreateMediaDrmHandler(playbackLooper);
     if (placeholderDrmSession == null) {
       DefaultDrmSession<T> placeholderDrmSession =
-          createNewDefaultSession(/* schemeDatas= */ null, /* isPlaceholderSession= */ true);
+          createNewDefaultSession(
+              /* schemeDatas= */ Collections.emptyList(), /* isPlaceholderSession= */ true);
       sessions.add(placeholderDrmSession);
       this.placeholderDrmSession = placeholderDrmSession;
     }

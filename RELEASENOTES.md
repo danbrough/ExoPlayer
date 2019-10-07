@@ -2,6 +2,14 @@
 
 ### dev-v2 (not yet released) ###
 
+* UI
+  * Setting `app:played_color` on `PlayerView` and `PlayerControlView` no longer
+    adjusts the colors of the scrubber handle , buffered and unplayed parts of
+    the time bar. These can be set separately using `app:scrubber_color`,
+    `app:buffered_color` and `app_unplayed_color` respectively.
+  * Setting `app:ad_marker_color` on `PlayerView` and `PlayerControlView` no
+    longer adjusts the color of played ad markers. The color of played ad
+    markers can be set separately using `app:played_ad_marker_color`
 * DRM:
   * Inject `DrmSessionManager` into the `MediaSources` instead of `Renderers`
     ([#5619](https://github.com/google/ExoPlayer/issues/5619)).
@@ -16,8 +24,11 @@
 * Remove the `DataSpec.FLAG_ALLOW_ICY_METADATA` flag. Instead, set the header
   `IcyHeaders.REQUEST_HEADER_ENABLE_METADATA_NAME` in the `DataSpec`
   `httpRequestHeaders`.
-* DASH: Support negative @r values in segment timelines
-  ([#1787](https://github.com/google/ExoPlayer/issues/1787)).
+* DASH:
+  * Support negative @r values in segment timelines
+    ([#1787](https://github.com/google/ExoPlayer/issues/1787)).
+  * Support `Label` elements
+    ([#6297](https://github.com/google/ExoPlayer/issues/6297)).
 * Add `allowedCapturePolicy` field to `AudioAttributes` wrapper to allow to
   opt-out of audio recording.
 * Add `DataSpec.httpRequestHeaders` to set HTTP request headers when connecting

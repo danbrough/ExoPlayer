@@ -32,6 +32,8 @@
     ([#1787](https://github.com/google/ExoPlayer/issues/1787)).
   * Support `Label` elements
     ([#6297](https://github.com/google/ExoPlayer/issues/6297)).
+  * Support legacy audio channel configuration
+    ([#6523](https://github.com/google/ExoPlayer/issues/6523)).
 * Add `allowedCapturePolicy` field to `AudioAttributes` wrapper to allow to
   opt-out of audio recording.
 * Add `DataSpec.httpRequestHeaders` to set HTTP request headers when connecting
@@ -110,6 +112,8 @@
 * Add `MediaPeriod.isLoading` to improve `Player.isLoading` state.
 * Add support for ID3-in-EMSG in HLS streams
   ([spec](https://aomediacodec.github.io/av1-id3/)).
+* Make show and hide player controls accessible for TalkBack in `PlayerView`.
+* Pass the codec output `MediaFormat` to `VideoFrameMetadataListener`.
 
 ### 2.10.5 (2019-09-20) ###
 

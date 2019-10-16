@@ -608,16 +608,14 @@ public class SimpleExoPlayer extends BasePlayer
   @Override
   public void setOutputBufferRenderer(VideoDecoderOutputBufferRenderer outputBufferRenderer) {
     verifyApplicationThread();
-    removeSurfaceCallbacks();
-    List<PlayerMessage> messages = new ArrayList<>();
+    setVideoSurface(null);
     for (Renderer renderer : renderers) {
       if (renderer.getTrackType() == C.TRACK_TYPE_VIDEO) {
-        messages.add(
-            player
-                .createMessage(renderer)
-                .setType(C.MSG_SET_OUTPUT_BUFFER_RENDERER)
-                .setPayload(outputBufferRenderer)
-                .send());
+        player
+            .createMessage(renderer)
+            .setType(C.MSG_SET_OUTPUT_BUFFER_RENDERER)
+            .setPayload(outputBufferRenderer)
+            .send();
       }
     }
   }
@@ -1454,7 +1452,7 @@ public class SimpleExoPlayer extends BasePlayer
     @PlaybackSuppressionReason
     int playbackSuppressionReason =
         playWhenReady && playerCommand != AudioFocusManager.PLAYER_COMMAND_PLAY_WHEN_READY
-            ? Player.PLAYBACK_SUPPRESSION_REASON_AUDIO_FOCUS_LOSS
+            ? Player.PLAYBACK_SUPPRESSION_REASON_TRANSIENT_AUDIO_FOCUS_LOSS
             : Player.PLAYBACK_SUPPRESSION_REASON_NONE;
     player.setPlayWhenReady(playWhenReady, playbackSuppressionReason);
   }

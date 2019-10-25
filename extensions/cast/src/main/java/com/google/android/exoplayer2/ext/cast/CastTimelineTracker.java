@@ -16,9 +16,7 @@
 package com.google.android.exoplayer2.ext.cast;
 
 import android.util.SparseArray;
-import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
-import com.google.android.gms.cast.MediaInfo;
 import com.google.android.gms.cast.MediaQueueItem;
 import com.google.android.gms.cast.MediaStatus;
 import com.google.android.gms.cast.framework.media.RemoteMediaClient;
@@ -63,31 +61,23 @@ import java.util.HashSet;
     }
 
     int currentItemId = mediaStatus.getCurrentItemId();
-    updateItemData(
-        currentItemId, mediaStatus.getMediaInfo(), /* defaultPositionUs= */ C.TIME_UNSET);
+    long durationUs = CastUtils.getStreamDurationUs(mediaStatus.getMediaInfo());
+    itemIdToData.put(
+        currentItemId,
+        itemIdToData
+            .get(currentItemId, CastTimeline.ItemData.EMPTY)
+            .copyWithDurationUs(durationUs));
 
     for (MediaQueueItem item : mediaStatus.getQueueItems()) {
-      long defaultPositionUs = (long) (item.getStartTime() * C.MICROS_PER_SECOND);
-      updateItemData(item.getItemId(), item.getMedia(), defaultPositionUs);
+      int itemId = item.getItemId();
+      itemIdToData.put(
+          itemId,
+          itemIdToData
+              .get(itemId, CastTimeline.ItemData.EMPTY)
+              .copyWithDefaultPositionUs((long) (item.getStartTime() * C.MICROS_PER_SECOND)));
     }
 
     return new CastTimeline(itemIds, itemIdToData);
-  }
-
-  private void updateItemData(int itemId, @Nullable MediaInfo mediaInfo, long defaultPositionUs) {
-    CastTimeline.ItemData previousData = itemIdToData.get(itemId, CastTimeline.ItemData.EMPTY);
-    long durationUs = CastUtils.getStreamDurationUs(mediaInfo);
-    if (durationUs == C.TIME_UNSET) {
-      durationUs = previousData.durationUs;
-    }
-    boolean isLive =
-        mediaInfo == null
-            ? previousData.isLive
-            : mediaInfo.getStreamType() == MediaInfo.STREAM_TYPE_LIVE;
-    if (defaultPositionUs == C.TIME_UNSET) {
-      defaultPositionUs = previousData.defaultPositionUs;
-    }
-    itemIdToData.put(itemId, previousData.copyWithNewValues(durationUs, defaultPositionUs, isLive));
   }
 
   private void removeUnusedItemDataEntries(int[] itemIds) {

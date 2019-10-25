@@ -28,7 +28,6 @@ android {
     }
 
     testOptions.unitTests.includeAndroidResources = true
-
     task sourcesJar(type: Jar) {
         from android.sourceSets.main.java.srcDirs
         classifier = 'sources'
@@ -37,17 +36,17 @@ android {
     artifacts {
         archives sourcesJar
     }
+
 }
 
 dependencies {
     api 'com.google.android.gms:play-services-cast-framework:17.0.0'
-    implementation 'androidx.annotation:annotation:' + androidxAnnotationVersion
+    implementation 'androidx.annotation:annotation:1.1.0'
     implementation project(modulePrefix + 'library-core')
     implementation project(modulePrefix + 'library-ui')
     compileOnly 'org.checkerframework:checker-qual:' + checkerframeworkVersion
     compileOnly 'org.checkerframework:checker-compat-qual:' + checkerframeworkVersion
-    testImplementation project(modulePrefix + 'testutils')
-    testImplementation 'org.robolectric:robolectric:' + robolectricVersion
+    testImplementation project(modulePrefix + 'testutils-robolectric')
 }
 
 ext {

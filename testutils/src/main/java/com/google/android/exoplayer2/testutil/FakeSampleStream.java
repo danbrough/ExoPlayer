@@ -31,7 +31,7 @@ import java.io.IOException;
 public final class FakeSampleStream implements SampleStream {
 
   private final Format format;
-  @Nullable private final EventDispatcher eventDispatcher;
+  private final @Nullable EventDispatcher eventDispatcher;
   private final byte[] sampleData;
 
   private boolean notifiedDownstreamFormat;

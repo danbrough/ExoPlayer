@@ -23,6 +23,9 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.ResultReceiver;
 import android.os.SystemClock;
+import androidx.annotation.LongDef;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import android.support.v4.media.MediaDescriptionCompat;
 import android.support.v4.media.MediaMetadataCompat;
 import android.support.v4.media.RatingCompat;
@@ -30,9 +33,6 @@ import android.support.v4.media.session.MediaControllerCompat;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
 import android.util.Pair;
-import androidx.annotation.LongDef;
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ControlDispatcher;
 import com.google.android.exoplayer2.DefaultControlDispatcher;
@@ -52,7 +52,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.checkerframework.checker.nullness.qual.EnsuresNonNullIf;
 
 /**
  * Connects a {@link MediaSessionCompat} to a {@link Player}.
@@ -369,7 +368,7 @@ public final class MediaSessionConnector {
      * @param extras Optional extras sent by a media controller.
      */
     void onCustomAction(
-        Player player, ControlDispatcher controlDispatcher, String action, @Nullable Bundle extras);
+        Player player, ControlDispatcher controlDispatcher, String action, Bundle extras);
 
     /**
      * Returns a {@link PlaybackStateCompat.CustomAction} which will be published to the media
@@ -567,7 +566,7 @@ public final class MediaSessionConnector {
    *
    * @param queueNavigator The queue navigator.
    */
-  public void setQueueNavigator(@Nullable QueueNavigator queueNavigator) {
+  public void setQueueNavigator(QueueNavigator queueNavigator) {
     if (this.queueNavigator != queueNavigator) {
       unregisterCommandReceiver(this.queueNavigator);
       this.queueNavigator = queueNavigator;
@@ -580,7 +579,7 @@ public final class MediaSessionConnector {
    *
    * @param queueEditor The queue editor.
    */
-  public void setQueueEditor(@Nullable QueueEditor queueEditor) {
+  public void setQueueEditor(QueueEditor queueEditor) {
     if (this.queueEditor != queueEditor) {
       unregisterCommandReceiver(this.queueEditor);
       this.queueEditor = queueEditor;
@@ -682,7 +681,7 @@ public final class MediaSessionConnector {
         mediaMetadataProvider != null && player != null
             ? mediaMetadataProvider.getMetadata(player)
             : METADATA_EMPTY;
-    mediaSession.setMetadata(metadata);
+    mediaSession.setMetadata(metadata != null ? metadata : METADATA_EMPTY);
   }
 
   /**
@@ -693,7 +692,6 @@ public final class MediaSessionConnector {
    */
   public final void invalidateMediaSessionPlaybackState() {
     PlaybackStateCompat.Builder builder = new PlaybackStateCompat.Builder();
-    @Nullable Player player = this.player;
     if (player == null) {
       builder
           .setActions(buildPrepareActions())
@@ -708,7 +706,6 @@ public final class MediaSessionConnector {
 
     Map<String, CustomActionProvider> currentActions = new HashMap<>();
     for (CustomActionProvider customActionProvider : customActionProviders) {
-      @Nullable
       PlaybackStateCompat.CustomAction customAction = customActionProvider.getCustomAction(player);
       if (customAction != null) {
         currentActions.put(customAction.getAction(), customActionProvider);
@@ -775,8 +772,8 @@ public final class MediaSessionConnector {
    *
    * @param commandReceiver The command receiver to register.
    */
-  public void registerCustomCommandReceiver(@Nullable CommandReceiver commandReceiver) {
-    if (commandReceiver != null && !customCommandReceivers.contains(commandReceiver)) {
+  public void registerCustomCommandReceiver(CommandReceiver commandReceiver) {
+    if (!customCommandReceivers.contains(commandReceiver)) {
       customCommandReceivers.add(commandReceiver);
     }
   }
@@ -786,22 +783,18 @@ public final class MediaSessionConnector {
    *
    * @param commandReceiver The command receiver to unregister.
    */
-  public void unregisterCustomCommandReceiver(@Nullable CommandReceiver commandReceiver) {
-    if (commandReceiver != null) {
-      customCommandReceivers.remove(commandReceiver);
-    }
+  public void unregisterCustomCommandReceiver(CommandReceiver commandReceiver) {
+    customCommandReceivers.remove(commandReceiver);
   }
 
-  private void registerCommandReceiver(@Nullable CommandReceiver commandReceiver) {
-    if (commandReceiver != null && !commandReceivers.contains(commandReceiver)) {
+  private void registerCommandReceiver(CommandReceiver commandReceiver) {
+    if (!commandReceivers.contains(commandReceiver)) {
       commandReceivers.add(commandReceiver);
     }
   }
 
-  private void unregisterCommandReceiver(@Nullable CommandReceiver commandReceiver) {
-    if (commandReceiver != null) {
-      commandReceivers.remove(commandReceiver);
-    }
+  private void unregisterCommandReceiver(CommandReceiver commandReceiver) {
+    commandReceivers.remove(commandReceiver);
   }
 
   private long buildPrepareActions() {
@@ -846,43 +839,29 @@ public final class MediaSessionConnector {
     return actions;
   }
 
-  @EnsuresNonNullIf(result = true, expression = "player")
   private boolean canDispatchPlaybackAction(long action) {
     return player != null && (enabledPlaybackActions & action) != 0;
   }
 
-  @EnsuresNonNullIf(result = true, expression = "playbackPreparer")
   private boolean canDispatchToPlaybackPreparer(long action) {
     return playbackPreparer != null
         && (playbackPreparer.getSupportedPrepareActions() & action) != 0;
   }
 
-  @EnsuresNonNullIf(
-      result = true,
-      expression = {"player", "queueNavigator"})
   private boolean canDispatchToQueueNavigator(long action) {
     return player != null
         && queueNavigator != null
         && (queueNavigator.getSupportedQueueNavigatorActions(player) & action) != 0;
   }
 
-  @EnsuresNonNullIf(
-      result = true,
-      expression = {"player", "ratingCallback"})
   private boolean canDispatchSetRating() {
     return player != null && ratingCallback != null;
   }
 
-  @EnsuresNonNullIf(
-      result = true,
-      expression = {"player", "queueEditor"})
   private boolean canDispatchQueueEdit() {
     return player != null && queueEditor != null;
   }
 
-  @EnsuresNonNullIf(
-      result = true,
-      expression = {"player", "mediaButtonEventHandler"})
   private boolean canDispatchMediaButtonEvent() {
     return player != null && mediaButtonEventHandler != null;
   }
@@ -914,7 +893,7 @@ public final class MediaSessionConnector {
   }
 
   private static int getMediaSessionPlaybackState(
-      @Player.State int exoPlayerPlaybackState, boolean playWhenReady) {
+      int exoPlayerPlaybackState, boolean playWhenReady) {
     switch (exoPlayerPlaybackState) {
       case Player.STATE_BUFFERING:
         return PlaybackStateCompat.STATE_BUFFERING;
@@ -970,10 +949,10 @@ public final class MediaSessionConnector {
           MediaSessionCompat.QueueItem queueItem = queue.get(i);
           if (queueItem.getQueueId() == activeQueueItemId) {
             MediaDescriptionCompat description = queueItem.getDescription();
-            @Nullable Bundle extras = description.getExtras();
+            Bundle extras = description.getExtras();
             if (extras != null) {
               for (String key : extras.keySet()) {
-                @Nullable Object value = extras.get(key);
+                Object value = extras.get(key);
                 if (value instanceof String) {
                   builder.putString(metadataExtrasPrefix + key, (String) value);
                 } else if (value instanceof CharSequence) {
@@ -989,40 +968,39 @@ public final class MediaSessionConnector {
                 }
               }
             }
-            @Nullable CharSequence title = description.getTitle();
-            if (title != null) {
-              String titleString = String.valueOf(title);
-              builder.putString(MediaMetadataCompat.METADATA_KEY_TITLE, titleString);
-              builder.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, titleString);
+            if (description.getTitle() != null) {
+              String title = String.valueOf(description.getTitle());
+              builder.putString(MediaMetadataCompat.METADATA_KEY_TITLE, title);
+              builder.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, title);
             }
-            @Nullable CharSequence subtitle = description.getSubtitle();
-            if (subtitle != null) {
+            if (description.getSubtitle() != null) {
               builder.putString(
-                  MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, String.valueOf(subtitle));
+                  MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE,
+                  String.valueOf(description.getSubtitle()));
             }
-            @Nullable CharSequence displayDescription = description.getDescription();
-            if (displayDescription != null) {
+            if (description.getDescription() != null) {
               builder.putString(
                   MediaMetadataCompat.METADATA_KEY_DISPLAY_DESCRIPTION,
-                  String.valueOf(displayDescription));
+                  String.valueOf(description.getDescription()));
             }
-            @Nullable Bitmap iconBitmap = description.getIconBitmap();
-            if (iconBitmap != null) {
-              builder.putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, iconBitmap);
+            if (description.getIconBitmap() != null) {
+              builder.putBitmap(
+                  MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, description.getIconBitmap());
             }
-            @Nullable Uri iconUri = description.getIconUri();
-            if (iconUri != null) {
+            if (description.getIconUri() != null) {
               builder.putString(
-                  MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON_URI, String.valueOf(iconUri));
+                  MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON_URI,
+                  String.valueOf(description.getIconUri()));
             }
-            @Nullable String mediaId = description.getMediaId();
-            if (mediaId != null) {
-              builder.putString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID, mediaId);
-            }
-            @Nullable Uri mediaUri = description.getMediaUri();
-            if (mediaUri != null) {
+            if (description.getMediaId() != null) {
               builder.putString(
-                  MediaMetadataCompat.METADATA_KEY_MEDIA_URI, String.valueOf(mediaUri));
+                  MediaMetadataCompat.METADATA_KEY_MEDIA_ID,
+                  String.valueOf(description.getMediaId()));
+            }
+            if (description.getMediaUri() != null) {
+              builder.putString(
+                  MediaMetadataCompat.METADATA_KEY_MEDIA_URI,
+                  String.valueOf(description.getMediaUri()));
             }
             break;
           }
@@ -1041,8 +1019,8 @@ public final class MediaSessionConnector {
     // Player.EventListener implementation.
 
     @Override
-    public void onTimelineChanged(Timeline timeline, @Player.TimelineChangeReason int reason) {
-      Player player = Assertions.checkNotNull(MediaSessionConnector.this.player);
+    public void onTimelineChanged(
+        Timeline timeline, @Nullable Object manifest, @Player.TimelineChangeReason int reason) {
       int windowCount = player.getCurrentTimeline().getWindowCount();
       int windowIndex = player.getCurrentWindowIndex();
       if (queueNavigator != null) {
@@ -1058,7 +1036,7 @@ public final class MediaSessionConnector {
     }
 
     @Override
-    public void onPlayerStateChanged(boolean playWhenReady, @Player.State int playbackState) {
+    public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
       invalidateMediaSessionPlaybackState();
     }
 
@@ -1090,7 +1068,6 @@ public final class MediaSessionConnector {
 
     @Override
     public void onPositionDiscontinuity(@Player.DiscontinuityReason int reason) {
-      Player player = Assertions.checkNotNull(MediaSessionConnector.this.player);
       if (currentWindowIndex != player.getCurrentWindowIndex()) {
         if (queueNavigator != null) {
           queueNavigator.onCurrentWindowIndexChanged(player);

@@ -19,13 +19,14 @@ import android.content.Context;
 import android.graphics.Point;
 import android.os.Parcel;
 import android.os.Parcelable;
+import androidx.annotation.Nullable;
 import android.text.TextUtils;
 import android.util.Pair;
 import android.util.SparseArray;
 import android.util.SparseBooleanArray;
-import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlaybackException;
+import com.google.android.exoplayer2.ExoPlayerFactory;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.Renderer;
@@ -43,7 +44,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
-import org.checkerframework.checker.initialization.qual.UnderInitialization;
 import org.checkerframework.checker.nullness.compatqual.NullableType;
 
 /**
@@ -187,31 +187,9 @@ public class DefaultTrackSelector extends MappingTrackSelector {
     private final SparseArray<Map<TrackGroupArray, SelectionOverride>> selectionOverrides;
     private final SparseBooleanArray rendererDisabledFlags;
 
-    /**
-     * @deprecated {@link Context} constraints will not be set using this constructor. Use {@link
-     *     #ParametersBuilder(Context)} instead.
-     */
-    @Deprecated
-    @SuppressWarnings({"deprecation"})
+    /** Creates a builder with default initial values. */
     public ParametersBuilder() {
-      super();
-      setInitialValuesWithoutContext();
-      selectionOverrides = new SparseArray<>();
-      rendererDisabledFlags = new SparseBooleanArray();
-    }
-
-    /**
-     * Creates a builder with default initial values.
-     *
-     * @param context Any context.
-     */
-
-    public ParametersBuilder(Context context) {
-      super(context);
-      setInitialValuesWithoutContext();
-      selectionOverrides = new SparseArray<>();
-      rendererDisabledFlags = new SparseBooleanArray();
-      setViewportSizeToPhysicalDisplaySize(context, /* viewportOrientationMayChange= */ true);
+      this(Parameters.DEFAULT);
     }
 
     /**
@@ -485,13 +463,6 @@ public class DefaultTrackSelector extends MappingTrackSelector {
     // Text
 
     @Override
-    public ParametersBuilder setPreferredTextLanguageAndRoleFlagsToCaptioningManagerSettings(
-        Context context) {
-      super.setPreferredTextLanguageAndRoleFlagsToCaptioningManagerSettings(context);
-      return this;
-    }
-
-    @Override
     public ParametersBuilder setPreferredTextLanguage(@Nullable String preferredTextLanguage) {
       super.setPreferredTextLanguage(preferredTextLanguage);
       return this;
@@ -516,7 +487,6 @@ public class DefaultTrackSelector extends MappingTrackSelector {
       super.setDisabledTextTrackSelectionFlags(disabledTextTrackSelectionFlags);
       return this;
     }
-
     // General
 
     /**
@@ -749,32 +719,6 @@ public class DefaultTrackSelector extends MappingTrackSelector {
           rendererDisabledFlags);
     }
 
-    private void setInitialValuesWithoutContext(@UnderInitialization ParametersBuilder this) {
-      // Video
-      maxVideoWidth = Integer.MAX_VALUE;
-      maxVideoHeight = Integer.MAX_VALUE;
-      maxVideoFrameRate = Integer.MAX_VALUE;
-      maxVideoBitrate = Integer.MAX_VALUE;
-      exceedVideoConstraintsIfNecessary = true;
-      allowVideoMixedMimeTypeAdaptiveness = false;
-      allowVideoNonSeamlessAdaptiveness = true;
-      viewportWidth = Integer.MAX_VALUE;
-      viewportHeight = Integer.MAX_VALUE;
-      viewportOrientationMayChange = true;
-      // Audio
-      maxAudioChannelCount = Integer.MAX_VALUE;
-      maxAudioBitrate = Integer.MAX_VALUE;
-      exceedAudioConstraintsIfNecessary = true;
-      allowAudioMixedMimeTypeAdaptiveness = false;
-      allowAudioMixedSampleRateAdaptiveness = false;
-      allowAudioMixedChannelCountAdaptiveness = false;
-      // General
-      forceLowestBitrate = false;
-      forceHighestSupportedBitrate = false;
-      exceedRendererCapabilitiesIfNecessary = true;
-      tunnelingAudioSessionId = C.AUDIO_SESSION_ID_UNSET;
-    }
-
     private static SparseArray<Map<TrackGroupArray, SelectionOverride>> cloneSelectionOverrides(
         SparseArray<Map<TrackGroupArray, SelectionOverride>> selectionOverrides) {
       SparseArray<Map<TrackGroupArray, SelectionOverride>> clone = new SparseArray<>();
@@ -791,43 +735,8 @@ public class DefaultTrackSelector extends MappingTrackSelector {
    */
   public static final class Parameters extends TrackSelectionParameters {
 
-    /**
-     * An instance with default values, except those obtained from the {@link Context}.
-     *
-     * <p>If possible, use {@link #getDefaults(Context)} instead.
-     *
-     * <p>This instance will not have the following settings:
-     *
-     * <ul>
-     *   <li>{@link ParametersBuilder#setViewportSizeToPhysicalDisplaySize(Context, boolean)
-     *       Viewport constraints} configured for the primary display.
-     *   <li>{@link
-     *       ParametersBuilder#setPreferredTextLanguageAndRoleFlagsToCaptioningManagerSettings(Context)
-     *       Preferred text language and role flags} configured to the accessibility settings of
-     *       {@link android.view.accessibility.CaptioningManager}.
-     * </ul>
-     */
-    @SuppressWarnings("deprecation")
-    public static final Parameters DEFAULT_WITHOUT_CONTEXT = new ParametersBuilder().build();
-
-    /**
-     * @deprecated This instance does not have {@link Context} constraints configured. Use {@link
-     *     #getDefaults(Context)} instead.
-     */
-    @Deprecated public static final Parameters DEFAULT_WITHOUT_VIEWPORT = DEFAULT_WITHOUT_CONTEXT;
-
-    /**
-     * @deprecated This instance does not have {@link Context} constraints configured. Use {@link
-     *     #getDefaults(Context)} instead.
-     */
-    @SuppressWarnings("deprecation")
-    @Deprecated
-    public static final Parameters DEFAULT = DEFAULT_WITHOUT_CONTEXT;
-
-    /** Returns an instance configured with default values. */
-    public static Parameters getDefaults(Context context) {
-      return new ParametersBuilder(context).build();
-    }
+    /** An instance with default values. */
+    public static final Parameters DEFAULT = new Parameters();
 
     // Video
     /**
@@ -878,14 +787,14 @@ public class DefaultTrackSelector extends MappingTrackSelector {
     public final boolean allowVideoNonSeamlessAdaptiveness;
     /**
      * Viewport width in pixels. Constrains video track selections for adaptive content so that only
-     * tracks suitable for the viewport are selected. The default value is the physical width of the
-     * primary display, in pixels.
+     * tracks suitable for the viewport are selected. The default value is {@link Integer#MAX_VALUE}
+     * (i.e. no constraint).
      */
     public final int viewportWidth;
     /**
      * Viewport height in pixels. Constrains video track selections for adaptive content so that
-     * only tracks suitable for the viewport are selected. The default value is the physical height
-     * of the primary display, in pixels.
+     * only tracks suitable for the viewport are selected. The default value is {@link
+     * Integer#MAX_VALUE} (i.e. no constraint).
      */
     public final int viewportHeight;
     /**
@@ -965,6 +874,41 @@ public class DefaultTrackSelector extends MappingTrackSelector {
     // Overrides
     private final SparseArray<Map<TrackGroupArray, SelectionOverride>> selectionOverrides;
     private final SparseBooleanArray rendererDisabledFlags;
+
+    private Parameters() {
+      this(
+          // Video
+          /* maxVideoWidth= */ Integer.MAX_VALUE,
+          /* maxVideoHeight= */ Integer.MAX_VALUE,
+          /* maxVideoFrameRate= */ Integer.MAX_VALUE,
+          /* maxVideoBitrate= */ Integer.MAX_VALUE,
+          /* exceedVideoConstraintsIfNecessary= */ true,
+          /* allowVideoMixedMimeTypeAdaptiveness= */ false,
+          /* allowVideoNonSeamlessAdaptiveness= */ true,
+          /* viewportWidth= */ Integer.MAX_VALUE,
+          /* viewportHeight= */ Integer.MAX_VALUE,
+          /* viewportOrientationMayChange= */ true,
+          // Audio
+          TrackSelectionParameters.DEFAULT.preferredAudioLanguage,
+          /* maxAudioChannelCount= */ Integer.MAX_VALUE,
+          /* maxAudioBitrate= */ Integer.MAX_VALUE,
+          /* exceedAudioConstraintsIfNecessary= */ true,
+          /* allowAudioMixedMimeTypeAdaptiveness= */ false,
+          /* allowAudioMixedSampleRateAdaptiveness= */ false,
+          /* allowAudioMixedChannelCountAdaptiveness= */ false,
+          // Text
+          TrackSelectionParameters.DEFAULT.preferredTextLanguage,
+          TrackSelectionParameters.DEFAULT.preferredTextRoleFlags,
+          TrackSelectionParameters.DEFAULT.selectUndeterminedTextLanguage,
+          TrackSelectionParameters.DEFAULT.disabledTextTrackSelectionFlags,
+          // General
+          /* forceLowestBitrate= */ false,
+          /* forceHighestSupportedBitrate= */ false,
+          /* exceedRendererCapabilitiesIfNecessary= */ true,
+          /* tunnelingAudioSessionId= */ C.AUDIO_SESSION_ID_UNSET,
+          new SparseArray<>(),
+          new SparseBooleanArray());
+    }
 
     /* package */ Parameters(
         // Video
@@ -1438,17 +1382,13 @@ public class DefaultTrackSelector extends MappingTrackSelector {
 
   private boolean allowMultipleAdaptiveSelections;
 
-  /** @deprecated Use {@link #DefaultTrackSelector(Context)} instead. */
-  @Deprecated
-  @SuppressWarnings("deprecation")
   public DefaultTrackSelector() {
     this(new AdaptiveTrackSelection.Factory());
   }
 
   /**
-   * @deprecated Use {@link #DefaultTrackSelector(Context)} instead. The bandwidth meter should be
-   *     passed directly to the player in {@link
-   *     com.google.android.exoplayer2.SimpleExoPlayer.Builder}.
+   * @deprecated Use {@link #DefaultTrackSelector()} instead. Custom bandwidth meter should be
+   *     directly passed to the player in {@link ExoPlayerFactory}.
    */
   @Deprecated
   @SuppressWarnings("deprecation")
@@ -1456,33 +1396,10 @@ public class DefaultTrackSelector extends MappingTrackSelector {
     this(new AdaptiveTrackSelection.Factory(bandwidthMeter));
   }
 
-  /** @deprecated Use {@link #DefaultTrackSelector(Context, TrackSelection.Factory)}. */
-  @Deprecated
-  @SuppressWarnings("deprecation")
+  /** @param trackSelectionFactory A factory for {@link TrackSelection}s. */
   public DefaultTrackSelector(TrackSelection.Factory trackSelectionFactory) {
-    this(Parameters.DEFAULT_WITHOUT_CONTEXT, trackSelectionFactory);
-  }
-
-  /** @param context Any {@link Context}. */
-  public DefaultTrackSelector(Context context) {
-    this(context, new AdaptiveTrackSelection.Factory());
-  }
-
-  /**
-   * @param context Any {@link Context}.
-   * @param trackSelectionFactory A factory for {@link TrackSelection}s.
-   */
-  public DefaultTrackSelector(Context context, TrackSelection.Factory trackSelectionFactory) {
-    this(Parameters.getDefaults(context), trackSelectionFactory);
-  }
-
-  /**
-   * @param parameters Initial {@link Parameters}.
-   * @param trackSelectionFactory A factory for {@link TrackSelection}s.
-   */
-  public DefaultTrackSelector(Parameters parameters, TrackSelection.Factory trackSelectionFactory) {
     this.trackSelectionFactory = trackSelectionFactory;
-    parametersReference = new AtomicReference<>(parameters);
+    parametersReference = new AtomicReference<>(Parameters.DEFAULT);
   }
 
   /**

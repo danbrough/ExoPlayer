@@ -19,7 +19,6 @@ import androidx.annotation.VisibleForTesting;
 import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.metadata.MetadataDecoder;
 import com.google.android.exoplayer2.metadata.MetadataInputBuffer;
-import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.Util;
 import java.nio.ByteBuffer;
 import java.util.regex.Matcher;
@@ -37,7 +36,7 @@ public final class IcyDecoder implements MetadataDecoder {
   @Override
   @SuppressWarnings("ByteBufferBackingArray")
   public Metadata decode(MetadataInputBuffer inputBuffer) {
-    ByteBuffer buffer = Assertions.checkNotNull(inputBuffer.data);
+    ByteBuffer buffer = inputBuffer.data;
     byte[] data = buffer.array();
     int length = buffer.limit();
     return decode(Util.fromUtf8Bytes(data, 0, length));

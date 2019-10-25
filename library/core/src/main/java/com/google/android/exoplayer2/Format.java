@@ -1132,6 +1132,38 @@ public final class Format implements Parcelable {
         exoMediaCryptoType);
   }
 
+  public Format copyWithLabel(@Nullable String label) {
+    return new Format(
+        id,
+        label,
+        selectionFlags,
+        roleFlags,
+        bitrate,
+        codecs,
+        metadata,
+        containerMimeType,
+        sampleMimeType,
+        maxInputSize,
+        initializationData,
+        drmInitData,
+        subsampleOffsetUs,
+        width,
+        height,
+        frameRate,
+        rotationDegrees,
+        pixelWidthHeightRatio,
+        projectionData,
+        stereoMode,
+        colorInfo,
+        channelCount,
+        sampleRate,
+        pcmEncoding,
+        encoderDelay,
+        encoderPadding,
+        language,
+        accessibilityChannel);
+  }
+
   public Format copyWithContainerInfo(
       @Nullable String id,
       @Nullable String label,

@@ -24,9 +24,6 @@ import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * Defines a region of data.
@@ -35,14 +32,19 @@ public final class DataSpec {
 
   /**
    * The flags that apply to any request for data. Possible flag values are {@link
-   * #FLAG_ALLOW_GZIP}, {@link #FLAG_DONT_CACHE_IF_LENGTH_UNKNOWN} and {@link
-   * #FLAG_ALLOW_CACHE_FRAGMENTATION}.
+   * #FLAG_ALLOW_GZIP}, {@link #FLAG_ALLOW_ICY_METADATA}, {@link #FLAG_DONT_CACHE_IF_LENGTH_UNKNOWN}
+   * and {@link #FLAG_ALLOW_CACHE_FRAGMENTATION}.
    */
   @Documented
   @Retention(RetentionPolicy.SOURCE)
   @IntDef(
       flag = true,
-      value = {FLAG_ALLOW_GZIP, FLAG_DONT_CACHE_IF_LENGTH_UNKNOWN, FLAG_ALLOW_CACHE_FRAGMENTATION})
+      value = {
+        FLAG_ALLOW_GZIP,
+        FLAG_ALLOW_ICY_METADATA,
+        FLAG_DONT_CACHE_IF_LENGTH_UNKNOWN,
+        FLAG_ALLOW_CACHE_FRAGMENTATION
+      })
   public @interface Flags {}
   /**
    * Allows an underlying network stack to request that the server use gzip compression.
@@ -56,15 +58,17 @@ public final class DataSpec {
    * DataSource#read(byte[], int, int)} will be the decompressed data.
    */
   public static final int FLAG_ALLOW_GZIP = 1;
+  /** Allows an underlying network stack to request that the stream contain ICY metadata. */
+  public static final int FLAG_ALLOW_ICY_METADATA = 1 << 1; // 2
   /** Prevents caching if the length cannot be resolved when the {@link DataSource} is opened. */
-  public static final int FLAG_DONT_CACHE_IF_LENGTH_UNKNOWN = 1 << 1; // 2
+  public static final int FLAG_DONT_CACHE_IF_LENGTH_UNKNOWN = 1 << 2; // 4
   /**
    * Allows fragmentation of this request into multiple cache files, meaning a cache eviction policy
    * will be able to evict individual fragments of the data. Depending on the cache implementation,
    * setting this flag may also enable more concurrent access to the data (e.g. reading one fragment
    * whilst writing another).
    */
-  public static final int FLAG_ALLOW_CACHE_FRAGMENTATION = 1 << 2; // 4
+  public static final int FLAG_ALLOW_CACHE_FRAGMENTATION = 1 << 3; // 8
 
   /**
    * The set of HTTP methods that are supported by ExoPlayer {@link HttpDataSource}s. One of {@link
@@ -91,15 +95,16 @@ public final class DataSpec {
   public final @HttpMethod int httpMethod;
 
   /**
-   * The HTTP request body, null otherwise. If the body is non-null, then httpBody.length will be
-   * non-zero.
+   * The HTTP body, null otherwise. If the body is non-null, then httpBody.length will be non-zero.
    */
-  @Nullable public final byte[] httpBody;
+  public final @Nullable byte[] httpBody;
 
-  /** Immutable map containing the headers to use in HTTP requests. */
-  public final Map<String, String> httpRequestHeaders;
+  /** @deprecated Use {@link #httpBody} instead. */
+  @Deprecated public final @Nullable byte[] postBody;
 
-  /** The absolute position of the data in the full stream. */
+  /**
+   * The absolute position of the data in the full stream.
+   */
   public final long absoluteStreamPosition;
   /**
    * The position of the data when read from {@link #uri}.
@@ -116,7 +121,7 @@ public final class DataSpec {
    * A key that uniquely identifies the original stream. Used for cache indexing. May be null if the
    * data spec is not intended to be used in conjunction with a cache.
    */
-  @Nullable public final String key;
+  public final @Nullable String key;
   /** Request {@link Flags flags}. */
   public final @Flags int flags;
 
@@ -166,36 +171,6 @@ public final class DataSpec {
   }
 
   /**
-   * Construct a data spec where {@link #position} equals {@link #absoluteStreamPosition} and has
-   * request headers.
-   *
-   * @param uri {@link #uri}.
-   * @param absoluteStreamPosition {@link #absoluteStreamPosition}, equal to {@link #position}.
-   * @param length {@link #length}.
-   * @param key {@link #key}.
-   * @param flags {@link #flags}.
-   * @param httpRequestHeaders {@link #httpRequestHeaders}
-   */
-  public DataSpec(
-      Uri uri,
-      long absoluteStreamPosition,
-      long length,
-      @Nullable String key,
-      @Flags int flags,
-      Map<String, String> httpRequestHeaders) {
-    this(
-        uri,
-        inferHttpMethod(null),
-        null,
-        absoluteStreamPosition,
-        absoluteStreamPosition,
-        length,
-        key,
-        flags,
-        httpRequestHeaders);
-  }
-
-  /**
    * Construct a data spec where {@link #position} may differ from {@link #absoluteStreamPosition}.
    *
    * @param uri {@link #uri}.
@@ -239,7 +214,7 @@ public final class DataSpec {
       @Flags int flags) {
     this(
         uri,
-        /* httpMethod= */ inferHttpMethod(postBody),
+        /* httpMethod= */ postBody != null ? HTTP_METHOD_POST : HTTP_METHOD_GET,
         /* httpBody= */ postBody,
         absoluteStreamPosition,
         position,
@@ -260,6 +235,7 @@ public final class DataSpec {
    * @param key {@link #key}.
    * @param flags {@link #flags}.
    */
+  @SuppressWarnings("deprecation")
   public DataSpec(
       Uri uri,
       @HttpMethod int httpMethod,
@@ -269,53 +245,18 @@ public final class DataSpec {
       long length,
       @Nullable String key,
       @Flags int flags) {
-    this(
-        uri,
-        httpMethod,
-        httpBody,
-        absoluteStreamPosition,
-        position,
-        length,
-        key,
-        flags,
-        /* httpRequestHeaders= */ Collections.emptyMap());
-  }
-
-  /**
-   * Construct a data spec with request parameters to be used as HTTP headers inside HTTP requests.
-   *
-   * @param uri {@link #uri}.
-   * @param httpMethod {@link #httpMethod}.
-   * @param httpBody {@link #httpBody}.
-   * @param absoluteStreamPosition {@link #absoluteStreamPosition}.
-   * @param position {@link #position}.
-   * @param length {@link #length}.
-   * @param key {@link #key}.
-   * @param flags {@link #flags}.
-   * @param httpRequestHeaders {@link #httpRequestHeaders}.
-   */
-  public DataSpec(
-      Uri uri,
-      @HttpMethod int httpMethod,
-      @Nullable byte[] httpBody,
-      long absoluteStreamPosition,
-      long position,
-      long length,
-      @Nullable String key,
-      @Flags int flags,
-      Map<String, String> httpRequestHeaders) {
     Assertions.checkArgument(absoluteStreamPosition >= 0);
     Assertions.checkArgument(position >= 0);
     Assertions.checkArgument(length > 0 || length == C.LENGTH_UNSET);
     this.uri = uri;
     this.httpMethod = httpMethod;
     this.httpBody = (httpBody != null && httpBody.length != 0) ? httpBody : null;
+    this.postBody = this.httpBody;
     this.absoluteStreamPosition = absoluteStreamPosition;
     this.position = position;
     this.length = length;
     this.key = key;
     this.flags = flags;
-    this.httpRequestHeaders = Collections.unmodifiableMap(new HashMap<>(httpRequestHeaders));
   }
 
   /**
@@ -403,8 +344,7 @@ public final class DataSpec {
           position + offset,
           length,
           key,
-          flags,
-          httpRequestHeaders);
+          flags);
     }
   }
 
@@ -416,63 +356,6 @@ public final class DataSpec {
    */
   public DataSpec withUri(Uri uri) {
     return new DataSpec(
-        uri,
-        httpMethod,
-        httpBody,
-        absoluteStreamPosition,
-        position,
-        length,
-        key,
-        flags,
-        httpRequestHeaders);
-  }
-
-  /**
-   * Returns a copy of this data spec with the specified request headers.
-   *
-   * @param requestHeaders The HTTP request headers.
-   * @return The copied data spec with the specified request headers.
-   */
-  public DataSpec withRequestHeaders(Map<String, String> requestHeaders) {
-    return new DataSpec(
-        uri,
-        httpMethod,
-        httpBody,
-        absoluteStreamPosition,
-        position,
-        length,
-        key,
-        flags,
-        requestHeaders);
-  }
-
-  /**
-   * Returns a copy this data spec with additional request headers.
-   *
-   * <p>Note: Values in {@code requestHeaders} will overwrite values with the same header key that
-   * were previously set in this instance's {@code #httpRequestHeaders}.
-   *
-   * @param requestHeaders The additional HTTP request headers.
-   * @return The copied data with the additional HTTP request headers.
-   */
-  public DataSpec withAdditionalHeaders(Map<String, String> requestHeaders) {
-    Map<String, String> totalHeaders = new HashMap<>(this.httpRequestHeaders);
-    totalHeaders.putAll(requestHeaders);
-
-    return new DataSpec(
-        uri,
-        httpMethod,
-        httpBody,
-        absoluteStreamPosition,
-        position,
-        length,
-        key,
-        flags,
-        totalHeaders);
-  }
-
-  @HttpMethod
-  private static int inferHttpMethod(@Nullable byte[] postBody) {
-    return postBody != null ? HTTP_METHOD_POST : HTTP_METHOD_GET;
+        uri, httpMethod, httpBody, absoluteStreamPosition, position, length, key, flags);
   }
 }

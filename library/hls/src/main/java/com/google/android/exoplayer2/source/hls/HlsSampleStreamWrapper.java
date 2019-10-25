@@ -22,11 +22,8 @@ import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.FormatHolder;
-import com.google.android.exoplayer2.ParserException;
 import com.google.android.exoplayer2.decoder.DecoderInputBuffer;
 import com.google.android.exoplayer2.drm.DrmInitData;
-import com.google.android.exoplayer2.drm.DrmSession;
-import com.google.android.exoplayer2.drm.DrmSessionManager;
 import com.google.android.exoplayer2.extractor.DummyTrackOutput;
 import com.google.android.exoplayer2.extractor.ExtractorInput;
 import com.google.android.exoplayer2.extractor.ExtractorOutput;
@@ -36,7 +33,6 @@ import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.metadata.emsg.EventMessage;
 import com.google.android.exoplayer2.metadata.emsg.EventMessageDecoder;
 import com.google.android.exoplayer2.metadata.id3.PrivFrame;
-import com.google.android.exoplayer2.source.DecryptableSampleQueueReader;
 import com.google.android.exoplayer2.source.MediaSourceEventListener.EventDispatcher;
 import com.google.android.exoplayer2.source.SampleQueue;
 import com.google.android.exoplayer2.source.SampleQueue.UpstreamFormatChangedListener;
@@ -65,10 +61,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.checkerframework.checker.nullness.compatqual.NullableType;
-import org.checkerframework.checker.nullness.qual.EnsuresNonNull;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
-import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
 /**
  * Loads {@link HlsMediaChunk}s obtained from a {@link HlsChunkSource}, and provides
@@ -113,7 +106,6 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   private final HlsChunkSource chunkSource;
   private final Allocator allocator;
   private final Format muxedAudioFormat;
-  private final DrmSessionManager<?> drmSessionManager;
   private final LoadErrorHandlingPolicy loadErrorHandlingPolicy;
   private final Loader loader;
   private final EventDispatcher eventDispatcher;
@@ -121,31 +113,32 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   private final HlsChunkSource.HlsChunkHolder nextChunkHolder;
   private final ArrayList<HlsMediaChunk> mediaChunks;
   private final List<HlsMediaChunk> readOnlyMediaChunks;
+  private final Runnable maybeFinishPrepareRunnable;
+  private final Runnable onTracksEndedRunnable;
   private final Handler handler;
   private final ArrayList<HlsSampleStream> hlsSampleStreams;
   private final Map<String, DrmInitData> overridingDrmInitData;
 
   private SampleQueue[] sampleQueues;
-  private DecryptableSampleQueueReader[] sampleQueueReaders;
   private int[] sampleQueueTrackIds;
   private Set<Integer> sampleQueueMappingDoneByType;
   private SparseIntArray sampleQueueIndicesByType;
-  @MonotonicNonNull private TrackOutput emsgUnwrappingTrackOutput;
+  private TrackOutput emsgUnwrappingTrackOutput;
   private int primarySampleQueueType;
   private int primarySampleQueueIndex;
   private boolean sampleQueuesBuilt;
   private boolean prepared;
   private int enabledTrackGroupCount;
-  @MonotonicNonNull private Format upstreamTrackFormat;
-  @Nullable private Format downstreamTrackFormat;
+  private Format upstreamTrackFormat;
+  private Format downstreamTrackFormat;
   private boolean released;
 
   // Tracks are complicated in HLS. See documentation of buildTracksFromSampleStreams for details.
   // Indexed by track (as exposed by this source).
-  @MonotonicNonNull private TrackGroupArray trackGroups;
-  @MonotonicNonNull private Set<TrackGroup> optionalTrackGroups;
+  private TrackGroupArray trackGroups;
+  private TrackGroupArray optionalTrackGroups;
   // Indexed by track group.
-  private int @MonotonicNonNull [] trackGroupToSampleQueueIndex;
+  private int[] trackGroupToSampleQueueIndex;
   private int primaryTrackGroupIndex;
   private boolean haveAudioVideoSampleQueues;
   private boolean[] sampleQueuesEnabledStates;
@@ -173,8 +166,6 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
    * @param allocator An {@link Allocator} from which to obtain media buffer allocations.
    * @param positionUs The position from which to start loading media.
    * @param muxedAudioFormat Optional muxed audio {@link Format} as defined by the master playlist.
-   * @param drmSessionManager The {@link DrmSessionManager} to acquire {@link DrmSession
-   *     DrmSessions} with.
    * @param loadErrorHandlingPolicy A {@link LoadErrorHandlingPolicy}.
    * @param eventDispatcher A dispatcher to notify of events.
    */
@@ -186,7 +177,6 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
       Allocator allocator,
       long positionUs,
       Format muxedAudioFormat,
-      DrmSessionManager<?> drmSessionManager,
       LoadErrorHandlingPolicy loadErrorHandlingPolicy,
       EventDispatcher eventDispatcher,
       @HlsMetadataType int metadataType) {
@@ -196,7 +186,6 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     this.overridingDrmInitData = overridingDrmInitData;
     this.allocator = allocator;
     this.muxedAudioFormat = muxedAudioFormat;
-    this.drmSessionManager = drmSessionManager;
     this.loadErrorHandlingPolicy = loadErrorHandlingPolicy;
     this.eventDispatcher = eventDispatcher;
     this.metadataType = metadataType;
@@ -206,12 +195,13 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     sampleQueueMappingDoneByType = new HashSet<>(MAPPABLE_TYPES.size());
     sampleQueueIndicesByType = new SparseIntArray(MAPPABLE_TYPES.size());
     sampleQueues = new SampleQueue[0];
-    sampleQueueReaders = new DecryptableSampleQueueReader[0];
     sampleQueueIsAudioVideoFlags = new boolean[0];
     sampleQueuesEnabledStates = new boolean[0];
     mediaChunks = new ArrayList<>();
     readOnlyMediaChunks = Collections.unmodifiableList(mediaChunks);
     hlsSampleStreams = new ArrayList<>();
+    maybeFinishPrepareRunnable = this::maybeFinishPrepare;
+    onTracksEndedRunnable = this::onTracksEnded;
     handler = new Handler();
     lastSeekPositionUs = positionUs;
     pendingResetPositionUs = positionUs;
@@ -226,33 +216,27 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   /**
    * Prepares the sample stream wrapper with master playlist information.
    *
-   * @param trackGroups The {@link TrackGroup TrackGroups} to expose through {@link
-   *     #getTrackGroups()}.
+   * @param trackGroups The {@link TrackGroupArray} to expose.
    * @param primaryTrackGroupIndex The index of the adaptive track group.
-   * @param optionalTrackGroupsIndices The indices of any {@code trackGroups} that should not
-   *     trigger a failure if not found in the media playlist's segments.
+   * @param optionalTrackGroups A subset of {@code trackGroups} that should not trigger a failure if
+   *     not found in the media playlist's segments.
    */
   public void prepareWithMasterPlaylistInfo(
-      TrackGroup[] trackGroups, int primaryTrackGroupIndex, int... optionalTrackGroupsIndices) {
-    this.trackGroups = createTrackGroupArrayWithDrmInfo(trackGroups);
-    optionalTrackGroups = new HashSet<>();
-    for (int optionalTrackGroupIndex : optionalTrackGroupsIndices) {
-      optionalTrackGroups.add(this.trackGroups.get(optionalTrackGroupIndex));
-    }
+      TrackGroupArray trackGroups,
+      int primaryTrackGroupIndex,
+      TrackGroupArray optionalTrackGroups) {
+    prepared = true;
+    this.trackGroups = trackGroups;
+    this.optionalTrackGroups = optionalTrackGroups;
     this.primaryTrackGroupIndex = primaryTrackGroupIndex;
     handler.post(callback::onPrepared);
-    setIsPrepared();
   }
 
   public void maybeThrowPrepareError() throws IOException {
     maybeThrowError();
-    if (loadingFinished && !prepared) {
-      throw new ParserException("Loading finished before preparation is complete.");
-    }
   }
 
   public TrackGroupArray getTrackGroups() {
-    assertIsPrepared();
     return trackGroups;
   }
 
@@ -261,14 +245,11 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   }
 
   public int bindSampleQueueToSampleStream(int trackGroupIndex) {
-    assertIsPrepared();
-    Assertions.checkNotNull(trackGroupToSampleQueueIndex);
-
     int sampleQueueIndex = trackGroupToSampleQueueIndex[trackGroupIndex];
     if (sampleQueueIndex == C.INDEX_UNSET) {
-      return optionalTrackGroups.contains(trackGroups.get(trackGroupIndex))
-          ? SAMPLE_QUEUE_INDEX_NO_MAPPING_NON_FATAL
-          : SAMPLE_QUEUE_INDEX_NO_MAPPING_FATAL;
+      return optionalTrackGroups.indexOf(trackGroups.get(trackGroupIndex)) == C.INDEX_UNSET
+          ? SAMPLE_QUEUE_INDEX_NO_MAPPING_FATAL
+          : SAMPLE_QUEUE_INDEX_NO_MAPPING_NON_FATAL;
     }
     if (sampleQueuesEnabledStates[sampleQueueIndex]) {
       // This sample queue is already bound to a different sample stream.
@@ -279,8 +260,6 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   }
 
   public void unbindSampleQueue(int trackGroupIndex) {
-    assertIsPrepared();
-    Assertions.checkNotNull(trackGroupToSampleQueueIndex);
     int sampleQueueIndex = trackGroupToSampleQueueIndex[trackGroupIndex];
     Assertions.checkState(sampleQueuesEnabledStates[sampleQueueIndex]);
     sampleQueuesEnabledStates[sampleQueueIndex] = false;
@@ -303,21 +282,15 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
    * @return Whether this wrapper requires the parent {@link HlsMediaPeriod} to perform a seek as
    *     part of the track selection.
    */
-  public boolean selectTracks(
-      TrackSelection[] selections,
-      boolean[] mayRetainStreamFlags,
-      @NullableType SampleStream[] streams,
-      boolean[] streamResetFlags,
-      long positionUs,
-      boolean forceReset) {
-    assertIsPrepared();
+  public boolean selectTracks(TrackSelection[] selections, boolean[] mayRetainStreamFlags,
+      SampleStream[] streams, boolean[] streamResetFlags, long positionUs, boolean forceReset) {
+    Assertions.checkState(prepared);
     int oldEnabledTrackGroupCount = enabledTrackGroupCount;
     // Deselect old tracks.
     for (int i = 0; i < selections.length; i++) {
-      HlsSampleStream stream = (HlsSampleStream) streams[i];
-      if (stream != null && (selections[i] == null || !mayRetainStreamFlags[i])) {
+      if (streams[i] != null && (selections[i] == null || !mayRetainStreamFlags[i])) {
         enabledTrackGroupCount--;
-        stream.unbindSampleQueue();
+        ((HlsSampleStream) streams[i]).unbindSampleQueue();
         streams[i] = null;
       }
     }
@@ -353,8 +326,6 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
         }
         // If there's still a chance of avoiding a seek, try and seek within the sample queue.
         if (sampleQueuesBuilt && !seekRequired) {
-          // Must be non-null if sampleQueuesBuilt == true.
-          Assertions.checkNotNull(trackGroupToSampleQueueIndex);
           SampleQueue sampleQueue = sampleQueues[trackGroupToSampleQueueIndex[trackGroupIndex]];
           sampleQueue.rewind();
           // A seek can be avoided if we're able to advance to the current playback position in the
@@ -483,9 +454,6 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
       for (SampleQueue sampleQueue : sampleQueues) {
         sampleQueue.discardToEnd();
       }
-      for (DecryptableSampleQueueReader reader : sampleQueueReaders) {
-        reader.release();
-      }
     }
     loader.release(this);
     handler.removeCallbacksAndMessages(null);
@@ -496,9 +464,6 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   @Override
   public void onLoaderReleased() {
     resetSampleQueues();
-    for (DecryptableSampleQueueReader reader : sampleQueueReaders) {
-      reader.release();
-    }
   }
 
   public void setIsTimestampMaster(boolean isTimestampMaster) {
@@ -512,12 +477,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   // SampleStream implementation.
 
   public boolean isReady(int sampleQueueIndex) {
-    return !isPendingReset() && sampleQueueReaders[sampleQueueIndex].isReady(loadingFinished);
-  }
-
-  public void maybeThrowError(int sampleQueueIndex) throws IOException {
-    maybeThrowError();
-    sampleQueueReaders[sampleQueueIndex].maybeThrowError();
+    return loadingFinished || (!isPendingReset() && sampleQueues[sampleQueueIndex].hasNextSample());
   }
 
   public void maybeThrowError() throws IOException {
@@ -550,10 +510,10 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     }
 
     int result =
-        sampleQueueReaders[sampleQueueIndex].read(
+        sampleQueues[sampleQueueIndex].read(
             formatHolder, buffer, requireFormat, loadingFinished, lastSeekPositionUs);
     if (result == C.RESULT_FORMAT_READ) {
-      Format format = Assertions.checkNotNull(formatHolder.format);
+      Format format = formatHolder.format;
       if (sampleQueueIndex == primarySampleQueueIndex) {
         // Fill in primary sample format with information from the track format.
         int chunkUid = sampleQueues[sampleQueueIndex].peekSourceId();
@@ -564,8 +524,14 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
         Format trackFormat =
             chunkIndex < mediaChunks.size()
                 ? mediaChunks.get(chunkIndex).trackFormat
-                : Assertions.checkNotNull(upstreamTrackFormat);
+                : upstreamTrackFormat;
         format = format.copyWithManifestFormatInfo(trackFormat);
+      }
+      if (format.drmInitData != null) {
+        DrmInitData drmInitData = overridingDrmInitData.get(format.drmInitData.schemeType);
+        if (drmInitData != null) {
+          format = format.copyWithDrmInitData(drmInitData);
+        }
       }
       formatHolder.format = format;
     }
@@ -640,12 +606,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
               ? lastMediaChunk.endTimeUs
               : Math.max(lastSeekPositionUs, lastMediaChunk.startTimeUs);
     }
-    chunkSource.getNextChunk(
-        positionUs,
-        loadPositionUs,
-        chunkQueue,
-        /* allowEndOfStream= */ prepared || !chunkQueue.isEmpty(),
-        nextChunkHolder);
+    chunkSource.getNextChunk(positionUs, loadPositionUs, chunkQueue, nextChunkHolder);
     boolean endOfStream = nextChunkHolder.endOfStream;
     Chunk loadable = nextChunkHolder.chunk;
     Uri playlistUrlToLoad = nextChunkHolder.playlistUrl;
@@ -685,11 +646,6 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
         loadable.endTimeUs,
         elapsedRealtimeMs);
     return true;
-  }
-
-  @Override
-  public boolean isLoading() {
-    return loader.isLoading();
   }
 
   @Override
@@ -908,17 +864,14 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   private SampleQueue createSampleQueue(int id, int type) {
     int trackCount = sampleQueues.length;
 
-    SampleQueue trackOutput = new FormatAdjustingSampleQueue(allocator, overridingDrmInitData);
+    SampleQueue trackOutput = new PrivTimestampStrippingSampleQueue(allocator);
     trackOutput.setSampleOffsetUs(sampleOffsetUs);
     trackOutput.sourceId(chunkUid);
     trackOutput.setUpstreamFormatChangeListener(this);
     sampleQueueTrackIds = Arrays.copyOf(sampleQueueTrackIds, trackCount + 1);
     sampleQueueTrackIds[trackCount] = id;
-    sampleQueues = Util.nullSafeArrayAppend(sampleQueues, trackOutput);
-    sampleQueueReaders =
-        Util.nullSafeArrayAppend(
-            sampleQueueReaders,
-            new DecryptableSampleQueueReader(sampleQueues[trackCount], drmSessionManager));
+    sampleQueues = Arrays.copyOf(sampleQueues, trackCount + 1);
+    sampleQueues[trackCount] = trackOutput;
     sampleQueueIsAudioVideoFlags = Arrays.copyOf(sampleQueueIsAudioVideoFlags, trackCount + 1);
     sampleQueueIsAudioVideoFlags[trackCount] =
         type == C.TRACK_TYPE_AUDIO || type == C.TRACK_TYPE_VIDEO;
@@ -936,7 +889,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   @Override
   public void endTracks() {
     tracksEnded = true;
-    handler.post(this::onTracksEnded);
+    handler.post(onTracksEndedRunnable);
   }
 
   @Override
@@ -948,7 +901,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
   @Override
   public void onUpstreamFormatChanged(Format format) {
-    handler.post(this::maybeFinishPrepare);
+    handler.post(maybeFinishPrepareRunnable);
   }
 
   // Called by the loading thread.
@@ -962,7 +915,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
   // Internal methods.
 
-  private void updateSampleStreams(@NullableType SampleStream[] streams) {
+  private void updateSampleStreams(SampleStream[] streams) {
     hlsSampleStreams.clear();
     for (SampleStream stream : streams) {
       if (stream != null) {
@@ -989,7 +942,6 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     pendingResetUpstreamFormats = false;
   }
 
-  @RequiresNonNull("trackGroupToSampleQueueIndex")
   private void onTracksEnded() {
     sampleQueuesBuilt = true;
     maybeFinishPrepare();
@@ -1011,13 +963,11 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     } else {
       // Tracks are created using media segment information.
       buildTracksFromSampleStreams();
-      setIsPrepared();
+      prepared = true;
       callback.onPrepared();
     }
   }
 
-  @RequiresNonNull("trackGroups")
-  @EnsuresNonNull("trackGroupToSampleQueueIndex")
   private void mapSampleQueuesToMatchTrackGroups() {
     int trackGroupCount = trackGroups.length;
     trackGroupToSampleQueueIndex = new int[trackGroupCount];
@@ -1066,7 +1016,6 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
    *       unchanged.
    * </ul>
    */
-  @EnsuresNonNull({"trackGroups", "optionalTrackGroups", "trackGroupToSampleQueueIndex"})
   private void buildTracksFromSampleStreams() {
     // Iterate through the extractor tracks to discover the "primary" track type, and the index
     // of the single track of this type.
@@ -1130,27 +1079,9 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
         trackGroups[i] = new TrackGroup(deriveFormat(trackFormat, sampleFormat, false));
       }
     }
-    this.trackGroups = createTrackGroupArrayWithDrmInfo(trackGroups);
+    this.trackGroups = new TrackGroupArray(trackGroups);
     Assertions.checkState(optionalTrackGroups == null);
-    optionalTrackGroups = Collections.emptySet();
-  }
-
-  private TrackGroupArray createTrackGroupArrayWithDrmInfo(TrackGroup[] trackGroups) {
-    for (int i = 0; i < trackGroups.length; i++) {
-      TrackGroup trackGroup = trackGroups[i];
-      Format[] exposedFormats = new Format[trackGroup.length];
-      for (int j = 0; j < trackGroup.length; j++) {
-        Format format = trackGroup.getFormat(j);
-        if (format.drmInitData != null) {
-          format =
-              format.copyWithExoMediaCryptoType(
-                  drmSessionManager.getExoMediaCryptoType(format.drmInitData));
-        }
-        exposedFormats[j] = format;
-      }
-      trackGroups[i] = new TrackGroup(exposedFormats);
-    }
-    return new TrackGroupArray(trackGroups);
+    optionalTrackGroups = TrackGroupArray.EMPTY;
   }
 
   private HlsMediaChunk getLastMediaChunk() {
@@ -1185,18 +1116,6 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     return true;
   }
 
-  @RequiresNonNull({"trackGroups", "optionalTrackGroups"})
-  private void setIsPrepared() {
-    prepared = true;
-  }
-
-  @EnsuresNonNull({"trackGroups", "optionalTrackGroups"})
-  private void assertIsPrepared() {
-    Assertions.checkState(prepared);
-    Assertions.checkNotNull(trackGroups);
-    Assertions.checkNotNull(optionalTrackGroups);
-  }
-
   /**
    * Scores a track type. Where multiple tracks are muxed into a container, the track with the
    * highest score is the primary track.
@@ -1228,7 +1147,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
    * @return The derived track format.
    */
   private static Format deriveFormat(
-      @Nullable Format playlistFormat, Format sampleFormat, boolean propagateBitrate) {
+      Format playlistFormat, Format sampleFormat, boolean propagateBitrate) {
     if (playlistFormat == null) {
       return sampleFormat;
     }
@@ -1282,26 +1201,15 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     return new DummyTrackOutput();
   }
 
-  private static final class FormatAdjustingSampleQueue extends SampleQueue {
+  private static final class PrivTimestampStrippingSampleQueue extends SampleQueue {
 
-    private final Map<String, DrmInitData> overridingDrmInitData;
-
-    public FormatAdjustingSampleQueue(
-        Allocator allocator, Map<String, DrmInitData> overridingDrmInitData) {
+    public PrivTimestampStrippingSampleQueue(Allocator allocator) {
       super(allocator);
-      this.overridingDrmInitData = overridingDrmInitData;
     }
 
     @Override
     public void format(Format format) {
-      DrmInitData drmInitData = format.drmInitData;
-      if (drmInitData != null) {
-        DrmInitData overridingDrmInitData = this.overridingDrmInitData.get(drmInitData.schemeType);
-        if (overridingDrmInitData != null) {
-          drmInitData = overridingDrmInitData;
-        }
-      }
-      super.format(format.copyWithAdjustments(drmInitData, getAdjustedMetadata(format.metadata)));
+      super.format(format.copyWithMetadata(getAdjustedMetadata(format.metadata)));
     }
 
     /**
@@ -1416,7 +1324,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
         int size,
         int offset,
         @Nullable CryptoData cryptoData) {
-      Assertions.checkNotNull(format);
+      Assertions.checkState(format != null);
       ParsableByteArray sample = getSampleAndTrimBuffer(size, offset);
       ParsableByteArray sampleForDelegate;
       if (Util.areEqual(format.sampleMimeType, delegateFormat.sampleMimeType)) {

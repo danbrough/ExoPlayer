@@ -1,4 +1,4 @@
-// Copyright (C) 2016 The Android Open Source Project
+// Copyright (C) 2017 The Android Open Source Project
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,10 +33,7 @@ android {
         release {
             shrinkResources true
             minifyEnabled true
-            proguardFiles = [
-                "proguard-rules.txt",
-                getDefaultProguardFile('proguard-android.txt')
-            ]
+            proguardFiles getDefaultProguardFile('proguard-android.txt')
         }
         debug {
             jniDebuggable = true
@@ -44,39 +41,19 @@ android {
     }
 
     lintOptions {
-        // The demo app isn't indexed, doesn't have translations, and has a
-        // banner for AndroidTV that's only in xhdpi density.
-        disable 'GoogleAppIndexingWarning','MissingTranslation','IconDensities'
-    }
-
-    flavorDimensions "extensions"
-
-    productFlavors {
-        noExtensions {
-            dimension "extensions"
-        }
-        withExtensions {
-            dimension "extensions"
-        }
+        // The demo app isn't indexed and doesn't have translations.
+        disable 'GoogleAppIndexingWarning','MissingTranslation'
     }
 }
 
 dependencies {
-    implementation 'androidx.annotation:annotation:1.1.0'
-    implementation 'androidx.legacy:legacy-support-core-ui:1.0.0'
-    implementation 'androidx.fragment:fragment:1.0.0'
-    implementation 'com.google.android.material:material:1.0.0'
     implementation project(modulePrefix + 'library-core')
+    implementation project(modulePrefix + 'library-ui')
     implementation project(modulePrefix + 'library-dash')
     implementation project(modulePrefix + 'library-hls')
     implementation project(modulePrefix + 'library-smoothstreaming')
-    implementation project(modulePrefix + 'library-ui')
-    withExtensionsImplementation project(path: modulePrefix + 'extension-ffmpeg')
-    withExtensionsImplementation project(path: modulePrefix + 'extension-flac')
-    withExtensionsImplementation project(path: modulePrefix + 'extension-ima')
-    withExtensionsImplementation project(path: modulePrefix + 'extension-opus')
-    withExtensionsImplementation project(path: modulePrefix + 'extension-vp9')
-    withExtensionsImplementation project(path: modulePrefix + 'extension-rtmp')
+    implementation project(modulePrefix + 'extension-ima')
+    implementation 'androidx.annotation:annotation:1.1.0'
 }
 
 apply plugin: 'com.google.android.gms.strict-version-matcher-plugin'

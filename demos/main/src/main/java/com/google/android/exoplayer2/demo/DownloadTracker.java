@@ -18,9 +18,9 @@ package com.google.android.exoplayer2.demo;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.net.Uri;
-import android.widget.Toast;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.FragmentManager;
+import android.widget.Toast;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.RenderersFactory;
 import com.google.android.exoplayer2.offline.Download;
@@ -30,7 +30,6 @@ import com.google.android.exoplayer2.offline.DownloadIndex;
 import com.google.android.exoplayer2.offline.DownloadManager;
 import com.google.android.exoplayer2.offline.DownloadRequest;
 import com.google.android.exoplayer2.offline.DownloadService;
-import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
 import com.google.android.exoplayer2.trackselection.MappingTrackSelector.MappedTrackInfo;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.util.Log;
@@ -56,7 +55,6 @@ public class DownloadTracker {
   private final CopyOnWriteArraySet<Listener> listeners;
   private final HashMap<Uri, Download> downloads;
   private final DownloadIndex downloadIndex;
-  private final DefaultTrackSelector.Parameters trackSelectorParameters;
 
   @Nullable private StartDownloadDialogHelper startDownloadDialogHelper;
 
@@ -67,7 +65,6 @@ public class DownloadTracker {
     listeners = new CopyOnWriteArraySet<>();
     downloads = new HashMap<>();
     downloadIndex = downloadManager.getDownloadIndex();
-    trackSelectorParameters = DownloadHelper.getDefaultTrackSelectorParameters(context);
     downloadManager.addListener(new DownloadManagerListener());
     loadDownloads();
   }
@@ -85,6 +82,7 @@ public class DownloadTracker {
     return download != null && download.state != Download.STATE_FAILED;
   }
 
+  @SuppressWarnings("unchecked")
   public DownloadRequest getDownloadRequest(Uri uri) {
     Download download = downloads.get(uri);
     return download != null && download.state != Download.STATE_FAILED ? download.request : null;
@@ -126,13 +124,13 @@ public class DownloadTracker {
     int type = Util.inferContentType(uri, extension);
     switch (type) {
       case C.TYPE_DASH:
-        return DownloadHelper.forDash(context, uri, dataSourceFactory, renderersFactory);
+        return DownloadHelper.forDash(uri, dataSourceFactory, renderersFactory);
       case C.TYPE_SS:
-        return DownloadHelper.forSmoothStreaming(context, uri, dataSourceFactory, renderersFactory);
+        return DownloadHelper.forSmoothStreaming(uri, dataSourceFactory, renderersFactory);
       case C.TYPE_HLS:
-        return DownloadHelper.forHls(context, uri, dataSourceFactory, renderersFactory);
+        return DownloadHelper.forHls(uri, dataSourceFactory, renderersFactory);
       case C.TYPE_OTHER:
-        return DownloadHelper.forProgressive(context, uri);
+        return DownloadHelper.forProgressive(uri);
       default:
         throw new IllegalStateException("Unsupported type: " + type);
     }
@@ -205,7 +203,7 @@ public class DownloadTracker {
           TrackSelectionDialog.createForMappedTrackInfoAndParameters(
               /* titleId= */ R.string.exo_download_description,
               mappedTrackInfo,
-              trackSelectorParameters,
+              /* initialParameters= */ DownloadHelper.DEFAULT_TRACK_SELECTOR_PARAMETERS,
               /* allowAdaptiveSelections =*/ false,
               /* allowMultipleOverrides= */ true,
               /* onClickListener= */ this,
@@ -215,13 +213,10 @@ public class DownloadTracker {
 
     @Override
     public void onPrepareError(DownloadHelper helper, IOException e) {
-      Toast.makeText(context, R.string.download_start_error, Toast.LENGTH_LONG).show();
-      Log.e(
-          TAG,
-          e instanceof DownloadHelper.LiveContentUnsupportedException
-              ? "Downloading live content unsupported"
-              : "Failed to start download",
-          e);
+      Toast.makeText(
+              context.getApplicationContext(), R.string.download_start_error, Toast.LENGTH_LONG)
+          .show();
+      Log.e(TAG, "Failed to start download", e);
     }
 
     // DialogInterface.OnClickListener implementation.
@@ -235,7 +230,7 @@ public class DownloadTracker {
             downloadHelper.addTrackSelectionForSingleRenderer(
                 periodIndex,
                 /* rendererIndex= */ i,
-                trackSelectorParameters,
+                DownloadHelper.DEFAULT_TRACK_SELECTOR_PARAMETERS,
                 trackSelectionDialog.getOverrides(/* rendererIndex= */ i));
           }
         }

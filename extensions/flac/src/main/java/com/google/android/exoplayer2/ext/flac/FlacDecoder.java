@@ -22,7 +22,6 @@ import com.google.android.exoplayer2.decoder.DecoderInputBuffer;
 import com.google.android.exoplayer2.decoder.SimpleDecoder;
 import com.google.android.exoplayer2.decoder.SimpleOutputBuffer;
 import com.google.android.exoplayer2.util.FlacStreamMetadata;
-import com.google.android.exoplayer2.util.Util;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -102,7 +101,7 @@ import java.util.List;
     if (reset) {
       decoderJni.flush();
     }
-    decoderJni.setData(Util.castNonNull(inputBuffer.data));
+    decoderJni.setData(inputBuffer.data);
     ByteBuffer outputData = outputBuffer.init(inputBuffer.timeUs, maxOutputBufferSize);
     try {
       decoderJni.decodeSample(outputData);

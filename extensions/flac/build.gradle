@@ -44,16 +44,16 @@ android {
     artifacts {
         archives sourcesJar
     }
+
 }
 
 dependencies {
     implementation project(modulePrefix + 'library-core')
-    implementation 'androidx.annotation:annotation:' + androidxAnnotationVersion
+    implementation 'androidx.annotation:annotation:1.1.0'
     compileOnly 'org.checkerframework:checker-qual:' + checkerframeworkVersion
     androidTestImplementation project(modulePrefix + 'testutils')
-    androidTestImplementation 'androidx.test:runner:' + androidxTestVersion
-    testImplementation project(modulePrefix + 'testutils')
-    testImplementation 'org.robolectric:robolectric:' + robolectricVersion
+    androidTestImplementation 'androidx.test:runner:' + androidXTestVersion
+    testImplementation project(modulePrefix + 'testutils-robolectric')
 }
 
 ext {

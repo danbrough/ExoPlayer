@@ -13,10 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-#switch APP_STL := gnustl_static to either c++_static or c++_shared in file Application.mk
-#
+
 APP_OPTIM := release
-#APP_STL := gnustl_static
-APP_STL := c++_static
+APP_STL := gnustl_static
 APP_CPPFLAGS := -frtti
 APP_PLATFORM := android-14

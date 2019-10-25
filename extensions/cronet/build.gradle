@@ -31,13 +31,11 @@ android {
 }
 
 dependencies {
-    api 'org.chromium.net:cronet-embedded:76.3809.111'
+    api 'org.chromium.net:cronet-embedded:75.3770.101'
     implementation project(modulePrefix + 'library-core')
-    implementation 'androidx.annotation:annotation:' + androidxAnnotationVersion
-    compileOnly 'org.checkerframework:checker-qual:' + checkerframeworkVersion
+    implementation 'androidx.annotation:annotation:1.1.0'
     testImplementation project(modulePrefix + 'library')
-    testImplementation project(modulePrefix + 'testutils')
-    testImplementation 'org.robolectric:robolectric:' + robolectricVersion
+    testImplementation project(modulePrefix + 'testutils-robolectric')
 }
 
 ext {

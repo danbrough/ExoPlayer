@@ -22,10 +22,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import android.net.Uri;
+import androidx.annotation.Nullable;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
-import androidx.annotation.Nullable;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import com.google.ads.interactivemedia.v3.api.Ad;
@@ -63,8 +63,7 @@ public class ImaAdsLoaderTest {
 
   private static final long CONTENT_DURATION_US = 10 * C.MICROS_PER_SECOND;
   private static final Timeline CONTENT_TIMELINE =
-      new SinglePeriodTimeline(
-          CONTENT_DURATION_US, /* isSeekable= */ true, /* isDynamic= */ false, /* isLive= */ false);
+      new SinglePeriodTimeline(CONTENT_DURATION_US, /* isSeekable= */ true, /* isDynamic= */ false);
   private static final Uri TEST_URI = Uri.EMPTY;
   private static final long TEST_AD_DURATION_US = 5 * C.MICROS_PER_SECOND;
   private static final long[][] PREROLL_ADS_DURATIONS_US = new long[][] {{TEST_AD_DURATION_US}};
@@ -254,8 +253,7 @@ public class ImaAdsLoaderTest {
       }
 
       @Override
-      @Nullable
-      public Ad getAd() {
+      public @Nullable Ad getAd() {
         return ad;
       }
 
@@ -286,9 +284,7 @@ public class ImaAdsLoaderTest {
     public void onAdPlaybackState(AdPlaybackState adPlaybackState) {
       adPlaybackState = adPlaybackState.withAdDurationsUs(adDurationsUs);
       this.adPlaybackState = adPlaybackState;
-      fakeExoPlayer.updateTimeline(
-          new SinglePeriodAdTimeline(contentTimeline, adPlaybackState),
-          Player.TIMELINE_CHANGE_REASON_SOURCE_UPDATE);
+      fakeExoPlayer.updateTimeline(new SinglePeriodAdTimeline(contentTimeline, adPlaybackState));
     }
 
     @Override

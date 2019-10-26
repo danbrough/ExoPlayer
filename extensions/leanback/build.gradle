@@ -28,20 +28,11 @@ android {
     }
 
     testOptions.unitTests.includeAndroidResources = true
-
-    task sourcesJar(type: Jar) {
-        from android.sourceSets.main.java.srcDirs
-        classifier = 'sources'
-    }
-
-    artifacts {
-        archives sourcesJar
-    }
 }
 
 dependencies {
     implementation project(modulePrefix + 'library-core')
-    implementation 'androidx.annotation:annotation:' + androidxAnnotationVersion
+    implementation 'androidx.annotation:annotation:1.1.0'
     implementation 'androidx.leanback:leanback:1.0.0'
 }
 

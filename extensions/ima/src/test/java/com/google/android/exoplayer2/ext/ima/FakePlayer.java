@@ -30,7 +30,8 @@ import java.util.ArrayList;
   private final Timeline.Period period;
   private final Timeline timeline;
 
-  @Player.State private int state;
+  private boolean prepared;
+  private int state;
   private boolean playWhenReady;
   private long position;
   private long contentPosition;
@@ -46,17 +47,15 @@ import java.util.ArrayList;
     timeline = Timeline.EMPTY;
   }
 
-  /**
-   * Sets the timeline on this fake player, which notifies listeners with the changed timeline and
-   * the given timeline change reason.
-   *
-   * @param timeline The new timeline.
-   * @param timelineChangeReason The reason for the timeline change.
-   */
-  public void updateTimeline(Timeline timeline, @TimelineChangeReason int timelineChangeReason) {
+  /** Sets the timeline on this fake player, which notifies listeners with the changed timeline. */
+  public void updateTimeline(Timeline timeline) {
     for (Player.EventListener listener : listeners) {
-      listener.onTimelineChanged(timeline, timelineChangeReason);
+      listener.onTimelineChanged(
+          timeline,
+          null,
+          prepared ? TIMELINE_CHANGE_REASON_DYNAMIC : TIMELINE_CHANGE_REASON_PREPARED);
     }
+    prepared = true;
   }
 
   /**
@@ -97,8 +96,8 @@ import java.util.ArrayList;
     }
   }
 
-  /** Sets the {@link Player.State} of this player. */
-  public void setState(@Player.State int state, boolean playWhenReady) {
+  /** Sets the state of this player with the given {@code STATE} constant. */
+  public void setState(int state, boolean playWhenReady) {
     boolean notify = this.state != state || this.playWhenReady != playWhenReady;
     this.state = state;
     this.playWhenReady = playWhenReady;
@@ -132,7 +131,6 @@ import java.util.ArrayList;
   }
 
   @Override
-  @Player.State
   public int getPlaybackState() {
     return state;
   }

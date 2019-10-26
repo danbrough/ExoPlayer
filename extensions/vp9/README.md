@@ -85,48 +85,34 @@ Once you've followed the instructions above to check out, build and depend on
 the extension, the next step is to tell ExoPlayer to use `LibvpxVideoRenderer`.
 How you do this depends on which player API you're using:
 
-* If you're passing a `DefaultRenderersFactory` to `SimpleExoPlayer.Builder`,
-  you can enable using the extension by setting the `extensionRendererMode`
-  parameter of the `DefaultRenderersFactory` constructor to
-  `EXTENSION_RENDERER_MODE_ON`. This will use `LibvpxVideoRenderer` for playback
-  if `MediaCodecVideoRenderer` doesn't support decoding the input VP9 stream.
-  Pass `EXTENSION_RENDERER_MODE_PREFER` to give `LibvpxVideoRenderer` priority
-  over `MediaCodecVideoRenderer`.
+* If you're passing a `DefaultRenderersFactory` to
+  `ExoPlayerFactory.newSimpleInstance`, you can enable using the extension by
+  setting the `extensionRendererMode` parameter of the `DefaultRenderersFactory`
+  constructor to `EXTENSION_RENDERER_MODE_ON`. This will use
+  `LibvpxVideoRenderer` for playback if `MediaCodecVideoRenderer` doesn't
+  support decoding the input VP9 stream. Pass `EXTENSION_RENDERER_MODE_PREFER`
+  to give `LibvpxVideoRenderer` priority over `MediaCodecVideoRenderer`.
 * If you've subclassed `DefaultRenderersFactory`, add a `LibvpxVideoRenderer`
   to the output list in `buildVideoRenderers`. ExoPlayer will use the first
   `Renderer` in the list that supports the input media format.
 * If you've implemented your own `RenderersFactory`, return a
   `LibvpxVideoRenderer` instance from `createRenderers`. ExoPlayer will use the
   first `Renderer` in the returned array that supports the input media format.
-* If you're using `ExoPlayer.Builder`, pass a `LibvpxVideoRenderer` in the array
-  of `Renderer`s. ExoPlayer will use the first `Renderer` in the list that
-  supports the input media format.
+* If you're using `ExoPlayerFactory.newInstance`, pass a `LibvpxVideoRenderer`
+  in the array of `Renderer`s. ExoPlayer will use the first `Renderer` in the
+  list that supports the input media format.
 
 Note: These instructions assume you're using `DefaultTrackSelector`. If you have
 a custom track selector the choice of `Renderer` is up to your implementation,
 so you need to make sure you are passing an `LibvpxVideoRenderer` to the
 player, then implement your own logic to use the renderer for a given track.
 
-## Rendering options ##
-
-There are two possibilities for rendering the output `LibvpxVideoRenderer`
-gets from the libvpx decoder:
-
-* GL rendering using GL shader for color space conversion
-  * If you are using `SimpleExoPlayer` with `PlayerView`, enable this option by
-    setting `surface_type` of `PlayerView` to be `video_decoder_surface_view`.
-  * Otherwise, enable this option by sending `LibvpxVideoRenderer` a message of
-    type `C.MSG_SET_OUTPUT_BUFFER_RENDERER` with an instance of
-    `VideoDecoderOutputBufferRenderer` as its object.
-
-* Native rendering using `ANativeWindow`
-  * If you are using `SimpleExoPlayer` with `PlayerView`, this option is enabled
-    by default.
-  * Otherwise, enable this option by sending `LibvpxVideoRenderer` a message of
-    type `C.MSG_SET_SURFACE` with an instance of `SurfaceView` as its object.
-
-Note: Although the default option uses `ANativeWindow`, based on our testing the
-GL rendering mode has better performance, so should be preferred.
+`LibvpxVideoRenderer` can optionally output to a `VpxVideoSurfaceView` when not
+being used via `SimpleExoPlayer`, in which case color space conversion will be
+performed using a GL shader. To enable this mode, send the renderer a message of
+type `LibvpxVideoRenderer.MSG_SET_OUTPUT_BUFFER_RENDERER` with the
+`VpxVideoSurfaceView` as its object, instead of sending `MSG_SET_SURFACE` with a
+`Surface`.
 
 ## Links ##
 

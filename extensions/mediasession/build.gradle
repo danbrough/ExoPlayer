@@ -28,21 +28,11 @@ android {
     }
 
     testOptions.unitTests.includeAndroidResources = true
-
-    task sourcesJar(type: Jar) {
-        from android.sourceSets.main.java.srcDirs
-        classifier = 'sources'
-    }
-
-    artifacts {
-        archives sourcesJar
-    }
 }
 
 dependencies {
     implementation project(modulePrefix + 'library-core')
-    api 'androidx.media:media:' + androidxMediaVersion
-    compileOnly 'org.checkerframework:checker-qual:' + checkerframeworkVersion
+    api 'androidx.media:media:1.0.1'
 }
 
 ext {

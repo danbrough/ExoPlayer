@@ -16,7 +16,6 @@
 package com.google.android.exoplayer2.testutil;
 
 import androidx.annotation.Nullable;
-import com.google.android.exoplayer2.drm.DrmSessionManager;
 import com.google.android.exoplayer2.source.CompositeSequenceableLoader;
 import com.google.android.exoplayer2.source.MediaPeriod;
 import com.google.android.exoplayer2.source.MediaSourceEventListener.EventDispatcher;
@@ -34,14 +33,14 @@ import java.util.List;
 
 /**
  * Fake {@link MediaPeriod} that provides tracks from the given {@link TrackGroupArray}. Selecting a
- * track will give the player a {@link ChunkSampleStream}.
+ * track will give the player a {@link ChunkSampleStream<FakeChunkSource>}.
  */
 public class FakeAdaptiveMediaPeriod extends FakeMediaPeriod
     implements SequenceableLoader.Callback<ChunkSampleStream<FakeChunkSource>> {
 
   private final Allocator allocator;
   private final FakeChunkSource.Factory chunkSourceFactory;
-  @Nullable private final TransferListener transferListener;
+  private final @Nullable TransferListener transferListener;
   private final long durationUs;
 
   private Callback callback;
@@ -139,11 +138,6 @@ public class FakeAdaptiveMediaPeriod extends FakeMediaPeriod
   }
 
   @Override
-  public boolean isLoading() {
-    return sequenceableLoader.isLoading();
-  }
-
-  @Override
   protected SampleStream createSampleStream(TrackSelection trackSelection) {
     FakeChunkSource chunkSource =
         chunkSourceFactory.createChunkSource(trackSelection, durationUs, transferListener);
@@ -155,7 +149,6 @@ public class FakeAdaptiveMediaPeriod extends FakeMediaPeriod
         /* callback= */ this,
         allocator,
         /* positionUs= */ 0,
-        /* drmSessionManager= */ DrmSessionManager.getDummyDrmSessionManager(),
         new DefaultLoadErrorHandlingPolicy(/* minimumLoadableRetryCount= */ 3),
         eventDispatcher);
   }

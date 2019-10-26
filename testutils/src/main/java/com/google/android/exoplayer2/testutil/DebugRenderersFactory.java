@@ -24,7 +24,6 @@ import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.DefaultRenderersFactory;
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.Format;
-import com.google.android.exoplayer2.FormatHolder;
 import com.google.android.exoplayer2.Renderer;
 import com.google.android.exoplayer2.decoder.DecoderInputBuffer;
 import com.google.android.exoplayer2.drm.DrmSessionManager;
@@ -141,8 +140,8 @@ public class DebugRenderersFactory extends DefaultRenderersFactory {
     }
 
     @Override
-    protected void onInputFormatChanged(FormatHolder formatHolder) throws ExoPlaybackException {
-      super.onInputFormatChanged(formatHolder);
+    protected void onInputFormatChanged(Format newFormat) throws ExoPlaybackException {
+      super.onInputFormatChanged(newFormat);
       // Ensure timestamps of buffers queued after this format change are never inserted into the
       // queue of expected output timestamps before those of buffers that have already been queued.
       minimumInsertIndex = startIndex + queueSize;

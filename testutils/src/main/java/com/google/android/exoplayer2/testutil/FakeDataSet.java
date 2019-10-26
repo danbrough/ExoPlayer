@@ -79,11 +79,11 @@ public class FakeDataSet {
      */
     public static final class Segment {
 
-      @Nullable public final IOException exception;
-      @Nullable public final byte[] data;
+      public @Nullable final IOException exception;
+      public @Nullable final byte[] data;
       public final int length;
       public final long byteOffset;
-      @Nullable public final Runnable action;
+      public @Nullable final Runnable action;
 
       public boolean exceptionThrown;
       public boolean exceptionCleared;

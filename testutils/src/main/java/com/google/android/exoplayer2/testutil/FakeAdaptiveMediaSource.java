@@ -34,9 +34,10 @@ public class FakeAdaptiveMediaSource extends FakeMediaSource {
 
   public FakeAdaptiveMediaSource(
       Timeline timeline,
+      Object manifest,
       TrackGroupArray trackGroupArray,
       FakeChunkSource.Factory chunkSourceFactory) {
-    super(timeline, trackGroupArray);
+    super(timeline, manifest, trackGroupArray);
     this.chunkSourceFactory = chunkSourceFactory;
   }
 

@@ -23,6 +23,7 @@ import android.media.MediaCrypto;
 import android.media.MediaCryptoException;
 import android.media.MediaFormat;
 import android.os.Bundle;
+import android.os.Looper;
 import android.os.SystemClock;
 import androidx.annotation.CheckResult;
 import androidx.annotation.IntDef;
@@ -79,20 +80,21 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
     public final boolean secureDecoderRequired;
 
     /**
-     * The {@link MediaCodecInfo} of the decoder that failed to initialize. Null if no suitable
-     * decoder was found.
+     * The name of the decoder that failed to initialize. Null if no suitable decoder was found.
      */
-    @Nullable public final MediaCodecInfo codecInfo;
+    public final String decoderName;
 
-    /** An optional developer-readable diagnostic information string. May be null. */
-    @Nullable public final String diagnosticInfo;
+    /**
+     * An optional developer-readable diagnostic information string. May be null.
+     */
+    public final String diagnosticInfo;
 
     /**
      * If the decoder failed to initialize and another decoder being used as a fallback also failed
      * to initialize, the {@link DecoderInitializationException} for the fallback decoder. Null if
      * there was no fallback decoder or no suitable decoders were found.
      */
-    @Nullable public final DecoderInitializationException fallbackDecoderInitializationException;
+    public final @Nullable DecoderInitializationException fallbackDecoderInitializationException;
 
     public DecoderInitializationException(Format format, Throwable cause,
         boolean secureDecoderRequired, int errorCode) {
@@ -101,22 +103,19 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
           cause,
           format.sampleMimeType,
           secureDecoderRequired,
-          /* mediaCodecInfo= */ null,
+          /* decoderName= */ null,
           buildCustomDiagnosticInfo(errorCode),
           /* fallbackDecoderInitializationException= */ null);
     }
 
-    public DecoderInitializationException(
-        Format format,
-        Throwable cause,
-        boolean secureDecoderRequired,
-        MediaCodecInfo mediaCodecInfo) {
+    public DecoderInitializationException(Format format, Throwable cause,
+        boolean secureDecoderRequired, String decoderName) {
       this(
-          "Decoder init failed: " + mediaCodecInfo.name + ", " + format,
+          "Decoder init failed: " + decoderName + ", " + format,
           cause,
           format.sampleMimeType,
           secureDecoderRequired,
-          mediaCodecInfo,
+          decoderName,
           Util.SDK_INT >= 21 ? getDiagnosticInfoV21(cause) : null,
           /* fallbackDecoderInitializationException= */ null);
     }
@@ -126,13 +125,13 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
         Throwable cause,
         String mimeType,
         boolean secureDecoderRequired,
-        @Nullable MediaCodecInfo mediaCodecInfo,
+        @Nullable String decoderName,
         @Nullable String diagnosticInfo,
         @Nullable DecoderInitializationException fallbackDecoderInitializationException) {
       super(message, cause);
       this.mimeType = mimeType;
       this.secureDecoderRequired = secureDecoderRequired;
-      this.codecInfo = mediaCodecInfo;
+      this.decoderName = decoderName;
       this.diagnosticInfo = diagnosticInfo;
       this.fallbackDecoderInitializationException = fallbackDecoderInitializationException;
     }
@@ -145,7 +144,7 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
           getCause(),
           mimeType,
           secureDecoderRequired,
-          codecInfo,
+          decoderName,
           diagnosticInfo,
           fallbackException);
     }
@@ -160,34 +159,9 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
 
     private static String buildCustomDiagnosticInfo(int errorCode) {
       String sign = errorCode < 0 ? "neg_" : "";
-      return "com.google.android.exoplayer2.mediacodec.MediaCodecRenderer_"
-          + sign
-          + Math.abs(errorCode);
-    }
-  }
-
-  /** Thrown when a failure occurs in the decoder. */
-  public static class DecoderException extends Exception {
-
-    /** The {@link MediaCodecInfo} of the decoder that failed. Null if unknown. */
-    @Nullable public final MediaCodecInfo codecInfo;
-
-    /** An optional developer-readable diagnostic information string. May be null. */
-    @Nullable public final String diagnosticInfo;
-
-    public DecoderException(Throwable cause, @Nullable MediaCodecInfo codecInfo) {
-      super("Decoder failed: " + (codecInfo == null ? null : codecInfo.name), cause);
-      this.codecInfo = codecInfo;
-      diagnosticInfo = Util.SDK_INT >= 21 ? getDiagnosticInfoV21(cause) : null;
+      return "com.google.android.exoplayer.MediaCodecTrackRenderer_" + sign + Math.abs(errorCode);
     }
 
-    @TargetApi(21)
-    private static String getDiagnosticInfoV21(Throwable cause) {
-      if (cause instanceof CodecException) {
-        return ((CodecException) cause).getDiagnosticInfo();
-      }
-      return null;
-    }
   }
 
   /** Indicates no codec operating rate should be set. */
@@ -323,6 +297,7 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
   private final float assumedMinimumCodecOperatingRate;
   private final DecoderInputBuffer buffer;
   private final DecoderInputBuffer flagsOnlyBuffer;
+  private final FormatHolder formatHolder;
   private final TimedValueQueue<Format> formatQueue;
   private final ArrayList<Long> decodeOnlyPresentationTimestamps;
   private final MediaCodec.BufferInfo outputBufferInfo;
@@ -408,6 +383,7 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
     this.assumedMinimumCodecOperatingRate = assumedMinimumCodecOperatingRate;
     buffer = new DecoderInputBuffer(DecoderInputBuffer.BUFFER_REPLACEMENT_MODE_DISABLED);
     flagsOnlyBuffer = DecoderInputBuffer.newFlagsOnlyInstance();
+    formatHolder = new FormatHolder();
     formatQueue = new TimedValueQueue<>();
     decodeOnlyPresentationTimestamps = new ArrayList<>();
     outputBufferInfo = new MediaCodec.BufferInfo();
@@ -453,14 +429,12 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
    * @param mediaCodecSelector The decoder selector.
    * @param drmSessionManager The renderer's {@link DrmSessionManager}.
    * @param format The format.
-   * @return The extent to which the renderer is capable of supporting the given format. See {@link
-   *     #supportsFormat(Format)} for more detail.
+   * @return The extent to which the renderer is capable of supporting the given format. See
+   *     {@link #supportsFormat(Format)} for more detail.
    * @throws DecoderQueryException If there was an error querying decoders.
    */
-  protected abstract int supportsFormat(
-      MediaCodecSelector mediaCodecSelector,
-      @Nullable DrmSessionManager<FrameworkMediaCrypto> drmSessionManager,
-      Format format)
+  protected abstract int supportsFormat(MediaCodecSelector mediaCodecSelector,
+      DrmSessionManager<FrameworkMediaCrypto> drmSessionManager, Format format)
       throws DecoderQueryException;
 
   /**
@@ -490,7 +464,7 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
       MediaCodecInfo codecInfo,
       MediaCodec codec,
       Format format,
-      @Nullable MediaCrypto crypto,
+      MediaCrypto crypto,
       float codecOperatingRate);
 
   protected final void maybeInitCodec() throws ExoPlaybackException {
@@ -525,7 +499,7 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
                   && mediaCrypto.requiresSecureDecoderComponent(mimeType);
         }
       }
-      if (FrameworkMediaCrypto.WORKAROUND_DEVICE_NEEDS_KEYS_TO_CONFIGURE_CODEC) {
+      if (deviceNeedsDrmKeysToConfigureCodecWorkaround()) {
         @DrmSession.State int drmSessionState = codecDrmSession.getState();
         if (drmSessionState == DrmSession.STATE_ERROR) {
           throw ExoPlaybackException.createForRenderer(codecDrmSession.getError(), getIndex());
@@ -667,40 +641,31 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
 
   @Override
   public void render(long positionUs, long elapsedRealtimeUs) throws ExoPlaybackException {
-    try {
-      if (outputStreamEnded) {
-        renderToEndOfStream();
-        return;
-      }
-      if (inputFormat == null && !readToFlagsOnlyBuffer(/* requireFormat= */ true)) {
+    if (outputStreamEnded) {
+      renderToEndOfStream();
+      return;
+    }
+    if (inputFormat == null && !readToFlagsOnlyBuffer(/* requireFormat= */ true)) {
         // We still don't have a format and can't make progress without one.
         return;
-      }
-      // We have a format.
-      maybeInitCodec();
-      if (codec != null) {
-        long drainStartTimeMs = SystemClock.elapsedRealtime();
-        TraceUtil.beginSection("drainAndFeed");
-        while (drainOutputBuffer(positionUs, elapsedRealtimeUs)) {}
-        while (feedInputBuffer() && shouldContinueFeeding(drainStartTimeMs)) {}
-        TraceUtil.endSection();
-      } else {
-        decoderCounters.skippedInputBufferCount += skipSource(positionUs);
-        // We need to read any format changes despite not having a codec so that drmSession can be
-        // updated, and so that we have the most recent format should the codec be initialized. We
-        // may
-        // also reach the end of the stream. Note that readSource will not read a sample into a
-        // flags-only buffer.
-        readToFlagsOnlyBuffer(/* requireFormat= */ false);
-      }
-      decoderCounters.ensureUpdated();
-    } catch (IllegalStateException e) {
-      if (isMediaCodecException(e)) {
-        throw ExoPlaybackException.createForRenderer(
-            createDecoderException(e, getCodecInfo()), getIndex());
-      }
-      throw e;
     }
+    // We have a format.
+    maybeInitCodec();
+    if (codec != null) {
+      long drainStartTimeMs = SystemClock.elapsedRealtime();
+      TraceUtil.beginSection("drainAndFeed");
+      while (drainOutputBuffer(positionUs, elapsedRealtimeUs)) {}
+      while (feedInputBuffer() && shouldContinueFeeding(drainStartTimeMs)) {}
+      TraceUtil.endSection();
+    } else {
+      decoderCounters.skippedInputBufferCount += skipSource(positionUs);
+      // We need to read any format changes despite not having a codec so that drmSession can be
+      // updated, and so that we have the most recent format should the codec be initialized. We may
+      // also reach the end of the stream. Note that readSource will not read a sample into a
+      // flags-only buffer.
+      readToFlagsOnlyBuffer(/* requireFormat= */ false);
+    }
+    decoderCounters.ensureUpdated();
   }
 
   /**
@@ -764,18 +729,12 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
     return false;
   }
 
-  protected DecoderException createDecoderException(
-      Throwable cause, @Nullable MediaCodecInfo codecInfo) {
-    return new DecoderException(cause, codecInfo);
-  }
-
   /** Reads into {@link #flagsOnlyBuffer} and returns whether a format was read. */
   private boolean readToFlagsOnlyBuffer(boolean requireFormat) throws ExoPlaybackException {
-    FormatHolder formatHolder = getFormatHolder();
     flagsOnlyBuffer.clear();
     int result = readSource(formatHolder, flagsOnlyBuffer, requireFormat);
     if (result == C.RESULT_FORMAT_READ) {
-      onInputFormatChanged(formatHolder);
+      onInputFormatChanged(formatHolder.format);
       return true;
     } else if (result == C.RESULT_BUFFER_READ && flagsOnlyBuffer.isEndOfStream()) {
       inputStreamEnded = true;
@@ -830,7 +789,7 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
         availableCodecInfos.removeFirst();
         DecoderInitializationException exception =
             new DecoderInitializationException(
-                inputFormat, e, mediaCryptoRequiresSecureDecoder, codecInfo);
+                inputFormat, e, mediaCryptoRequiresSecureDecoder, codecInfo.name);
         if (preferredDecoderInitializationException == null) {
           preferredDecoderInitializationException = exception;
         } else {
@@ -992,13 +951,21 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
   }
 
   private void setSourceDrmSession(@Nullable DrmSession<FrameworkMediaCrypto> session) {
-    DrmSession.replaceSessionReferences(sourceDrmSession, session);
+    DrmSession<FrameworkMediaCrypto> previous = sourceDrmSession;
     sourceDrmSession = session;
+    releaseDrmSessionIfUnused(previous);
   }
 
   private void setCodecDrmSession(@Nullable DrmSession<FrameworkMediaCrypto> session) {
-    DrmSession.replaceSessionReferences(codecDrmSession, session);
+    DrmSession<FrameworkMediaCrypto> previous = codecDrmSession;
     codecDrmSession = session;
+    releaseDrmSessionIfUnused(previous);
+  }
+
+  private void releaseDrmSessionIfUnused(@Nullable DrmSession<FrameworkMediaCrypto> session) {
+    if (session != null && session != sourceDrmSession && session != codecDrmSession) {
+      drmSessionManager.releaseSession(session);
+    }
   }
 
   /**
@@ -1043,7 +1010,6 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
     }
 
     int result;
-    FormatHolder formatHolder = getFormatHolder();
     int adaptiveReconfigurationBytes = 0;
     if (waitingForKeys) {
       // We've already read an encrypted sample into buffer, and are waiting for keys.
@@ -1077,7 +1043,7 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
         buffer.clear();
         codecReconfigurationState = RECONFIGURATION_STATE_WRITE_PENDING;
       }
-      onInputFormatChanged(formatHolder);
+      onInputFormatChanged(formatHolder.format);
       return true;
     }
 
@@ -1143,9 +1109,6 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
           Math.max(largestQueuedPresentationTimeUs, presentationTimeUs);
 
       buffer.flip();
-      if (buffer.hasSupplementalData()) {
-        handleInputBufferSupplementalData(buffer);
-      }
       onQueueInputBuffer(buffer);
 
       if (bufferEncrypted) {
@@ -1194,20 +1157,34 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
   /**
    * Called when a new format is read from the upstream {@link MediaPeriod}.
    *
-   * @param formatHolder A {@link FormatHolder} that holds the new {@link Format}.
+   * @param newFormat The new format.
    * @throws ExoPlaybackException If an error occurs re-initializing the {@link MediaCodec}.
    */
-  @SuppressWarnings("unchecked")
-  protected void onInputFormatChanged(FormatHolder formatHolder) throws ExoPlaybackException {
-    waitingForFirstSampleInFormat = true;
-    Format newFormat = Assertions.checkNotNull(formatHolder.format);
-    if (formatHolder.includesDrmSession) {
-      setSourceDrmSession((DrmSession<FrameworkMediaCrypto>) formatHolder.drmSession);
-    } else {
-      sourceDrmSession =
-          getUpdatedSourceDrmSession(inputFormat, newFormat, drmSessionManager, sourceDrmSession);
-    }
+  protected void onInputFormatChanged(Format newFormat) throws ExoPlaybackException {
+    Format oldFormat = inputFormat;
     inputFormat = newFormat;
+    waitingForFirstSampleInFormat = true;
+
+    boolean drmInitDataChanged =
+        !Util.areEqual(newFormat.drmInitData, oldFormat == null ? null : oldFormat.drmInitData);
+    if (drmInitDataChanged) {
+      if (newFormat.drmInitData != null) {
+        if (drmSessionManager == null) {
+          throw ExoPlaybackException.createForRenderer(
+              new IllegalStateException("Media requires a DrmSessionManager"), getIndex());
+        }
+        DrmSession<FrameworkMediaCrypto> session =
+            drmSessionManager.acquireSession(Looper.myLooper(), newFormat.drmInitData);
+        if (session == sourceDrmSession || session == codecDrmSession) {
+          // We already had this session. The manager must be reference counting, so release it once
+          // to get the count attributed to this renderer back down to 1.
+          drmSessionManager.releaseSession(session);
+        }
+        setSourceDrmSession(session);
+      } else {
+        setSourceDrmSession(null);
+      }
+    }
 
     if (codec == null) {
       maybeInitCodec();
@@ -1286,22 +1263,9 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
   }
 
   /**
-   * Handles supplemental data associated with an input buffer.
-   *
-   * <p>The default implementation is a no-op.
-   *
-   * @param buffer The input buffer that is about to be queued.
-   * @throws ExoPlaybackException Thrown if an error occurs handling supplemental data.
-   */
-  protected void handleInputBufferSupplementalData(DecoderInputBuffer buffer)
-      throws ExoPlaybackException {
-    // Do nothing.
-  }
-
-  /**
    * Called immediately before an input buffer is queued into the codec.
-   *
-   * <p>The default implementation is a no-op.
+   * <p>
+   * The default implementation is a no-op.
    *
    * @param buffer The buffer to be queued.
    */
@@ -1745,17 +1709,14 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
     return cryptoInfo;
   }
 
-  private static boolean isMediaCodecException(IllegalStateException error) {
-    if (Util.SDK_INT >= 21 && isMediaCodecExceptionV21(error)) {
-      return true;
-    }
-    StackTraceElement[] stackTrace = error.getStackTrace();
-    return stackTrace.length > 0 && stackTrace[0].getClassName().equals("android.media.MediaCodec");
-  }
-
-  @TargetApi(21)
-  private static boolean isMediaCodecExceptionV21(IllegalStateException error) {
-    return error instanceof MediaCodec.CodecException;
+  /**
+   * Returns whether the device needs keys to have been loaded into the {@link DrmSession} before
+   * codec configuration.
+   */
+  private boolean deviceNeedsDrmKeysToConfigureCodecWorkaround() {
+    return "Amazon".equals(Util.MANUFACTURER)
+        && ("AFTM".equals(Util.MODEL) // Fire TV Stick Gen 1
+            || "AFTB".equals(Util.MODEL)); // Fire TV Gen 1
   }
 
   /**

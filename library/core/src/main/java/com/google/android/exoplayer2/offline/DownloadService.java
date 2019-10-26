@@ -176,7 +176,7 @@ public abstract class DownloadService extends Service {
   @StringRes private final int channelNameResourceId;
   @StringRes private final int channelDescriptionResourceId;
 
-  @Nullable private DownloadManager downloadManager;
+  private DownloadManager downloadManager;
   private int lastStartId;
   private boolean startedInForeground;
   private boolean taskRemoved;
@@ -592,8 +592,8 @@ public abstract class DownloadService extends Service {
   public int onStartCommand(Intent intent, int flags, int startId) {
     lastStartId = startId;
     taskRemoved = false;
-    @Nullable String intentAction = null;
-    @Nullable String contentId = null;
+    String intentAction = null;
+    String contentId = null;
     if (intent != null) {
       intentAction = intent.getAction();
       startedInForeground |=
@@ -604,14 +604,13 @@ public abstract class DownloadService extends Service {
     if (intentAction == null) {
       intentAction = ACTION_INIT;
     }
-    DownloadManager downloadManager = Assertions.checkNotNull(this.downloadManager);
     switch (intentAction) {
       case ACTION_INIT:
       case ACTION_RESTART:
         // Do nothing.
         break;
       case ACTION_ADD_DOWNLOAD:
-        @Nullable DownloadRequest downloadRequest = intent.getParcelableExtra(KEY_DOWNLOAD_REQUEST);
+        DownloadRequest downloadRequest = intent.getParcelableExtra(KEY_DOWNLOAD_REQUEST);
         if (downloadRequest == null) {
           Log.e(TAG, "Ignored ADD_DOWNLOAD: Missing " + KEY_DOWNLOAD_REQUEST + " extra");
         } else {
@@ -644,7 +643,7 @@ public abstract class DownloadService extends Service {
         }
         break;
       case ACTION_SET_REQUIREMENTS:
-        @Nullable Requirements requirements = intent.getParcelableExtra(KEY_REQUIREMENTS);
+        Requirements requirements = intent.getParcelableExtra(KEY_REQUIREMENTS);
         if (requirements == null) {
           Log.e(TAG, "Ignored SET_REQUIREMENTS: Missing " + KEY_REQUIREMENTS + " extra");
         } else {
@@ -670,9 +669,8 @@ public abstract class DownloadService extends Service {
   @Override
   public void onDestroy() {
     isDestroyed = true;
-    DownloadManagerHelper downloadManagerHelper =
-        Assertions.checkNotNull(downloadManagerListeners.get(getClass()));
-    boolean unschedule = !downloadManagerHelper.downloadManager.isWaitingForRequirements();
+    DownloadManagerHelper downloadManagerHelper = downloadManagerListeners.get(getClass());
+    boolean unschedule = !downloadManager.isWaitingForRequirements();
     downloadManagerHelper.detachService(this, unschedule);
     if (foregroundNotificationUpdater != null) {
       foregroundNotificationUpdater.stopPeriodicUpdates();
@@ -806,6 +804,7 @@ public abstract class DownloadService extends Service {
     private final int notificationId;
     private final long updateInterval;
     private final Handler handler;
+    private final Runnable updateRunnable;
 
     private boolean periodicUpdatesStarted;
     private boolean notificationDisplayed;
@@ -814,6 +813,7 @@ public abstract class DownloadService extends Service {
       this.notificationId = notificationId;
       this.updateInterval = updateInterval;
       this.handler = new Handler(Looper.getMainLooper());
+      this.updateRunnable = this::update;
     }
 
     public void startPeriodicUpdates() {
@@ -823,7 +823,7 @@ public abstract class DownloadService extends Service {
 
     public void stopPeriodicUpdates() {
       periodicUpdatesStarted = false;
-      handler.removeCallbacksAndMessages(null);
+      handler.removeCallbacks(updateRunnable);
     }
 
     public void showNotificationIfNotAlready() {
@@ -839,12 +839,12 @@ public abstract class DownloadService extends Service {
     }
 
     private void update() {
-      List<Download> downloads = Assertions.checkNotNull(downloadManager).getCurrentDownloads();
+      List<Download> downloads = downloadManager.getCurrentDownloads();
       startForeground(notificationId, getForegroundNotification(downloads));
       notificationDisplayed = true;
       if (periodicUpdatesStarted) {
-        handler.removeCallbacksAndMessages(null);
-        handler.postDelayed(this::update, updateInterval);
+        handler.removeCallbacks(updateRunnable);
+        handler.postDelayed(updateRunnable, updateInterval);
       }
     }
   }
@@ -869,8 +869,7 @@ public abstract class DownloadService extends Service {
       downloadManager.addListener(this);
       if (scheduler != null) {
         Requirements requirements = downloadManager.getRequirements();
-        setSchedulerEnabled(
-            scheduler, /* enabled= */ !requirements.checkRequirements(context), requirements);
+        setSchedulerEnabled(/* enabled= */ !requirements.checkRequirements(context), requirements);
       }
     }
 
@@ -924,12 +923,11 @@ public abstract class DownloadService extends Service {
         }
       }
       if (scheduler != null) {
-        setSchedulerEnabled(scheduler, /* enabled= */ !requirementsMet, requirements);
+        setSchedulerEnabled(/* enabled= */ !requirementsMet, requirements);
       }
     }
 
-    private void setSchedulerEnabled(
-        Scheduler scheduler, boolean enabled, Requirements requirements) {
+    private void setSchedulerEnabled(boolean enabled, Requirements requirements) {
       if (!enabled) {
         scheduler.cancel();
       } else {

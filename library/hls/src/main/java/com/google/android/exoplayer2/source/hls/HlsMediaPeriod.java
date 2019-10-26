@@ -16,14 +16,12 @@
 package com.google.android.exoplayer2.source.hls;
 
 import android.net.Uri;
-import android.text.TextUtils;
 import androidx.annotation.Nullable;
+import android.text.TextUtils;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.SeekParameters;
 import com.google.android.exoplayer2.drm.DrmInitData;
-import com.google.android.exoplayer2.drm.DrmSession;
-import com.google.android.exoplayer2.drm.DrmSessionManager;
 import com.google.android.exoplayer2.extractor.Extractor;
 import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.offline.StreamKey;
@@ -55,7 +53,6 @@ import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
-import org.checkerframework.checker.nullness.compatqual.NullableType;
 
 /**
  * A {@link MediaPeriod} that loads an HLS stream.
@@ -66,8 +63,7 @@ public final class HlsMediaPeriod implements MediaPeriod, HlsSampleStreamWrapper
   private final HlsExtractorFactory extractorFactory;
   private final HlsPlaylistTracker playlistTracker;
   private final HlsDataSourceFactory dataSourceFactory;
-  @Nullable private final TransferListener mediaTransferListener;
-  private final DrmSessionManager<?> drmSessionManager;
+  private final @Nullable TransferListener mediaTransferListener;
   private final LoadErrorHandlingPolicy loadErrorHandlingPolicy;
   private final EventDispatcher eventDispatcher;
   private final Allocator allocator;
@@ -78,7 +74,7 @@ public final class HlsMediaPeriod implements MediaPeriod, HlsSampleStreamWrapper
   private final @HlsMetadataType int metadataType;
   private final boolean useSessionKeys;
 
-  @Nullable private Callback callback;
+  private @Nullable Callback callback;
   private int pendingPrepareCount;
   private TrackGroupArray trackGroups;
   private HlsSampleStreamWrapper[] sampleStreamWrappers;
@@ -97,8 +93,6 @@ public final class HlsMediaPeriod implements MediaPeriod, HlsSampleStreamWrapper
    *     and keys.
    * @param mediaTransferListener The transfer listener to inform of any media data transfers. May
    *     be null if no listener is available.
-   * @param drmSessionManager The {@link DrmSessionManager} to acquire {@link DrmSession
-   *     DrmSessions} with.
    * @param loadErrorHandlingPolicy A {@link LoadErrorHandlingPolicy}.
    * @param eventDispatcher A dispatcher to notify of events.
    * @param allocator An {@link Allocator} from which to obtain media buffer allocations.
@@ -112,7 +106,6 @@ public final class HlsMediaPeriod implements MediaPeriod, HlsSampleStreamWrapper
       HlsPlaylistTracker playlistTracker,
       HlsDataSourceFactory dataSourceFactory,
       @Nullable TransferListener mediaTransferListener,
-      DrmSessionManager<?> drmSessionManager,
       LoadErrorHandlingPolicy loadErrorHandlingPolicy,
       EventDispatcher eventDispatcher,
       Allocator allocator,
@@ -124,7 +117,6 @@ public final class HlsMediaPeriod implements MediaPeriod, HlsSampleStreamWrapper
     this.playlistTracker = playlistTracker;
     this.dataSourceFactory = dataSourceFactory;
     this.mediaTransferListener = mediaTransferListener;
-    this.drmSessionManager = drmSessionManager;
     this.loadErrorHandlingPolicy = loadErrorHandlingPolicy;
     this.eventDispatcher = eventDispatcher;
     this.allocator = allocator;
@@ -254,12 +246,8 @@ public final class HlsMediaPeriod implements MediaPeriod, HlsSampleStreamWrapper
   }
 
   @Override
-  public long selectTracks(
-      @NullableType TrackSelection[] selections,
-      boolean[] mayRetainStreamFlags,
-      @NullableType SampleStream[] streams,
-      boolean[] streamResetFlags,
-      long positionUs) {
+  public long selectTracks(TrackSelection[] selections, boolean[] mayRetainStreamFlags,
+      SampleStream[] streams, boolean[] streamResetFlags, long positionUs) {
     // Map each selection and stream onto a child period index.
     int[] streamChildIndices = new int[selections.length];
     int[] selectionChildIndices = new int[selections.length];
@@ -360,11 +348,6 @@ public final class HlsMediaPeriod implements MediaPeriod, HlsSampleStreamWrapper
     } else {
       return compositeSequenceableLoader.continueLoading(positionUs);
     }
-  }
-
-  @Override
-  public boolean isLoading() {
-    return compositeSequenceableLoader.isLoading();
   }
 
   @Override
@@ -508,8 +491,7 @@ public final class HlsMediaPeriod implements MediaPeriod, HlsSampleStreamWrapper
       manifestUrlIndicesPerWrapper.add(new int[] {i});
       sampleStreamWrappers.add(sampleStreamWrapper);
       sampleStreamWrapper.prepareWithMasterPlaylistInfo(
-          new TrackGroup[] {new TrackGroup(subtitleRendition.format)},
-          /* primaryTrackGroupIndex= */ 0);
+          new TrackGroupArray(new TrackGroup(subtitleRendition.format)), 0, TrackGroupArray.EMPTY);
     }
 
     this.sampleStreamWrappers = sampleStreamWrappers.toArray(new HlsSampleStreamWrapper[0]);
@@ -667,9 +649,9 @@ public final class HlsMediaPeriod implements MediaPeriod, HlsSampleStreamWrapper
       muxedTrackGroups.add(id3TrackGroup);
 
       sampleStreamWrapper.prepareWithMasterPlaylistInfo(
-          muxedTrackGroups.toArray(new TrackGroup[0]),
-          /* primaryTrackGroupIndex= */ 0,
-          /* optionalTrackGroupsIndices= */ muxedTrackGroups.indexOf(id3TrackGroup));
+          new TrackGroupArray(muxedTrackGroups.toArray(new TrackGroup[0])),
+          0,
+          new TrackGroupArray(id3TrackGroup));
     }
   }
 
@@ -725,7 +707,7 @@ public final class HlsMediaPeriod implements MediaPeriod, HlsSampleStreamWrapper
       if (allowChunklessPreparation && renditionsHaveCodecs) {
         Format[] renditionFormats = scratchPlaylistFormats.toArray(new Format[0]);
         sampleStreamWrapper.prepareWithMasterPlaylistInfo(
-            new TrackGroup[] {new TrackGroup(renditionFormats)}, /* primaryTrackGroupIndex= */ 0);
+            new TrackGroupArray(new TrackGroup(renditionFormats)), 0, TrackGroupArray.EMPTY);
       }
     }
   }
@@ -735,7 +717,7 @@ public final class HlsMediaPeriod implements MediaPeriod, HlsSampleStreamWrapper
       Uri[] playlistUrls,
       Format[] playlistFormats,
       Format muxedAudioFormat,
-      @Nullable List<Format> muxedCaptionFormats,
+      List<Format> muxedCaptionFormats,
       Map<String, DrmInitData> overridingDrmInitData,
       long positionUs) {
     HlsChunkSource defaultChunkSource =
@@ -756,7 +738,6 @@ public final class HlsMediaPeriod implements MediaPeriod, HlsSampleStreamWrapper
         allocator,
         positionUs,
         muxedAudioFormat,
-        drmSessionManager,
         loadErrorHandlingPolicy,
         eventDispatcher,
         metadataType);

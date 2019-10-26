@@ -16,7 +16,6 @@
 package com.google.android.exoplayer2.source.smoothstreaming.manifest;
 
 import android.net.Uri;
-import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.extractor.mp4.TrackEncryptionBox;
@@ -70,7 +69,7 @@ public class SsManifest implements FilterableManifest<SsManifest> {
     public final int maxHeight;
     public final int displayWidth;
     public final int displayHeight;
-    @Nullable public final String language;
+    public final String language;
     public final Format[] formats;
     public final int chunkCount;
 
@@ -81,20 +80,9 @@ public class SsManifest implements FilterableManifest<SsManifest> {
     private final long[] chunkStartTimesUs;
     private final long lastChunkDurationUs;
 
-    public StreamElement(
-        String baseUri,
-        String chunkTemplate,
-        int type,
-        String subType,
-        long timescale,
-        String name,
-        int maxWidth,
-        int maxHeight,
-        int displayWidth,
-        int displayHeight,
-        @Nullable String language,
-        Format[] formats,
-        List<Long> chunkStartTimes,
+    public StreamElement(String baseUri, String chunkTemplate, int type, String subType,
+        long timescale, String name, int maxWidth, int maxHeight, int displayWidth,
+        int displayHeight, String language, Format[] formats, List<Long> chunkStartTimes,
         long lastChunkDuration) {
       this(
           baseUri,
@@ -114,22 +102,10 @@ public class SsManifest implements FilterableManifest<SsManifest> {
           Util.scaleLargeTimestamp(lastChunkDuration, C.MICROS_PER_SECOND, timescale));
     }
 
-    private StreamElement(
-        String baseUri,
-        String chunkTemplate,
-        int type,
-        String subType,
-        long timescale,
-        String name,
-        int maxWidth,
-        int maxHeight,
-        int displayWidth,
-        int displayHeight,
-        @Nullable String language,
-        Format[] formats,
-        List<Long> chunkStartTimes,
-        long[] chunkStartTimesUs,
-        long lastChunkDurationUs) {
+    private StreamElement(String baseUri, String chunkTemplate, int type, String subType,
+        long timescale, String name, int maxWidth, int maxHeight, int displayWidth,
+        int displayHeight, String language, Format[] formats, List<Long> chunkStartTimes,
+        long[] chunkStartTimesUs, long lastChunkDurationUs) {
       this.baseUri = baseUri;
       this.chunkTemplate = chunkTemplate;
       this.type = type;
@@ -232,7 +208,7 @@ public class SsManifest implements FilterableManifest<SsManifest> {
   public final boolean isLive;
 
   /** Content protection information, or null if the content is not protected. */
-  @Nullable public final ProtectionElement protectionElement;
+  public final ProtectionElement protectionElement;
 
   /** The contained stream elements. */
   public final StreamElement[] streamElements;
@@ -273,7 +249,7 @@ public class SsManifest implements FilterableManifest<SsManifest> {
       long dvrWindowLength,
       int lookAheadCount,
       boolean isLive,
-      @Nullable ProtectionElement protectionElement,
+      ProtectionElement protectionElement,
       StreamElement[] streamElements) {
     this(
         majorVersion,
@@ -297,7 +273,7 @@ public class SsManifest implements FilterableManifest<SsManifest> {
       long dvrWindowLengthUs,
       int lookAheadCount,
       boolean isLive,
-      @Nullable ProtectionElement protectionElement,
+      ProtectionElement protectionElement,
       StreamElement[] streamElements) {
     this.majorVersion = majorVersion;
     this.minorVersion = minorVersion;

@@ -15,7 +15,6 @@
  */
 package com.google.android.exoplayer2.decoder;
 
-import androidx.annotation.Nullable;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
@@ -26,7 +25,7 @@ public class SimpleOutputBuffer extends OutputBuffer {
 
   private final SimpleDecoder<?, SimpleOutputBuffer, ?> owner;
 
-  @Nullable public ByteBuffer data;
+  public ByteBuffer data;
 
   public SimpleOutputBuffer(SimpleDecoder<?, SimpleOutputBuffer, ?> owner) {
     this.owner = owner;

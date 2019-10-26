@@ -88,12 +88,13 @@ public final class StandaloneMediaClock implements MediaClock {
   }
 
   @Override
-  public void setPlaybackParameters(PlaybackParameters playbackParameters) {
+  public PlaybackParameters setPlaybackParameters(PlaybackParameters playbackParameters) {
     // Store the current position as the new base, in case the playback speed has changed.
     if (started) {
       resetPosition(getPositionUs());
     }
     this.playbackParameters = playbackParameters;
+    return playbackParameters;
   }
 
   @Override

@@ -18,7 +18,6 @@ package com.google.android.exoplayer2.util;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
-import androidx.annotation.Nullable;
 
 /**
  * An interface to call through to a {@link Handler}. Instances must be created by calling {@link
@@ -33,13 +32,13 @@ public interface HandlerWrapper {
   Message obtainMessage(int what);
 
   /** @see Handler#obtainMessage(int, Object) */
-  Message obtainMessage(int what, @Nullable Object obj);
+  Message obtainMessage(int what, Object obj);
 
   /** @see Handler#obtainMessage(int, int, int) */
   Message obtainMessage(int what, int arg1, int arg2);
 
   /** @see Handler#obtainMessage(int, int, int, Object) */
-  Message obtainMessage(int what, int arg1, int arg2, @Nullable Object obj);
+  Message obtainMessage(int what, int arg1, int arg2, Object obj);
 
   /** @see Handler#sendEmptyMessage(int) */
   boolean sendEmptyMessage(int what);
@@ -51,7 +50,7 @@ public interface HandlerWrapper {
   void removeMessages(int what);
 
   /** @see Handler#removeCallbacksAndMessages(Object) */
-  void removeCallbacksAndMessages(@Nullable Object token);
+  void removeCallbacksAndMessages(Object token);
 
   /** @see Handler#post(Runnable) */
   boolean post(Runnable runnable);

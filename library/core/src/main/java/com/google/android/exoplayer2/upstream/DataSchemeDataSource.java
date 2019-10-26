@@ -18,8 +18,8 @@ package com.google.android.exoplayer2.upstream;
 import static com.google.android.exoplayer2.util.Util.castNonNull;
 
 import android.net.Uri;
-import android.util.Base64;
 import androidx.annotation.Nullable;
+import android.util.Base64;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ParserException;
 import com.google.android.exoplayer2.util.Util;

@@ -17,9 +17,7 @@ package com.google.android.exoplayer2.source.smoothstreaming;
 
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
-import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.SeekParameters;
-import com.google.android.exoplayer2.drm.DrmSessionManager;
 import com.google.android.exoplayer2.offline.StreamKey;
 import com.google.android.exoplayer2.source.CompositeSequenceableLoaderFactory;
 import com.google.android.exoplayer2.source.MediaPeriod;
@@ -38,23 +36,21 @@ import com.google.android.exoplayer2.upstream.TransferListener;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import org.checkerframework.checker.nullness.compatqual.NullableType;
 
 /** A SmoothStreaming {@link MediaPeriod}. */
 /* package */ final class SsMediaPeriod
     implements MediaPeriod, SequenceableLoader.Callback<ChunkSampleStream<SsChunkSource>> {
 
   private final SsChunkSource.Factory chunkSourceFactory;
-  @Nullable private final TransferListener transferListener;
+  private final @Nullable TransferListener transferListener;
   private final LoaderErrorThrower manifestLoaderErrorThrower;
-  private final DrmSessionManager<?> drmSessionManager;
   private final LoadErrorHandlingPolicy loadErrorHandlingPolicy;
   private final EventDispatcher eventDispatcher;
   private final Allocator allocator;
   private final TrackGroupArray trackGroups;
   private final CompositeSequenceableLoaderFactory compositeSequenceableLoaderFactory;
 
-  @Nullable private Callback callback;
+  private @Nullable Callback callback;
   private SsManifest manifest;
   private ChunkSampleStream<SsChunkSource>[] sampleStreams;
   private SequenceableLoader compositeSequenceableLoader;
@@ -65,7 +61,6 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
       SsChunkSource.Factory chunkSourceFactory,
       @Nullable TransferListener transferListener,
       CompositeSequenceableLoaderFactory compositeSequenceableLoaderFactory,
-      DrmSessionManager<?> drmSessionManager,
       LoadErrorHandlingPolicy loadErrorHandlingPolicy,
       EventDispatcher eventDispatcher,
       LoaderErrorThrower manifestLoaderErrorThrower,
@@ -74,12 +69,11 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
     this.chunkSourceFactory = chunkSourceFactory;
     this.transferListener = transferListener;
     this.manifestLoaderErrorThrower = manifestLoaderErrorThrower;
-    this.drmSessionManager = drmSessionManager;
     this.loadErrorHandlingPolicy = loadErrorHandlingPolicy;
     this.eventDispatcher = eventDispatcher;
     this.allocator = allocator;
     this.compositeSequenceableLoaderFactory = compositeSequenceableLoaderFactory;
-    trackGroups = buildTrackGroups(manifest, drmSessionManager);
+    trackGroups = buildTrackGroups(manifest);
     sampleStreams = newSampleStreamArray(0);
     compositeSequenceableLoader =
         compositeSequenceableLoaderFactory.createCompositeSequenceableLoader(sampleStreams);
@@ -121,12 +115,8 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
   }
 
   @Override
-  public long selectTracks(
-      @NullableType TrackSelection[] selections,
-      boolean[] mayRetainStreamFlags,
-      @NullableType SampleStream[] streams,
-      boolean[] streamResetFlags,
-      long positionUs) {
+  public long selectTracks(TrackSelection[] selections, boolean[] mayRetainStreamFlags,
+      SampleStream[] streams, boolean[] streamResetFlags, long positionUs) {
     ArrayList<ChunkSampleStream<SsChunkSource>> sampleStreamsList = new ArrayList<>();
     for (int i = 0; i < selections.length; i++) {
       if (streams[i] != null) {
@@ -182,11 +172,6 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
   @Override
   public boolean continueLoading(long positionUs) {
     return compositeSequenceableLoader.continueLoading(positionUs);
-  }
-
-  @Override
-  public boolean isLoading() {
-    return compositeSequenceableLoader.isLoading();
   }
 
   @Override
@@ -253,26 +238,14 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
         this,
         allocator,
         positionUs,
-        drmSessionManager,
         loadErrorHandlingPolicy,
         eventDispatcher);
   }
 
-  private static TrackGroupArray buildTrackGroups(
-      SsManifest manifest, DrmSessionManager<?> drmSessionManager) {
+  private static TrackGroupArray buildTrackGroups(SsManifest manifest) {
     TrackGroup[] trackGroups = new TrackGroup[manifest.streamElements.length];
     for (int i = 0; i < manifest.streamElements.length; i++) {
-      Format[] manifestFormats = manifest.streamElements[i].formats;
-      Format[] exposedFormats = new Format[manifestFormats.length];
-      for (int j = 0; j < manifestFormats.length; j++) {
-        Format manifestFormat = manifestFormats[j];
-        exposedFormats[j] =
-            manifestFormat.drmInitData != null
-                ? manifestFormat.copyWithExoMediaCryptoType(
-                    drmSessionManager.getExoMediaCryptoType(manifestFormat.drmInitData))
-                : manifestFormat;
-      }
-      trackGroups[i] = new TrackGroup(exposedFormats);
+      trackGroups[i] = new TrackGroup(manifest.streamElements[i].formats);
     }
     return new TrackGroupArray(trackGroups);
   }

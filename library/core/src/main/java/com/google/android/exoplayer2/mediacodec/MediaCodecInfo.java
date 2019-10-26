@@ -22,8 +22,8 @@ import android.media.MediaCodecInfo.AudioCapabilities;
 import android.media.MediaCodecInfo.CodecCapabilities;
 import android.media.MediaCodecInfo.CodecProfileLevel;
 import android.media.MediaCodecInfo.VideoCapabilities;
-import android.util.Pair;
 import androidx.annotation.Nullable;
+import android.util.Pair;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.Log;
@@ -51,7 +51,7 @@ public final class MediaCodecInfo {
   public final String name;
 
   /** The MIME type handled by the codec, or {@code null} if this is a passthrough codec. */
-  @Nullable public final String mimeType;
+  public final @Nullable String mimeType;
 
   /**
    * The MIME type that the codec uses for media of type {@link #mimeType}, or {@code null} if this
@@ -64,7 +64,7 @@ public final class MediaCodecInfo {
    * The capabilities of the decoder, like the profiles/levels it supports, or {@code null} if not
    * known.
    */
-  @Nullable public final CodecCapabilities capabilities;
+  public final @Nullable CodecCapabilities capabilities;
 
   /**
    * Whether the decoder supports seamless resolution switches.
@@ -93,33 +93,6 @@ public final class MediaCodecInfo {
   /** Whether this instance describes a passthrough codec. */
   public final boolean passthrough;
 
-  /**
-   * Whether the codec is hardware accelerated.
-   *
-   * <p>This could be an approximation as the exact information is only provided in API levels 29+.
-   *
-   * @see android.media.MediaCodecInfo#isHardwareAccelerated()
-   */
-  public final boolean hardwareAccelerated;
-
-  /**
-   * Whether the codec is software only.
-   *
-   * <p>This could be an approximation as the exact information is only provided in API levels 29+.
-   *
-   * @see android.media.MediaCodecInfo#isSoftwareOnly()
-   */
-  public final boolean softwareOnly;
-
-  /**
-   * Whether the codec is from the vendor.
-   *
-   * <p>This could be an approximation as the exact information is only provided in API levels 29+.
-   *
-   * @see android.media.MediaCodecInfo#isVendor()
-   */
-  public final boolean vendor;
-
   private final boolean isVideo;
 
   /**
@@ -135,9 +108,6 @@ public final class MediaCodecInfo {
         /* codecMimeType= */ null,
         /* capabilities= */ null,
         /* passthrough= */ true,
-        /* hardwareAccelerated= */ false,
-        /* softwareOnly= */ true,
-        /* vendor= */ false,
         /* forceDisableAdaptive= */ false,
         /* forceSecure= */ false);
   }
@@ -151,9 +121,6 @@ public final class MediaCodecInfo {
    *     Equal to {@code mimeType} unless the codec is known to use a non-standard MIME type alias.
    * @param capabilities The capabilities of the {@link MediaCodec} for the specified mime type, or
    *     {@code null} if not known.
-   * @param hardwareAccelerated Whether the {@link MediaCodec} is hardware accelerated.
-   * @param softwareOnly Whether the {@link MediaCodec} is software only.
-   * @param vendor Whether the {@link MediaCodec} is provided by the vendor.
    * @param forceDisableAdaptive Whether {@link #adaptive} should be forced to {@code false}.
    * @param forceSecure Whether {@link #secure} should be forced to {@code true}.
    * @return The created instance.
@@ -163,9 +130,6 @@ public final class MediaCodecInfo {
       String mimeType,
       String codecMimeType,
       @Nullable CodecCapabilities capabilities,
-      boolean hardwareAccelerated,
-      boolean softwareOnly,
-      boolean vendor,
       boolean forceDisableAdaptive,
       boolean forceSecure) {
     return new MediaCodecInfo(
@@ -174,9 +138,6 @@ public final class MediaCodecInfo {
         codecMimeType,
         capabilities,
         /* passthrough= */ false,
-        hardwareAccelerated,
-        softwareOnly,
-        vendor,
         forceDisableAdaptive,
         forceSecure);
   }
@@ -187,9 +148,6 @@ public final class MediaCodecInfo {
       @Nullable String codecMimeType,
       @Nullable CodecCapabilities capabilities,
       boolean passthrough,
-      boolean hardwareAccelerated,
-      boolean softwareOnly,
-      boolean vendor,
       boolean forceDisableAdaptive,
       boolean forceSecure) {
     this.name = Assertions.checkNotNull(name);
@@ -197,9 +155,6 @@ public final class MediaCodecInfo {
     this.codecMimeType = codecMimeType;
     this.capabilities = capabilities;
     this.passthrough = passthrough;
-    this.hardwareAccelerated = hardwareAccelerated;
-    this.softwareOnly = softwareOnly;
-    this.vendor = vendor;
     adaptive = !forceDisableAdaptive && capabilities != null && isAdaptive(capabilities);
     tunneling = capabilities != null && isTunneling(capabilities);
     secure = forceSecure || (capabilities != null && isSecure(capabilities));
@@ -242,7 +197,7 @@ public final class MediaCodecInfo {
    * @throws MediaCodecUtil.DecoderQueryException Thrown if an error occurs while querying decoders.
    */
   public boolean isFormatSupported(Format format) throws MediaCodecUtil.DecoderQueryException {
-    if (!isCodecSupported(format)) {
+    if (!isCodecSupported(format.codecs)) {
       return false;
     }
 
@@ -270,25 +225,25 @@ public final class MediaCodecInfo {
   }
 
   /**
-   * Whether the decoder supports the codec of the given {@code format}. If there is insufficient
-   * information to decide, returns true.
+   * Whether the decoder supports the given {@code codec}. If there is insufficient information to
+   * decide, returns true.
    *
-   * @param format The input media format.
-   * @return True if the codec of the given {@code format} is supported by the decoder.
+   * @param codec Codec string as defined in RFC 6381.
+   * @return True if the given codec is supported by the decoder.
    */
-  public boolean isCodecSupported(Format format) {
-    if (format.codecs == null || mimeType == null) {
+  public boolean isCodecSupported(String codec) {
+    if (codec == null || mimeType == null) {
       return true;
     }
-    String codecMimeType = MimeTypes.getMediaMimeType(format.codecs);
+    String codecMimeType = MimeTypes.getMediaMimeType(codec);
     if (codecMimeType == null) {
       return true;
     }
     if (!mimeType.equals(codecMimeType)) {
-      logNoSupport("codec.mime " + format.codecs + ", " + codecMimeType);
+      logNoSupport("codec.mime " + codec + ", " + codecMimeType);
       return false;
     }
-    Pair<Integer, Integer> codecProfileAndLevel = MediaCodecUtil.getCodecProfileAndLevel(format);
+    Pair<Integer, Integer> codecProfileAndLevel = MediaCodecUtil.getCodecProfileAndLevel(codec);
     if (codecProfileAndLevel == null) {
       // If we don't know any better, we assume that the profile and level are supported.
       return true;
@@ -305,19 +260,7 @@ public final class MediaCodecInfo {
         return true;
       }
     }
-    logNoSupport("codec.profileLevel, " + format.codecs + ", " + codecMimeType);
-    return false;
-  }
-
-  /** Whether the codec handles HDR10+ out-of-band metadata. */
-  public boolean isHdr10PlusOutOfBandMetadataSupported() {
-    if (Util.SDK_INT >= 29 && MimeTypes.VIDEO_VP9.equals(mimeType)) {
-      for (CodecProfileLevel capabilities : getProfileLevels()) {
-        if (capabilities.profile == CodecProfileLevel.VP9Profile2HDR10Plus) {
-          return true;
-        }
-      }
-    }
+    logNoSupport("codec.profileLevel, " + codec + ", " + codecMimeType);
     return false;
   }
 
@@ -335,7 +278,8 @@ public final class MediaCodecInfo {
     if (isVideo) {
       return adaptive;
     } else {
-      Pair<Integer, Integer> codecProfileLevel = MediaCodecUtil.getCodecProfileAndLevel(format);
+      Pair<Integer, Integer> codecProfileLevel =
+          MediaCodecUtil.getCodecProfileAndLevel(format.codecs);
       return codecProfileLevel != null && codecProfileLevel.first == CodecProfileLevel.AACObjectXHE;
     }
   }
@@ -369,9 +313,9 @@ public final class MediaCodecInfo {
       }
       // Check the codec profile levels support adaptation.
       Pair<Integer, Integer> oldCodecProfileLevel =
-          MediaCodecUtil.getCodecProfileAndLevel(oldFormat);
+          MediaCodecUtil.getCodecProfileAndLevel(oldFormat.codecs);
       Pair<Integer, Integer> newCodecProfileLevel =
-          MediaCodecUtil.getCodecProfileAndLevel(newFormat);
+          MediaCodecUtil.getCodecProfileAndLevel(newFormat.codecs);
       if (oldCodecProfileLevel == null || newCodecProfileLevel == null) {
         return false;
       }

@@ -262,11 +262,6 @@ public final class CompositeSequenceableLoaderTest {
     }
 
     @Override
-    public boolean isLoading() {
-      return nextChunkDurationUs != 0;
-    }
-
-    @Override
     public void reevaluateBuffer(long positionUs) {
       // Do nothing.
     }

@@ -40,11 +40,11 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.Parcel;
 import android.security.NetworkSecurityPolicy;
+import androidx.annotation.Nullable;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.view.Display;
 import android.view.WindowManager;
-import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlayerLibraryInfo;
 import com.google.android.exoplayer2.Format;
@@ -53,7 +53,6 @@ import com.google.android.exoplayer2.Renderer;
 import com.google.android.exoplayer2.RendererCapabilities;
 import com.google.android.exoplayer2.RenderersFactory;
 import com.google.android.exoplayer2.SeekParameters;
-import com.google.android.exoplayer2.Timeline;
 import com.google.android.exoplayer2.audio.AudioRendererEventListener;
 import com.google.android.exoplayer2.drm.DrmSessionManager;
 import com.google.android.exoplayer2.drm.FrameworkMediaCrypto;
@@ -253,14 +252,14 @@ public final class Util {
   /**
    * Tests whether an {@code items} array contains an object equal to {@code item}, according to
    * {@link Object#equals(Object)}.
-   *
-   * <p>If {@code item} is null then true is returned if and only if {@code items} contains null.
+   * <p>
+   * If {@code item} is null then true is returned if and only if {@code items} contains null.
    *
    * @param items The array of items to search.
    * @param item The item to search for.
    * @return True if the array contains an object equal to the item being searched for.
    */
-  public static boolean contains(@NullableType Object[] items, @Nullable Object item) {
+  public static boolean contains(Object[] items, Object item) {
     for (Object arrayItem : items) {
       if (areEqual(arrayItem, item)) {
         return true;
@@ -322,35 +321,7 @@ public final class Util {
   }
 
   /**
-   * Copies a subset of an array.
-   *
-   * @param input The input array.
-   * @param from The start the range to be copied, inclusive
-   * @param to The end of the range to be copied, exclusive.
-   * @return The copied array.
-   */
-  @SuppressWarnings({"nullness:argument.type.incompatible", "nullness:return.type.incompatible"})
-  public static <T> T[] nullSafeArrayCopyOfRange(T[] input, int from, int to) {
-    Assertions.checkArgument(0 <= from);
-    Assertions.checkArgument(to <= input.length);
-    return Arrays.copyOfRange(input, from, to);
-  }
-
-  /**
-   * Creates a new array containing {@code original} with {@code newElement} appended.
-   *
-   * @param original The input array.
-   * @param newElement The element to append.
-   * @return The new array.
-   */
-  public static <T> T[] nullSafeArrayAppend(T[] original, T newElement) {
-    @NullableType T[] result = Arrays.copyOf(original, original.length + 1);
-    result[original.length] = newElement;
-    return castNonNullTypeArray(result);
-  }
-
-  /**
-   * Creates a new array containing the concatenation of two non-null type arrays.
+   * Concatenates two non-null type arrays.
    *
    * @param first The first array.
    * @param second The second array.
@@ -470,20 +441,6 @@ public final class Util {
    */
   public static void writeBoolean(Parcel parcel, boolean value) {
     parcel.writeInt(value ? 1 : 0);
-  }
-
-  /**
-   * Returns the language tag for a {@link Locale}.
-   *
-   * <p>For API levels &ge; 21, this tag is IETF BCP 47 compliant. Use {@link
-   * #normalizeLanguageCode(String)} to retrieve a normalized IETF BCP 47 language tag for all API
-   * levels if needed.
-   *
-   * @param locale A {@link Locale}.
-   * @return The language tag.
-   */
-  public static String getLocaleLanguageTag(Locale locale) {
-    return SDK_INT >= 21 ? getLocaleLanguageTagV21(locale) : locale.toString();
   }
 
   /**
@@ -1253,9 +1210,9 @@ public final class Util {
    * @param codecs A codec sequence string, as defined in RFC 6381.
    * @param trackType One of {@link C}{@code .TRACK_TYPE_*}.
    * @return A copy of {@code codecs} without the codecs whose track type doesn't match {@code
-   *     trackType}. If this ends up empty, or {@code codecs} is null, return null.
+   *     trackType}.
    */
-  public static @Nullable String getCodecsOfType(@Nullable String codecs, int trackType) {
+  public static @Nullable String getCodecsOfType(String codecs, int trackType) {
     String[] codecArray = splitCodecs(codecs);
     if (codecArray.length == 0) {
       return null;
@@ -1276,9 +1233,9 @@ public final class Util {
    * Splits a codecs sequence string, as defined in RFC 6381, into individual codec strings.
    *
    * @param codecs A codec sequence string, as defined in RFC 6381.
-   * @return The split codecs, or an array of length zero if the input was empty or null.
+   * @return The split codecs, or an array of length zero if the input was empty.
    */
-  public static String[] splitCodecs(@Nullable String codecs) {
+  public static String[] splitCodecs(String codecs) {
     if (TextUtils.isEmpty(codecs)) {
       return new String[0];
     }
@@ -1514,7 +1471,7 @@ public final class Util {
    * @return The content type.
    */
   @C.ContentType
-  public static int inferContentType(Uri uri, @Nullable String overrideExtension) {
+  public static int inferContentType(Uri uri, String overrideExtension) {
     return TextUtils.isEmpty(overrideExtension)
         ? inferContentType(uri)
         : inferContentType("." + overrideExtension);
@@ -1990,7 +1947,7 @@ public final class Util {
     Configuration config = Resources.getSystem().getConfiguration();
     return SDK_INT >= 24
         ? getSystemLocalesV24(config)
-        : new String[] {getLocaleLanguageTag(config.locale)};
+        : SDK_INT >= 21 ? getSystemLocaleV21(config) : new String[] {config.locale.toString()};
   }
 
   @TargetApi(24)
@@ -1999,8 +1956,8 @@ public final class Util {
   }
 
   @TargetApi(21)
-  private static String getLocaleLanguageTagV21(Locale locale) {
-    return locale.toLanguageTag();
+  private static String[] getSystemLocaleV21(Configuration config) {
+    return new String[] {config.locale.toLanguageTag()};
   }
 
   @TargetApi(21)
@@ -2036,42 +1993,6 @@ public final class Util {
       default: // Future mobile network types.
         return C.NETWORK_TYPE_CELLULAR_UNKNOWN;
     }
-  }
-
-  /**
-   * Checks whether the timelines are the same.
-   *
-   * @param firstTimeline The first {@link Timeline}.
-   * @param secondTimeline The second {@link Timeline} to compare with.
-   * @return {@code true} if the both timelines are the same.
-   */
-  public static boolean areTimelinesSame(Timeline firstTimeline, Timeline secondTimeline) {
-    if (firstTimeline == secondTimeline) {
-      return true;
-    }
-    if (secondTimeline.getWindowCount() != firstTimeline.getWindowCount()
-        || secondTimeline.getPeriodCount() != firstTimeline.getPeriodCount()) {
-      return false;
-    }
-    Timeline.Window firstWindow = new Timeline.Window();
-    Timeline.Period firstPeriod = new Timeline.Period();
-    Timeline.Window secondWindow = new Timeline.Window();
-    Timeline.Period secondPeriod = new Timeline.Period();
-    for (int i = 0; i < firstTimeline.getWindowCount(); i++) {
-      if (!firstTimeline
-          .getWindow(i, firstWindow)
-          .equals(secondTimeline.getWindow(i, secondWindow))) {
-        return false;
-      }
-    }
-    for (int i = 0; i < firstTimeline.getPeriodCount(); i++) {
-      if (!firstTimeline
-          .getPeriod(i, firstPeriod, /* setIds= */ true)
-          .equals(secondTimeline.getPeriod(i, secondPeriod, /* setIds= */ true))) {
-        return false;
-      }
-    }
-    return true;
   }
 
   private static HashMap<String, String> createIso3ToIso2Map() {

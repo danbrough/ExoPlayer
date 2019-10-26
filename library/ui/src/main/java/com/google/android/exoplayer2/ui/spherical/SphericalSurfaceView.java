@@ -25,15 +25,15 @@ import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
 import android.os.Handler;
 import android.os.Looper;
-import android.util.AttributeSet;
-import android.view.Display;
-import android.view.Surface;
-import android.view.WindowManager;
 import androidx.annotation.AnyThread;
 import androidx.annotation.BinderThread;
 import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
 import androidx.annotation.VisibleForTesting;
+import android.util.AttributeSet;
+import android.view.Display;
+import android.view.Surface;
+import android.view.WindowManager;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.util.Assertions;
@@ -55,7 +55,7 @@ public final class SphericalSurfaceView extends GLSurfaceView {
 
   // Arbitrary vertical field of view.
   private static final int FIELD_OF_VIEW_DEGREES = 90;
-  private static final float Z_NEAR = 0.1f;
+  private static final float Z_NEAR = .1f;
   private static final float Z_FAR = 100;
 
   // TODO Calculate this depending on surface size and field of view.
@@ -64,14 +64,15 @@ public final class SphericalSurfaceView extends GLSurfaceView {
   /* package */ static final float UPRIGHT_ROLL = (float) Math.PI;
 
   private final SensorManager sensorManager;
-  @Nullable private final Sensor orientationSensor;
+  private final @Nullable Sensor orientationSensor;
   private final OrientationListener orientationListener;
+  private final Renderer renderer;
   private final Handler mainHandler;
   private final TouchTracker touchTracker;
   private final SceneRenderer scene;
-  @Nullable private SurfaceTexture surfaceTexture;
-  @Nullable private Surface surface;
-  @Nullable private Player.VideoComponent videoComponent;
+  private @Nullable SurfaceTexture surfaceTexture;
+  private @Nullable Surface surface;
+  private @Nullable Player.VideoComponent videoComponent;
 
   public SphericalSurfaceView(Context context) {
     this(context, null);
@@ -84,7 +85,7 @@ public final class SphericalSurfaceView extends GLSurfaceView {
     // Configure sensors and touch.
     sensorManager =
         (SensorManager) Assertions.checkNotNull(context.getSystemService(Context.SENSOR_SERVICE));
-    @Nullable Sensor orientationSensor = null;
+    Sensor orientationSensor = null;
     if (Util.SDK_INT >= 18) {
       // TYPE_GAME_ROTATION_VECTOR is the easiest sensor since it handles all the complex math for
       // fusion. It's used instead of TYPE_ROTATION_VECTOR since the latter uses the magnetometer on
@@ -98,7 +99,7 @@ public final class SphericalSurfaceView extends GLSurfaceView {
     this.orientationSensor = orientationSensor;
 
     scene = new SceneRenderer();
-    Renderer renderer = new Renderer(scene);
+    renderer = new Renderer(scene);
 
     touchTracker = new TouchTracker(context, renderer, PX_PER_DEGREES);
     WindowManager windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
@@ -307,7 +308,7 @@ public final class SphericalSurfaceView extends GLSurfaceView {
     private float calculateFieldOfViewInYDirection(float aspect) {
       boolean landscapeMode = aspect > 1;
       if (landscapeMode) {
-        double halfFovX = FIELD_OF_VIEW_DEGREES / 2f;
+        double halfFovX = FIELD_OF_VIEW_DEGREES / 2;
         double tanY = Math.tan(Math.toRadians(halfFovX)) / aspect;
         double halfFovY = Math.toDegrees(Math.atan(tanY));
         return (float) (halfFovY * 2);

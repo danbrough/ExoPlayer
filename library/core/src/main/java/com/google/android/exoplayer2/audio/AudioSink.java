@@ -259,12 +259,13 @@ public interface AudioSink {
   boolean hasPendingData();
 
   /**
-   * Attempts to set the playback parameters. The audio sink may override these parameters if they
-   * are not supported.
+   * Attempts to set the playback parameters and returns the active playback parameters, which may
+   * differ from those passed in.
    *
    * @param playbackParameters The new playback parameters to attempt to set.
+   * @return The active playback parameters.
    */
-  void setPlaybackParameters(PlaybackParameters playbackParameters);
+  PlaybackParameters setPlaybackParameters(PlaybackParameters playbackParameters);
 
   /**
    * Gets the active {@link PlaybackParameters}.

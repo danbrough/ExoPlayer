@@ -28,17 +28,16 @@ import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.Format;
-import com.google.android.exoplayer2.FormatHolder;
 import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.PlayerMessage.Target;
 import com.google.android.exoplayer2.audio.AudioRendererEventListener.EventDispatcher;
 import com.google.android.exoplayer2.decoder.DecoderInputBuffer;
+import com.google.android.exoplayer2.drm.DrmInitData;
 import com.google.android.exoplayer2.drm.DrmSessionManager;
 import com.google.android.exoplayer2.drm.FrameworkMediaCrypto;
 import com.google.android.exoplayer2.mediacodec.MediaCodecInfo;
 import com.google.android.exoplayer2.mediacodec.MediaCodecRenderer;
 import com.google.android.exoplayer2.mediacodec.MediaCodecSelector;
-import com.google.android.exoplayer2.mediacodec.MediaCodecUtil;
 import com.google.android.exoplayer2.mediacodec.MediaCodecUtil.DecoderQueryException;
 import com.google.android.exoplayer2.mediacodec.MediaFormatUtil;
 import com.google.android.exoplayer2.util.Log;
@@ -301,21 +300,15 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
   }
 
   @Override
-  protected int supportsFormat(
-      MediaCodecSelector mediaCodecSelector,
-      @Nullable DrmSessionManager<FrameworkMediaCrypto> drmSessionManager,
-      Format format)
+  protected int supportsFormat(MediaCodecSelector mediaCodecSelector,
+      DrmSessionManager<FrameworkMediaCrypto> drmSessionManager, Format format)
       throws DecoderQueryException {
     String mimeType = format.sampleMimeType;
     if (!MimeTypes.isAudio(mimeType)) {
       return FORMAT_UNSUPPORTED_TYPE;
     }
     int tunnelingSupport = Util.SDK_INT >= 21 ? TUNNELING_SUPPORTED : TUNNELING_NOT_SUPPORTED;
-    boolean supportsFormatDrm =
-        format.drmInitData == null
-            || FrameworkMediaCrypto.class.equals(format.exoMediaCryptoType)
-            || (format.exoMediaCryptoType == null
-                && supportsFormatDrm(drmSessionManager, format.drmInitData));
+    boolean supportsFormatDrm = supportsFormatDrm(drmSessionManager, format.drmInitData);
     if (supportsFormatDrm
         && allowPassthrough(format.channelCount, mimeType)
         && mediaCodecSelector.getPassthroughDecoderInfo() != null) {
@@ -327,10 +320,26 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
       // Assume the decoder outputs 16-bit PCM, unless the input is raw.
       return FORMAT_UNSUPPORTED_SUBTYPE;
     }
+    boolean requiresSecureDecryption = false;
+    DrmInitData drmInitData = format.drmInitData;
+    if (drmInitData != null) {
+      for (int i = 0; i < drmInitData.schemeDataCount; i++) {
+        requiresSecureDecryption |= drmInitData.get(i).requiresSecureDecryption;
+      }
+    }
     List<MediaCodecInfo> decoderInfos =
-        getDecoderInfos(mediaCodecSelector, format, /* requiresSecureDecoder= */ false);
+        mediaCodecSelector.getDecoderInfos(
+            format.sampleMimeType, requiresSecureDecryption, /* requiresTunnelingDecoder= */ false);
     if (decoderInfos.isEmpty()) {
-      return FORMAT_UNSUPPORTED_SUBTYPE;
+      return requiresSecureDecryption
+              && !mediaCodecSelector
+                  .getDecoderInfos(
+                      format.sampleMimeType,
+                      /* requiresSecureDecoder= */ false,
+                      /* requiresTunnelingDecoder= */ false)
+                  .isEmpty()
+          ? FORMAT_UNSUPPORTED_DRM
+          : FORMAT_UNSUPPORTED_SUBTYPE;
     }
     if (!supportsFormatDrm) {
       return FORMAT_UNSUPPORTED_DRM;
@@ -359,7 +368,6 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
     List<MediaCodecInfo> decoderInfos =
         mediaCodecSelector.getDecoderInfos(
             format.sampleMimeType, requiresSecureDecoder, /* requiresTunnelingDecoder= */ false);
-    decoderInfos = MediaCodecUtil.getDecoderInfosSortedByFormatSupport(decoderInfos, format);
     if (MimeTypes.AUDIO_E_AC3_JOC.equals(format.sampleMimeType)) {
       // E-AC3 decoders can decode JOC streams, but in 2-D rather than 3-D.
       List<MediaCodecInfo> decoderInfosWithEac3 = new ArrayList<>(decoderInfos);
@@ -390,7 +398,7 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
       MediaCodecInfo codecInfo,
       MediaCodec codec,
       Format format,
-      @Nullable MediaCrypto crypto,
+      MediaCrypto crypto,
       float codecOperatingRate) {
     codecMaxInputSize = getCodecMaxInputSize(codecInfo, format, getStreamFormats());
     codecNeedsDiscardChannelsWorkaround = codecNeedsDiscardChannelsWorkaround(codecInfo.name);
@@ -460,9 +468,8 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
   }
 
   @Override
-  protected void onInputFormatChanged(FormatHolder formatHolder) throws ExoPlaybackException {
-    super.onInputFormatChanged(formatHolder);
-    Format newFormat = formatHolder.format;
+  protected void onInputFormatChanged(Format newFormat) throws ExoPlaybackException {
+    super.onInputFormatChanged(newFormat);
     eventDispatcher.inputFormatChanged(newFormat);
     // If the input format is anything other than PCM then we assume that the audio decoder will
     // output 16-bit PCM.
@@ -652,8 +659,8 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
   }
 
   @Override
-  public void setPlaybackParameters(PlaybackParameters playbackParameters) {
-    audioSink.setPlaybackParameters(playbackParameters);
+  public PlaybackParameters setPlaybackParameters(PlaybackParameters playbackParameters) {
+    return audioSink.setPlaybackParameters(playbackParameters);
   }
 
   @Override

@@ -15,7 +15,6 @@
  */
 package com.google.android.exoplayer2.text;
 
-import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.decoder.OutputBuffer;
 import com.google.android.exoplayer2.util.Assertions;
@@ -26,7 +25,7 @@ import java.util.List;
  */
 public abstract class SubtitleOutputBuffer extends OutputBuffer implements Subtitle {
 
-  @Nullable private Subtitle subtitle;
+  private Subtitle subtitle;
   private long subsampleOffsetUs;
 
   /**

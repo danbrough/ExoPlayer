@@ -217,7 +217,9 @@ public final class AdtsExtractorSeekTest {
   // Internal methods
 
   private static AdtsExtractor createAdtsExtractor() {
-    return new AdtsExtractor(/* flags= */ AdtsExtractor.FLAG_ENABLE_CONSTANT_BITRATE_SEEKING);
+    return new AdtsExtractor(
+        /* firstStreamSampleTimestampUs= */ 0,
+        /* flags= */ AdtsExtractor.FLAG_ENABLE_CONSTANT_BITRATE_SEEKING);
   }
 
   private void assertFirstSampleAfterSeekContainTargetSeekTime(

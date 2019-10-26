@@ -20,7 +20,6 @@ import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.upstream.DataSink;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DummyDataSource;
-import com.google.android.exoplayer2.upstream.FileDataSource;
 import com.google.android.exoplayer2.upstream.FileDataSourceFactory;
 import com.google.android.exoplayer2.upstream.PriorityDataSourceFactory;
 import com.google.android.exoplayer2.upstream.cache.Cache;
@@ -109,7 +108,7 @@ public final class DownloaderConstructorHelper {
     DataSource.Factory readDataSourceFactory =
         cacheReadDataSourceFactory != null
             ? cacheReadDataSourceFactory
-            : new FileDataSource.Factory();
+            : new FileDataSourceFactory();
     if (cacheWriteDataSinkFactory == null) {
       cacheWriteDataSinkFactory =
           new CacheDataSinkFactory(cache, CacheDataSink.DEFAULT_FRAGMENT_SIZE);

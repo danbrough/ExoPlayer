@@ -27,7 +27,7 @@ import java.util.List;
  */
 public final class HevcConfig {
 
-  @Nullable public final List<byte[]> initializationData;
+  public final @Nullable List<byte[]> initializationData;
   public final int nalUnitLengthFieldLength;
 
   /**

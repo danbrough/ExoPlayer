@@ -34,17 +34,17 @@ public abstract class CompositeMediaSource<T> extends BaseMediaSource {
 
   private final HashMap<T, MediaSourceAndListener> childSources;
 
-  @Nullable private Handler eventHandler;
-  @Nullable private TransferListener mediaTransferListener;
+  private @Nullable Handler eventHandler;
+  private @Nullable TransferListener mediaTransferListener;
 
-  /** Creates composite media source without child sources. */
+  /** Create composite media source without child sources. */
   protected CompositeMediaSource() {
     childSources = new HashMap<>();
   }
 
   @Override
   @CallSuper
-  protected void prepareSourceInternal(@Nullable TransferListener mediaTransferListener) {
+  public void prepareSourceInternal(@Nullable TransferListener mediaTransferListener) {
     this.mediaTransferListener = mediaTransferListener;
     eventHandler = new Handler();
   }
@@ -59,25 +59,9 @@ public abstract class CompositeMediaSource<T> extends BaseMediaSource {
 
   @Override
   @CallSuper
-  protected void enableInternal() {
+  public void releaseSourceInternal() {
     for (MediaSourceAndListener childSource : childSources.values()) {
-      childSource.mediaSource.enable(childSource.caller);
-    }
-  }
-
-  @Override
-  @CallSuper
-  protected void disableInternal() {
-    for (MediaSourceAndListener childSource : childSources.values()) {
-      childSource.mediaSource.disable(childSource.caller);
-    }
-  }
-
-  @Override
-  @CallSuper
-  protected void releaseSourceInternal() {
-    for (MediaSourceAndListener childSource : childSources.values()) {
-      childSource.mediaSource.releaseSource(childSource.caller);
+      childSource.mediaSource.releaseSource(childSource.listener);
       childSource.mediaSource.removeEventListener(childSource.eventListener);
     }
     childSources.clear();
@@ -89,15 +73,17 @@ public abstract class CompositeMediaSource<T> extends BaseMediaSource {
    * @param id The unique id used to prepare the child source.
    * @param mediaSource The child source whose source info has been refreshed.
    * @param timeline The timeline of the child source.
+   * @param manifest The manifest of the child source.
    */
   protected abstract void onChildSourceInfoRefreshed(
-      T id, MediaSource mediaSource, Timeline timeline);
+      T id, MediaSource mediaSource, Timeline timeline, @Nullable Object manifest);
 
   /**
    * Prepares a child source.
    *
-   * <p>{@link #onChildSourceInfoRefreshed(Object, MediaSource, Timeline)} will be called when the
-   * child source updates its timeline with the same {@code id} passed to this method.
+   * <p>{@link #onChildSourceInfoRefreshed(Object, MediaSource, Timeline, Object)} will be called
+   * when the child source updates its timeline and/or manifest with the same {@code id} passed to
+   * this method.
    *
    * <p>Any child sources that aren't explicitly released with {@link #releaseChildSource(Object)}
    * will be released in {@link #releaseSourceInternal()}.
@@ -107,35 +93,12 @@ public abstract class CompositeMediaSource<T> extends BaseMediaSource {
    */
   protected final void prepareChildSource(final T id, MediaSource mediaSource) {
     Assertions.checkArgument(!childSources.containsKey(id));
-    MediaSourceCaller caller =
-        (source, timeline) -> onChildSourceInfoRefreshed(id, source, timeline);
+    SourceInfoRefreshListener sourceListener =
+        (source, timeline, manifest) -> onChildSourceInfoRefreshed(id, source, timeline, manifest);
     MediaSourceEventListener eventListener = new ForwardingEventListener(id);
-    childSources.put(id, new MediaSourceAndListener(mediaSource, caller, eventListener));
+    childSources.put(id, new MediaSourceAndListener(mediaSource, sourceListener, eventListener));
     mediaSource.addEventListener(Assertions.checkNotNull(eventHandler), eventListener);
-    mediaSource.prepareSource(caller, mediaTransferListener);
-    if (!isEnabled()) {
-      mediaSource.disable(caller);
-    }
-  }
-
-  /**
-   * Enables a child source.
-   *
-   * @param id The unique id used to prepare the child source.
-   */
-  protected final void enableChildSource(final T id) {
-    MediaSourceAndListener enabledChild = Assertions.checkNotNull(childSources.get(id));
-    enabledChild.mediaSource.enable(enabledChild.caller);
-  }
-
-  /**
-   * Disables a child source.
-   *
-   * @param id The unique id used to prepare the child source.
-   */
-  protected final void disableChildSource(final T id) {
-    MediaSourceAndListener disabledChild = Assertions.checkNotNull(childSources.get(id));
-    disabledChild.mediaSource.disable(disabledChild.caller);
+    mediaSource.prepareSource(sourceListener, mediaTransferListener);
   }
 
   /**
@@ -145,7 +108,7 @@ public abstract class CompositeMediaSource<T> extends BaseMediaSource {
    */
   protected final void releaseChildSource(T id) {
     MediaSourceAndListener removedChild = Assertions.checkNotNull(childSources.remove(id));
-    removedChild.mediaSource.releaseSource(removedChild.caller);
+    removedChild.mediaSource.releaseSource(removedChild.listener);
     removedChild.mediaSource.removeEventListener(removedChild.eventListener);
   }
 
@@ -188,28 +151,18 @@ public abstract class CompositeMediaSource<T> extends BaseMediaSource {
     return mediaTimeMs;
   }
 
-  /**
-   * Returns whether {@link MediaSourceEventListener#onMediaPeriodCreated(int, MediaPeriodId)} and
-   * {@link MediaSourceEventListener#onMediaPeriodReleased(int, MediaPeriodId)} events of the given
-   * media period should be reported. The default implementation is to always report these events.
-   *
-   * @param mediaPeriodId A {@link MediaPeriodId} in the composite media source.
-   * @return Whether create and release events for this media period should be reported.
-   */
-  protected boolean shouldDispatchCreateOrReleaseEvent(MediaPeriodId mediaPeriodId) {
-    return true;
-  }
-
   private static final class MediaSourceAndListener {
 
     public final MediaSource mediaSource;
-    public final MediaSourceCaller caller;
+    public final SourceInfoRefreshListener listener;
     public final MediaSourceEventListener eventListener;
 
     public MediaSourceAndListener(
-        MediaSource mediaSource, MediaSourceCaller caller, MediaSourceEventListener eventListener) {
+        MediaSource mediaSource,
+        SourceInfoRefreshListener listener,
+        MediaSourceEventListener eventListener) {
       this.mediaSource = mediaSource;
-      this.caller = caller;
+      this.listener = listener;
       this.eventListener = eventListener;
     }
   }
@@ -227,20 +180,14 @@ public abstract class CompositeMediaSource<T> extends BaseMediaSource {
     @Override
     public void onMediaPeriodCreated(int windowIndex, MediaPeriodId mediaPeriodId) {
       if (maybeUpdateEventDispatcher(windowIndex, mediaPeriodId)) {
-        if (shouldDispatchCreateOrReleaseEvent(
-            Assertions.checkNotNull(eventDispatcher.mediaPeriodId))) {
-          eventDispatcher.mediaPeriodCreated();
-        }
+        eventDispatcher.mediaPeriodCreated();
       }
     }
 
     @Override
     public void onMediaPeriodReleased(int windowIndex, MediaPeriodId mediaPeriodId) {
       if (maybeUpdateEventDispatcher(windowIndex, mediaPeriodId)) {
-        if (shouldDispatchCreateOrReleaseEvent(
-            Assertions.checkNotNull(eventDispatcher.mediaPeriodId))) {
-          eventDispatcher.mediaPeriodReleased();
-        }
+        eventDispatcher.mediaPeriodReleased();
       }
     }
 

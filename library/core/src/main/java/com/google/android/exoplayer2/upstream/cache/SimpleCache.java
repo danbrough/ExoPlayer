@@ -75,7 +75,7 @@ public final class SimpleCache implements Cache {
   private long uid;
   private long totalSpace;
   private boolean released;
-  private @MonotonicNonNull CacheException initializationException;
+  @MonotonicNonNull private CacheException initializationException;
 
   /**
    * Returns whether {@code cacheFolder} is locked by a {@link SimpleCache} instance. To unlock the
@@ -380,21 +380,20 @@ public final class SimpleCache implements Cache {
   }
 
   @Override
-  public synchronized CacheSpan startReadWrite(String key, long position)
+  public synchronized SimpleCacheSpan startReadWrite(String key, long position)
       throws InterruptedException, CacheException {
     Assertions.checkState(!released);
     checkInitialization();
 
     while (true) {
-      CacheSpan span = startReadWriteNonBlocking(key, position);
+      SimpleCacheSpan span = startReadWriteNonBlocking(key, position);
       if (span != null) {
         return span;
       } else {
-        // Lock not available. We'll be woken up when a span is added, or when a locked span is
-        // released. We'll be able to make progress when either:
-        // 1. A span is added for the requested key that covers the requested position, in which
-        //    case a read can be started.
-        // 2. The lock for the requested key is released, in which case a write can be started.
+        // Write case, lock not available. We'll be woken up when a locked span is released (if the
+        // released lock is for the requested key then we'll be able to make progress) or when a
+        // span is added to the cache (if the span is for the requested key and covers the requested
+        // position, then we'll become a read and be able to make progress).
         wait();
       }
     }
@@ -402,26 +401,47 @@ public final class SimpleCache implements Cache {
 
   @Override
   @Nullable
-  public synchronized CacheSpan startReadWriteNonBlocking(String key, long position)
+  public synchronized SimpleCacheSpan startReadWriteNonBlocking(String key, long position)
       throws CacheException {
     Assertions.checkState(!released);
     checkInitialization();
 
     SimpleCacheSpan span = getSpan(key, position);
 
+    // Read case.
     if (span.isCached) {
-      // Read case.
-      return touchSpan(key, span);
+      if (!touchCacheSpans) {
+        return span;
+      }
+      String fileName = Assertions.checkNotNull(span.file).getName();
+      long length = span.length;
+      long lastTouchTimestamp = System.currentTimeMillis();
+      boolean updateFile = false;
+      if (fileIndex != null) {
+        try {
+          fileIndex.set(fileName, length, lastTouchTimestamp);
+        } catch (IOException e) {
+          Log.w(TAG, "Failed to update index with new touch timestamp.");
+        }
+      } else {
+        // Updating the file itself to incorporate the new last touch timestamp is much slower than
+        // updating the file index. Hence we only update the file if we don't have a file index.
+        updateFile = true;
+      }
+      SimpleCacheSpan newSpan =
+          contentIndex.get(key).setLastTouchTimestamp(span, lastTouchTimestamp, updateFile);
+      notifySpanTouched(span, newSpan);
+      return newSpan;
     }
 
     CachedContent cachedContent = contentIndex.getOrAdd(key);
     if (!cachedContent.isLocked()) {
-      // Write case.
+      // Write case, lock available.
       cachedContent.setLocked(true);
       return span;
     }
 
-    // Lock not available.
+    // Write case, lock not available.
     return null;
   }
 
@@ -538,6 +558,36 @@ public final class SimpleCache implements Cache {
     return contentIndex.getContentMetadata(key);
   }
 
+  /**
+   * Returns the cache {@link SimpleCacheSpan} corresponding to the provided lookup {@link
+   * SimpleCacheSpan}.
+   *
+   * <p>If the lookup position is contained by an existing entry in the cache, then the returned
+   * {@link SimpleCacheSpan} defines the file in which the data is stored. If the lookup position is
+   * not contained by an existing entry, then the returned {@link SimpleCacheSpan} defines the
+   * maximum extents of the hole in the cache.
+   *
+   * @param key The key of the span being requested.
+   * @param position The position of the span being requested.
+   * @return The corresponding cache {@link SimpleCacheSpan}.
+   */
+  private SimpleCacheSpan getSpan(String key, long position) {
+    CachedContent cachedContent = contentIndex.get(key);
+    if (cachedContent == null) {
+      return SimpleCacheSpan.createOpenHole(key, position);
+    }
+    while (true) {
+      SimpleCacheSpan span = cachedContent.getSpan(position);
+      if (span.isCached && !span.file.exists()) {
+        // The file has been deleted from under us. It's likely that other files will have been
+        // deleted too, so scan the whole in-memory representation.
+        removeStaleSpans();
+        continue;
+      }
+      return span;
+    }
+  }
+
   /** Ensures that the cache's in-memory representation has been initialized. */
   private void initialize() {
     if (!cacheDir.exists()) {
@@ -647,67 +697,6 @@ public final class SimpleCache implements Cache {
   }
 
   /**
-   * Touches a cache span, returning the updated result. If the evictor does not require cache spans
-   * to be touched, then this method does nothing and the span is returned without modification.
-   *
-   * @param key The key of the span being touched.
-   * @param span The span being touched.
-   * @return The updated span.
-   */
-  private SimpleCacheSpan touchSpan(String key, SimpleCacheSpan span) {
-    if (!touchCacheSpans) {
-      return span;
-    }
-    String fileName = Assertions.checkNotNull(span.file).getName();
-    long length = span.length;
-    long lastTouchTimestamp = System.currentTimeMillis();
-    boolean updateFile = false;
-    if (fileIndex != null) {
-      try {
-        fileIndex.set(fileName, length, lastTouchTimestamp);
-      } catch (IOException e) {
-        Log.w(TAG, "Failed to update index with new touch timestamp.");
-      }
-    } else {
-      // Updating the file itself to incorporate the new last touch timestamp is much slower than
-      // updating the file index. Hence we only update the file if we don't have a file index.
-      updateFile = true;
-    }
-    SimpleCacheSpan newSpan =
-        contentIndex.get(key).setLastTouchTimestamp(span, lastTouchTimestamp, updateFile);
-    notifySpanTouched(span, newSpan);
-    return newSpan;
-  }
-
-  /**
-   * Returns the cache span corresponding to the provided lookup span.
-   *
-   * <p>If the lookup position is contained by an existing entry in the cache, then the returned
-   * span defines the file in which the data is stored. If the lookup position is not contained by
-   * an existing entry, then the returned span defines the maximum extents of the hole in the cache.
-   *
-   * @param key The key of the span being requested.
-   * @param position The position of the span being requested.
-   * @return The corresponding cache {@link SimpleCacheSpan}.
-   */
-  private SimpleCacheSpan getSpan(String key, long position) {
-    CachedContent cachedContent = contentIndex.get(key);
-    if (cachedContent == null) {
-      return SimpleCacheSpan.createOpenHole(key, position);
-    }
-    while (true) {
-      SimpleCacheSpan span = cachedContent.getSpan(position);
-      if (span.isCached && span.file.length() != span.length) {
-        // The file has been modified or deleted underneath us. It's likely that other files will
-        // have been modified too, so scan the whole in-memory representation.
-        removeStaleSpans();
-        continue;
-      }
-      return span;
-    }
-  }
-
-  /**
    * Adds a cached span to the in-memory representation.
    *
    * @param span The span to be added.
@@ -739,14 +728,14 @@ public final class SimpleCache implements Cache {
   }
 
   /**
-   * Scans all of the cached spans in the in-memory representation, removing any for which the
-   * underlying file lengths no longer match.
+   * Scans all of the cached spans in the in-memory representation, removing any for which files no
+   * longer exist.
    */
   private void removeStaleSpans() {
     ArrayList<CacheSpan> spansToBeRemoved = new ArrayList<>();
     for (CachedContent cachedContent : contentIndex.getAll()) {
       for (CacheSpan span : cachedContent.getSpans()) {
-        if (span.file.length() != span.length) {
+        if (!span.file.exists()) {
           spansToBeRemoved.add(span);
         }
       }
@@ -791,6 +780,7 @@ public final class SimpleCache implements Cache {
    *
    * @param files The files belonging to the root directory.
    * @return The loaded UID, or {@link #UID_UNSET} if a UID has not yet been created.
+   * @throws IOException If there is an error loading or generating the UID.
    */
   private static long loadUid(File[] files) {
     for (File file : files) {

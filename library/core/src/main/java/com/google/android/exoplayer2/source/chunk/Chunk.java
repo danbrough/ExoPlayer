@@ -56,7 +56,7 @@ public abstract class Chunk implements Loadable {
    * Optional data associated with the selection of the track to which this chunk belongs. Null if
    * the chunk does not belong to a track.
    */
-  @Nullable public final Object trackSelectionData;
+  public final @Nullable Object trackSelectionData;
   /**
    * The start time of the media contained by the chunk, or {@link C#TIME_UNSET} if the data
    * being loaded does not contain media samples.

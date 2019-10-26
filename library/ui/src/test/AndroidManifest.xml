@@ -15,6 +15,4 @@
   ~ limitations under the License.
   -->
 
-<manifest package="com.google.android.exoplayer2.source.ui.test">
-  <uses-sdk/>
-</manifest>
+<manifest package="com.google.android.exoplayer2.source.ui.test" />

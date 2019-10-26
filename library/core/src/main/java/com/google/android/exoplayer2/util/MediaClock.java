@@ -28,12 +28,13 @@ public interface MediaClock {
   long getPositionUs();
 
   /**
-   * Attempts to set the playback parameters. The media clock may override these parameters if they
-   * are not supported.
+   * Attempts to set the playback parameters and returns the active playback parameters, which may
+   * differ from those passed in.
    *
-   * @param playbackParameters The playback parameters to attempt to set.
+   * @param playbackParameters The playback parameters.
+   * @return The active playback parameters.
    */
-  void setPlaybackParameters(PlaybackParameters playbackParameters);
+  PlaybackParameters setPlaybackParameters(PlaybackParameters playbackParameters);
 
   /**
    * Returns the active playback parameters.

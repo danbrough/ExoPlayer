@@ -23,7 +23,6 @@ import com.google.android.exoplayer2.drm.DrmInitData;
 import com.google.android.exoplayer2.extractor.DefaultExtractorInput;
 import com.google.android.exoplayer2.extractor.Extractor;
 import com.google.android.exoplayer2.extractor.ExtractorInput;
-import com.google.android.exoplayer2.extractor.PositionHolder;
 import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.metadata.id3.Id3Decoder;
 import com.google.android.exoplayer2.metadata.id3.PrivFrame;
@@ -31,7 +30,6 @@ import com.google.android.exoplayer2.source.chunk.MediaChunk;
 import com.google.android.exoplayer2.source.hls.playlist.HlsMediaPlaylist;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DataSpec;
-import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.ParsableByteArray;
 import com.google.android.exoplayer2.util.TimestampAdjuster;
 import com.google.android.exoplayer2.util.UriUtil;
@@ -41,9 +39,6 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.checkerframework.checker.nullness.qual.EnsuresNonNull;
-import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
-import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
 /**
  * An HLS {@link MediaChunk}.
@@ -98,9 +93,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
             /* key= */ null);
     boolean mediaSegmentEncrypted = mediaSegmentKey != null;
     byte[] mediaSegmentIv =
-        mediaSegmentEncrypted
-            ? getEncryptionIvArray(Assertions.checkNotNull(mediaSegment.encryptionIV))
-            : null;
+        mediaSegmentEncrypted ? getEncryptionIvArray(mediaSegment.encryptionIV) : null;
     DataSource mediaDataSource = buildDataSource(dataSource, mediaSegmentKey, mediaSegmentIv);
 
     // Init segment.
@@ -111,9 +104,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     if (initSegment != null) {
       initSegmentEncrypted = initSegmentKey != null;
       byte[] initSegmentIv =
-          initSegmentEncrypted
-              ? getEncryptionIvArray(Assertions.checkNotNull(initSegment.encryptionIV))
-              : null;
+          initSegmentEncrypted ? getEncryptionIvArray(initSegment.encryptionIV) : null;
       Uri initSegmentUri = UriUtil.resolveToUri(mediaPlaylist.baseUri, initSegment.url);
       initDataSpec =
           new DataSpec(
@@ -179,7 +170,6 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
   public static final String PRIV_TIMESTAMP_FRAME_OWNER =
       "com.apple.streaming.transportStreamTimestamp";
-  private static final PositionHolder DUMMY_POSITION_HOLDER = new PositionHolder();
 
   private static final AtomicInteger uidSource = new AtomicInteger();
 
@@ -198,8 +188,6 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
   @Nullable private final DataSource initDataSource;
   @Nullable private final DataSpec initDataSpec;
-  @Nullable private final Extractor previousExtractor;
-
   private final boolean isMasterTimestampSource;
   private final boolean hasGapTag;
   private final TimestampAdjuster timestampAdjuster;
@@ -207,14 +195,15 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   private final HlsExtractorFactory extractorFactory;
   @Nullable private final List<Format> muxedCaptionFormats;
   @Nullable private final DrmInitData drmInitData;
+  @Nullable private final Extractor previousExtractor;
   private final Id3Decoder id3Decoder;
   private final ParsableByteArray scratchId3Data;
   private final boolean mediaSegmentEncrypted;
   private final boolean initSegmentEncrypted;
 
-  @MonotonicNonNull private Extractor extractor;
+  private Extractor extractor;
   private boolean isExtractorReusable;
-  @MonotonicNonNull private HlsSampleStreamWrapper output;
+  private HlsSampleStreamWrapper output;
   // nextLoadPosition refers to the init segment if initDataLoadRequired is true.
   // Otherwise, nextLoadPosition refers to the media segment.
   private int nextLoadPosition;
@@ -228,13 +217,13 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
       DataSpec dataSpec,
       Format format,
       boolean mediaSegmentEncrypted,
-      @Nullable DataSource initDataSource,
+      DataSource initDataSource,
       @Nullable DataSpec initDataSpec,
       boolean initSegmentEncrypted,
       Uri playlistUrl,
       @Nullable List<Format> muxedCaptionFormats,
       int trackSelectionReason,
-      @Nullable Object trackSelectionData,
+      Object trackSelectionData,
       long startTimeUs,
       long endTimeUs,
       long chunkMediaSequence,
@@ -258,9 +247,8 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
         chunkMediaSequence);
     this.mediaSegmentEncrypted = mediaSegmentEncrypted;
     this.discontinuitySequenceNumber = discontinuitySequenceNumber;
-    this.initDataSpec = initDataSpec;
     this.initDataSource = initDataSource;
-    this.initDataLoadRequired = initDataSpec != null;
+    this.initDataSpec = initDataSpec;
     this.initSegmentEncrypted = initSegmentEncrypted;
     this.playlistUrl = playlistUrl;
     this.isMasterTimestampSource = isMasterTimestampSource;
@@ -273,6 +261,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     this.id3Decoder = id3Decoder;
     this.scratchId3Data = scratchId3Data;
     this.shouldSpliceIn = shouldSpliceIn;
+    initDataLoadRequired = initDataSpec != null;
     uid = uidSource.getAndIncrement();
   }
 
@@ -300,8 +289,6 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
   @Override
   public void load() throws IOException, InterruptedException {
-    // output == null means init() hasn't been called.
-    Assertions.checkNotNull(output);
     if (extractor == null && previousExtractor != null) {
       extractor = previousExtractor;
       isExtractorReusable = true;
@@ -319,20 +306,15 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
   // Internal methods.
 
-  @RequiresNonNull("output")
   private void maybeLoadInitData() throws IOException, InterruptedException {
     if (!initDataLoadRequired) {
       return;
     }
-    // initDataLoadRequired =>  initDataSource != null && initDataSpec != null
-    Assertions.checkNotNull(initDataSource);
-    Assertions.checkNotNull(initDataSpec);
     feedDataToExtractor(initDataSource, initDataSpec, initSegmentEncrypted);
     nextLoadPosition = 0;
     initDataLoadRequired = false;
   }
 
-  @RequiresNonNull("output")
   private void loadMedia() throws IOException, InterruptedException {
     if (!isMasterTimestampSource) {
       timestampAdjuster.waitUntilInitialized();
@@ -348,7 +330,6 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
    * concludes (because of a thrown exception or because the operation finishes), the number of fed
    * bytes is written to {@code nextLoadPosition}.
    */
-  @RequiresNonNull("output")
   private void feedDataToExtractor(
       DataSource dataSource, DataSpec dataSpec, boolean dataIsEncrypted)
       throws IOException, InterruptedException {
@@ -373,7 +354,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
       try {
         int result = Extractor.RESULT_CONTINUE;
         while (result == Extractor.RESULT_CONTINUE && !loadCanceled) {
-          result = extractor.read(input, DUMMY_POSITION_HOLDER);
+          result = extractor.read(input, /* seekPosition= */ null);
         }
       } finally {
         nextLoadPosition = (int) (input.getPosition() - dataSpec.absoluteStreamPosition);
@@ -383,8 +364,6 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     }
   }
 
-  @RequiresNonNull("output")
-  @EnsuresNonNull("extractor")
   private DefaultExtractorInput prepareExtraction(DataSource dataSource, DataSpec dataSpec)
       throws IOException, InterruptedException {
     long bytesToRead = dataSource.open(dataSpec);
@@ -504,15 +483,10 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   /**
    * If the segment is fully encrypted, returns an {@link Aes128DataSource} that wraps the original
    * in order to decrypt the loaded data. Else returns the original.
-   *
-   * <p>{@code fullSegmentEncryptionKey} & {@code encryptionIv} can either both be null, or neither.
    */
-  private static DataSource buildDataSource(
-      DataSource dataSource,
-      @Nullable byte[] fullSegmentEncryptionKey,
-      @Nullable byte[] encryptionIv) {
+  private static DataSource buildDataSource(DataSource dataSource, byte[] fullSegmentEncryptionKey,
+      byte[] encryptionIv) {
     if (fullSegmentEncryptionKey != null) {
-      Assertions.checkNotNull(encryptionIv);
       return new Aes128DataSource(dataSource, fullSegmentEncryptionKey, encryptionIv);
     }
     return dataSource;

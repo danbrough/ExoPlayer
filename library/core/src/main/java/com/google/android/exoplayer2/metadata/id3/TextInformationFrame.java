@@ -27,7 +27,7 @@ import com.google.android.exoplayer2.util.Util;
  */
 public final class TextInformationFrame extends Id3Frame {
 
-  @Nullable public final String description;
+  public final @Nullable String description;
   public final String value;
 
   public TextInformationFrame(String id, @Nullable String description, String value) {

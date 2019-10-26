@@ -83,13 +83,4 @@ public class CompositeSequenceableLoader implements SequenceableLoader {
     return madeProgress;
   }
 
-  @Override
-  public boolean isLoading() {
-    for (SequenceableLoader loader : loaders) {
-      if (loader.isLoading()) {
-        return true;
-      }
-    }
-    return false;
-  }
 }

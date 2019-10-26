@@ -166,13 +166,11 @@ public final class DefaultHlsPlaylistTracker
   }
 
   @Override
-  @Nullable
-  public HlsMasterPlaylist getMasterPlaylist() {
+  public @Nullable HlsMasterPlaylist getMasterPlaylist() {
     return masterPlaylist;
   }
 
   @Override
-  @Nullable
   public HlsMediaPlaylist getPlaylistSnapshot(Uri url, boolean isForPlayback) {
     HlsMediaPlaylist snapshot = playlistBundles.get(url).getPlaylistSnapshot();
     if (snapshot != null && isForPlayback) {
@@ -449,7 +447,7 @@ public final class DefaultHlsPlaylistTracker
     private final Loader mediaPlaylistLoader;
     private final ParsingLoadable<HlsPlaylist> mediaPlaylistLoadable;
 
-    @Nullable private HlsMediaPlaylist playlistSnapshot;
+    private HlsMediaPlaylist playlistSnapshot;
     private long lastSnapshotLoadMs;
     private long lastSnapshotChangeMs;
     private long earliestNextLoadTimeMs;
@@ -468,7 +466,6 @@ public final class DefaultHlsPlaylistTracker
               mediaPlaylistParser);
     }
 
-    @Nullable
     public HlsMediaPlaylist getPlaylistSnapshot() {
       return playlistSnapshot;
     }

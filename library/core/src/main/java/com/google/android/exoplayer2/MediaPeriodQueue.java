@@ -15,13 +15,13 @@
  */
 package com.google.android.exoplayer2;
 
-import android.util.Pair;
 import androidx.annotation.Nullable;
+import android.util.Pair;
 import com.google.android.exoplayer2.Player.RepeatMode;
 import com.google.android.exoplayer2.source.MediaPeriod;
+import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.source.MediaSource.MediaPeriodId;
 import com.google.android.exoplayer2.trackselection.TrackSelector;
-import com.google.android.exoplayer2.trackselection.TrackSelectorResult;
 import com.google.android.exoplayer2.upstream.Allocator;
 import com.google.android.exoplayer2.util.Assertions;
 
@@ -46,11 +46,11 @@ import com.google.android.exoplayer2.util.Assertions;
   private Timeline timeline;
   private @RepeatMode int repeatMode;
   private boolean shuffleModeEnabled;
-  @Nullable private MediaPeriodHolder playing;
-  @Nullable private MediaPeriodHolder reading;
-  @Nullable private MediaPeriodHolder loading;
+  private @Nullable MediaPeriodHolder playing;
+  private @Nullable MediaPeriodHolder reading;
+  private @Nullable MediaPeriodHolder loading;
   private int length;
-  @Nullable private Object oldFrontPeriodUid;
+  private @Nullable Object oldFrontPeriodUid;
   private long oldFrontPeriodWindowSequenceNumber;
 
   /** Creates a new media period queue. */
@@ -127,24 +127,21 @@ import com.google.android.exoplayer2.util.Assertions;
   }
 
   /**
-   * Enqueues a new media period holder based on the specified information as the new loading media
-   * period, and returns it.
+   * Enqueues a new media period based on the specified information as the new loading media period,
+   * and returns it.
    *
    * @param rendererCapabilities The renderer capabilities.
    * @param trackSelector The track selector.
    * @param allocator The allocator.
-   * @param playlist The playlist.
+   * @param mediaSource The media source that produced the media period.
    * @param info Information used to identify this media period in its timeline period.
-   * @param emptyTrackSelectorResult A {@link TrackSelectorResult} with empty selections for each
-   *     renderer.
    */
-  public MediaPeriodHolder enqueueNextMediaPeriodHolder(
+  public MediaPeriod enqueueNextMediaPeriod(
       RendererCapabilities[] rendererCapabilities,
       TrackSelector trackSelector,
       Allocator allocator,
-      Playlist playlist,
-      MediaPeriodInfo info,
-      TrackSelectorResult emptyTrackSelectorResult) {
+      MediaSource mediaSource,
+      MediaPeriodInfo info) {
     long rendererPositionOffsetUs =
         loading == null
             ? (info.id.isAd() && info.contentPositionUs != C.TIME_UNSET
@@ -157,43 +154,53 @@ import com.google.android.exoplayer2.util.Assertions;
             rendererPositionOffsetUs,
             trackSelector,
             allocator,
-            playlist,
-            info,
-            emptyTrackSelectorResult);
+            mediaSource,
+            info);
     if (loading != null) {
+      Assertions.checkState(hasPlayingPeriod());
       loading.setNext(newPeriodHolder);
-    } else {
-      playing = newPeriodHolder;
-      reading = newPeriodHolder;
     }
     oldFrontPeriodUid = null;
     loading = newPeriodHolder;
     length++;
-    return newPeriodHolder;
+    return newPeriodHolder.mediaPeriod;
   }
 
   /**
    * Returns the loading period holder which is at the end of the queue, or null if the queue is
    * empty.
    */
-  @Nullable
   public MediaPeriodHolder getLoadingPeriod() {
     return loading;
   }
 
   /**
    * Returns the playing period holder which is at the front of the queue, or null if the queue is
-   * empty.
+   * empty or hasn't started playing.
    */
-  @Nullable
   public MediaPeriodHolder getPlayingPeriod() {
     return playing;
   }
 
-  /** Returns the reading period holder, or null if the queue is empty. */
-  @Nullable
+  /**
+   * Returns the reading period holder, or null if the queue is empty or the player hasn't started
+   * reading.
+   */
   public MediaPeriodHolder getReadingPeriod() {
     return reading;
+  }
+
+  /**
+   * Returns the period holder in the front of the queue which is the playing period holder when
+   * playing, or null if the queue is empty.
+   */
+  public MediaPeriodHolder getFrontPeriod() {
+    return hasPlayingPeriod() ? playing : loading;
+  }
+
+  /** Returns whether the reading and playing period holders are set. */
+  public boolean hasPlayingPeriod() {
+    return playing != null;
   }
 
   /**
@@ -209,26 +216,28 @@ import com.google.android.exoplayer2.util.Assertions;
 
   /**
    * Dequeues the playing period holder from the front of the queue and advances the playing period
-   * holder to be the next item in the queue.
+   * holder to be the next item in the queue. If the playing period holder is unset, set it to the
+   * item in the front of the queue.
    *
    * @return The updated playing period holder, or null if the queue is or becomes empty.
    */
-  @Nullable
   public MediaPeriodHolder advancePlayingPeriod() {
-    if (playing == null) {
-      return null;
+    if (playing != null) {
+      if (playing == reading) {
+        reading = playing.getNext();
+      }
+      playing.release();
+      length--;
+      if (length == 0) {
+        loading = null;
+        oldFrontPeriodUid = playing.uid;
+        oldFrontPeriodWindowSequenceNumber = playing.info.id.windowSequenceNumber;
+      }
+      playing = playing.getNext();
+    } else {
+      playing = loading;
+      reading = loading;
     }
-    if (playing == reading) {
-      reading = playing.getNext();
-    }
-    playing.release();
-    length--;
-    if (length == 0) {
-      loading = null;
-      oldFrontPeriodUid = playing.uid;
-      oldFrontPeriodWindowSequenceNumber = playing.info.id.windowSequenceNumber;
-    }
-    playing = playing.getNext();
     return playing;
   }
 
@@ -264,12 +273,12 @@ import com.google.android.exoplayer2.util.Assertions;
    *     of queue (typically the playing one) for later reuse.
    */
   public void clear(boolean keepFrontPeriodUid) {
-    MediaPeriodHolder front = playing;
+    MediaPeriodHolder front = getFrontPeriod();
     if (front != null) {
       oldFrontPeriodUid = keepFrontPeriodUid ? front.uid : null;
       oldFrontPeriodWindowSequenceNumber = front.info.id.windowSequenceNumber;
-      removeAfter(front);
       front.release();
+      removeAfter(front);
     } else if (!keepFrontPeriodUid) {
       oldFrontPeriodUid = null;
     }
@@ -296,7 +305,7 @@ import com.google.android.exoplayer2.util.Assertions;
     // is set, once all cases handled by ExoPlayerImplInternal.handleSourceInfoRefreshed can be
     // handled here.
     MediaPeriodHolder previousPeriodHolder = null;
-    MediaPeriodHolder periodHolder = playing;
+    MediaPeriodHolder periodHolder = getFrontPeriod();
     while (periodHolder != null) {
       MediaPeriodInfo oldPeriodInfo = periodHolder.info;
 
@@ -432,7 +441,7 @@ import com.google.android.exoplayer2.util.Assertions;
         }
       }
     }
-    MediaPeriodHolder mediaPeriodHolder = playing;
+    MediaPeriodHolder mediaPeriodHolder = getFrontPeriod();
     while (mediaPeriodHolder != null) {
       if (mediaPeriodHolder.uid.equals(periodUid)) {
         // Reuse window sequence number of first exact period match.
@@ -440,7 +449,7 @@ import com.google.android.exoplayer2.util.Assertions;
       }
       mediaPeriodHolder = mediaPeriodHolder.getNext();
     }
-    mediaPeriodHolder = playing;
+    mediaPeriodHolder = getFrontPeriod();
     while (mediaPeriodHolder != null) {
       int indexOfHolderInTimeline = timeline.getIndexOfPeriod(mediaPeriodHolder.uid);
       if (indexOfHolderInTimeline != C.INDEX_UNSET) {
@@ -453,13 +462,7 @@ import com.google.android.exoplayer2.util.Assertions;
       mediaPeriodHolder = mediaPeriodHolder.getNext();
     }
     // If no match is found, create new sequence number.
-    long windowSequenceNumber = nextWindowSequenceNumber++;
-    if (playing == null) {
-      // If the queue is empty, save it as old front uid to allow later reuse.
-      oldFrontPeriodUid = periodUid;
-      oldFrontPeriodWindowSequenceNumber = windowSequenceNumber;
-    }
-    return windowSequenceNumber;
+    return nextWindowSequenceNumber++;
   }
 
   /**
@@ -483,7 +486,7 @@ import com.google.android.exoplayer2.util.Assertions;
    */
   private boolean updateForPlaybackModeChange() {
     // Find the last existing period holder that matches the new period order.
-    MediaPeriodHolder lastValidPeriodHolder = playing;
+    MediaPeriodHolder lastValidPeriodHolder = getFrontPeriod();
     if (lastValidPeriodHolder == null) {
       return true;
     }
@@ -516,7 +519,7 @@ import com.google.android.exoplayer2.util.Assertions;
     lastValidPeriodHolder.info = getUpdatedMediaPeriodInfo(lastValidPeriodHolder.info);
 
     // If renderers may have read from a period that's been removed, it is necessary to restart.
-    return !readingPeriodRemoved;
+    return !readingPeriodRemoved || !hasPlayingPeriod();
   }
 
   /**

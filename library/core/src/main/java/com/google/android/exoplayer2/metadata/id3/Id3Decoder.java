@@ -20,7 +20,6 @@ import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.metadata.MetadataDecoder;
 import com.google.android.exoplayer2.metadata.MetadataInputBuffer;
-import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.ParsableBitArray;
 import com.google.android.exoplayer2.util.ParsableByteArray;
@@ -62,8 +61,10 @@ public final class Id3Decoder implements MetadataDecoder {
 
   private static final String TAG = "Id3Decoder";
 
-  /** The first three bytes of a well formed ID3 tag header. */
-  public static final int ID3_TAG = 0x00494433;
+  /**
+   * The first three bytes of a well formed ID3 tag header.
+   */
+  public static final int ID3_TAG = Util.getIntegerCodeForString("ID3");
   /**
    * Length of an ID3 tag header.
    */
@@ -83,7 +84,7 @@ public final class Id3Decoder implements MetadataDecoder {
   private static final int ID3_TEXT_ENCODING_UTF_16BE = 2;
   private static final int ID3_TEXT_ENCODING_UTF_8 = 3;
 
-  @Nullable private final FramePredicate framePredicate;
+  private final @Nullable FramePredicate framePredicate;
 
   public Id3Decoder() {
     this(null);
@@ -98,9 +99,8 @@ public final class Id3Decoder implements MetadataDecoder {
 
   @SuppressWarnings("ByteBufferBackingArray")
   @Override
-  @Nullable
-  public Metadata decode(MetadataInputBuffer inputBuffer) {
-    ByteBuffer buffer = Assertions.checkNotNull(inputBuffer.data);
+  public @Nullable Metadata decode(MetadataInputBuffer inputBuffer) {
+    ByteBuffer buffer = inputBuffer.data;
     return decode(buffer.array(), buffer.limit());
   }
 
@@ -112,8 +112,7 @@ public final class Id3Decoder implements MetadataDecoder {
    * @return A {@link Metadata} object containing the decoded ID3 tags, or null if the data could
    *     not be decoded.
    */
-  @Nullable
-  public Metadata decode(byte[] data, int size) {
+  public @Nullable Metadata decode(byte[] data, int size) {
     List<Id3Frame> id3Frames = new ArrayList<>();
     ParsableByteArray id3Data = new ParsableByteArray(data, size);
 
@@ -163,7 +162,7 @@ public final class Id3Decoder implements MetadataDecoder {
 
     int id = data.readUnsignedInt24();
     if (id != ID3_TAG) {
-      Log.w(TAG, "Unexpected first three bytes of ID3 tag header: 0x" + String.format("%06X", id));
+      Log.w(TAG, "Unexpected first three bytes of ID3 tag header: " + id);
       return null;
     }
 

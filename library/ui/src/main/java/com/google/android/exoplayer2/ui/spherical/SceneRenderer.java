@@ -18,7 +18,6 @@ package com.google.android.exoplayer2.ui.spherical;
 import static com.google.android.exoplayer2.util.GlUtil.checkGlError;
 
 import android.graphics.SurfaceTexture;
-import android.media.MediaFormat;
 import android.opengl.GLES20;
 import android.opengl.Matrix;
 import androidx.annotation.Nullable;
@@ -55,7 +54,7 @@ public final class SceneRenderer implements VideoFrameMetadataListener, CameraMo
   // Used by other threads only
   private volatile @C.StreamType int defaultStereoMode;
   private @C.StreamType int lastStereoMode;
-  @Nullable private byte[] lastProjectionData;
+  private @Nullable byte[] lastProjectionData;
 
   // Methods called on any thread.
 
@@ -143,10 +142,7 @@ public final class SceneRenderer implements VideoFrameMetadataListener, CameraMo
 
   @Override
   public void onVideoFrameAboutToBeRendered(
-      long presentationTimeUs,
-      long releaseTimeNs,
-      Format format,
-      @Nullable MediaFormat mediaFormat) {
+      long presentationTimeUs, long releaseTimeNs, Format format) {
     sampleTimestampQueue.add(releaseTimeNs, presentationTimeUs);
     setProjection(format.projectionData, format.stereoMode, releaseTimeNs);
   }

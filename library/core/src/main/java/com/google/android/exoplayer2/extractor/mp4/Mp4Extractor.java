@@ -35,6 +35,7 @@ import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.NalUnitUtil;
 import com.google.android.exoplayer2.util.ParsableByteArray;
+import com.google.android.exoplayer2.util.Util;
 import java.io.IOException;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
@@ -77,7 +78,7 @@ public final class Mp4Extractor implements Extractor, SeekMap {
   private static final int STATE_READING_SAMPLE = 2;
 
   /** Brand stored in the ftyp atom for QuickTime media. */
-  private static final int BRAND_QUICKTIME = 0x71742020;
+  private static final int BRAND_QUICKTIME = Util.getIntegerCodeForString("qt  ");
 
   /**
    * When seeking within the source, if the offset is greater than or equal to this value (or the

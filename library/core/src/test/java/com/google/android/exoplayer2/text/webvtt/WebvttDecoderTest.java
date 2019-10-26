@@ -395,7 +395,7 @@ public class WebvttDecoderTest {
       throws IOException, SubtitleDecoderException {
     WebvttDecoder decoder = new WebvttDecoder();
     byte[] bytes = TestUtil.getByteArray(ApplicationProvider.getApplicationContext(), asset);
-    return (WebvttSubtitle) decoder.decode(bytes, bytes.length, /* reset= */ false);
+    return decoder.decode(bytes, bytes.length, /* reset= */ false);
   }
 
   private Spanned getUniqueSpanTextAt(WebvttSubtitle sub, long timeUs) {

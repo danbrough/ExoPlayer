@@ -83,11 +83,10 @@ public final class RangedUri {
    * <p>If {@code other} is null then the merge is considered unsuccessful, and null is returned.
    *
    * @param other The {@link RangedUri} to merge.
-   * @param baseUri The base Uri.
+   * @param baseUri The optional base Uri.
    * @return The merged {@link RangedUri} if the merge was successful. Null otherwise.
    */
-  @Nullable
-  public RangedUri attemptMerge(@Nullable RangedUri other, String baseUri) {
+  public @Nullable RangedUri attemptMerge(@Nullable RangedUri other, String baseUri) {
     final String resolvedUri = resolveUriString(baseUri);
     if (other == null || !resolvedUri.equals(other.resolveUriString(baseUri))) {
       return null;

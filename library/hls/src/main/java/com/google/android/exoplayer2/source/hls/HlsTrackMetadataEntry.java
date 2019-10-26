@@ -17,8 +17,8 @@ package com.google.android.exoplayer2.source.hls;
 
 import android.os.Parcel;
 import android.os.Parcelable;
-import android.text.TextUtils;
 import androidx.annotation.Nullable;
+import android.text.TextUtils;
 import com.google.android.exoplayer2.metadata.Metadata;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -182,11 +182,6 @@ public final class HlsTrackMetadataEntry implements Metadata.Entry {
       variantInfos.add(in.readParcelable(VariantInfo.class.getClassLoader()));
     }
     this.variantInfos = Collections.unmodifiableList(variantInfos);
-  }
-
-  @Override
-  public String toString() {
-    return "HlsTrackMetadataEntry" + (groupId != null ? (" [" + groupId + ", " + name + "]") : "");
   }
 
   @Override

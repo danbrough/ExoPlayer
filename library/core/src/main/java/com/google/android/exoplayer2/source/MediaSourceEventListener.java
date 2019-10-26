@@ -101,7 +101,7 @@ public interface MediaSourceEventListener {
      * The format of the track to which the data belongs. Null if the data does not belong to a
      * specific track.
      */
-    @Nullable public final Format trackFormat;
+    public final @Nullable Format trackFormat;
     /**
      * One of the {@link C} {@code SELECTION_REASON_*} constants if the data belongs to a track.
      * {@link C#SELECTION_REASON_UNKNOWN} otherwise.
@@ -111,7 +111,7 @@ public interface MediaSourceEventListener {
      * Optional data associated with the selection of the track to which the data belongs. Null if
      * the data does not belong to a track.
      */
-    @Nullable public final Object trackSelectionData;
+    public final @Nullable Object trackSelectionData;
     /**
      * The start time of the media, or {@link C#TIME_UNSET} if the data does not belong to a
      * specific media period.
@@ -296,7 +296,7 @@ public interface MediaSourceEventListener {
     /** The timeline window index reported with the events. */
     public final int windowIndex;
     /** The {@link MediaPeriodId} reported with the events. */
-    @Nullable public final MediaPeriodId mediaPeriodId;
+    public final @Nullable MediaPeriodId mediaPeriodId;
 
     private final CopyOnWriteArrayList<ListenerAndHandler> listenerAndHandlers;
     private final long mediaTimeOffsetMs;

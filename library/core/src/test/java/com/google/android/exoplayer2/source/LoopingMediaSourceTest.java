@@ -23,16 +23,17 @@ import com.google.android.exoplayer2.testutil.FakeMediaSource;
 import com.google.android.exoplayer2.testutil.FakeTimeline;
 import com.google.android.exoplayer2.testutil.FakeTimeline.TimelineWindowDefinition;
 import com.google.android.exoplayer2.testutil.MediaSourceTestRunner;
+import com.google.android.exoplayer2.testutil.RobolectricUtil;
 import com.google.android.exoplayer2.testutil.TimelineAsserts;
 import java.io.IOException;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.annotation.LooperMode;
+import org.robolectric.annotation.Config;
 
 /** Unit tests for {@link LoopingMediaSource}. */
 @RunWith(AndroidJUnit4.class)
-@LooperMode(LooperMode.Mode.PAUSED)
+@Config(shadows = {RobolectricUtil.CustomLooper.class, RobolectricUtil.CustomMessageQueue.class})
 public class LoopingMediaSourceTest {
 
   private FakeTimeline multiWindowTimeline;
@@ -135,7 +136,7 @@ public class LoopingMediaSourceTest {
    * Wraps the specified timeline in a {@link LoopingMediaSource} and returns the looping timeline.
    */
   private static Timeline getLoopingTimeline(Timeline timeline, int loopCount) throws IOException {
-    FakeMediaSource fakeMediaSource = new FakeMediaSource(timeline);
+    FakeMediaSource fakeMediaSource = new FakeMediaSource(timeline, null);
     LoopingMediaSource mediaSource = new LoopingMediaSource(fakeMediaSource, loopCount);
     MediaSourceTestRunner testRunner = new MediaSourceTestRunner(mediaSource, null);
     try {
@@ -153,7 +154,7 @@ public class LoopingMediaSourceTest {
    * the looping timeline can be created and prepared.
    */
   private static void testMediaPeriodCreation(Timeline timeline, int loopCount) throws Exception {
-    FakeMediaSource fakeMediaSource = new FakeMediaSource(timeline);
+    FakeMediaSource fakeMediaSource = new FakeMediaSource(timeline, null);
     LoopingMediaSource mediaSource = new LoopingMediaSource(fakeMediaSource, loopCount);
     MediaSourceTestRunner testRunner = new MediaSourceTestRunner(mediaSource, null);
     try {

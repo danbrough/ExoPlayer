@@ -18,7 +18,6 @@ package com.google.android.exoplayer2.audio;
 import android.annotation.TargetApi;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
-import com.google.android.exoplayer2.util.Util;
 
 /**
  * Attributes for audio playback, which configure the underlying platform
@@ -43,19 +42,17 @@ public final class AudioAttributes {
     private @C.AudioContentType int contentType;
     private @C.AudioFlags int flags;
     private @C.AudioUsage int usage;
-    private @C.AudioAllowedCapturePolicy int allowedCapturePolicy;
 
     /**
      * Creates a new builder for {@link AudioAttributes}.
-     *
-     * <p>By default the content type is {@link C#CONTENT_TYPE_UNKNOWN}, usage is {@link
-     * C#USAGE_MEDIA}, capture policy is {@link C#ALLOW_CAPTURE_BY_ALL} and no flags are set.
+     * <p>
+     * By default the content type is {@link C#CONTENT_TYPE_UNKNOWN}, usage is
+     * {@link C#USAGE_MEDIA}, and no flags are set.
      */
     public Builder() {
       contentType = C.CONTENT_TYPE_UNKNOWN;
       flags = 0;
       usage = C.USAGE_MEDIA;
-      allowedCapturePolicy = C.ALLOW_CAPTURE_BY_ALL;
     }
 
     /**
@@ -82,15 +79,11 @@ public final class AudioAttributes {
       return this;
     }
 
-    /** See {@link android.media.AudioAttributes.Builder#setAllowedCapturePolicy(int)}. */
-    public Builder setAllowedCapturePolicy(@C.AudioAllowedCapturePolicy int allowedCapturePolicy) {
-      this.allowedCapturePolicy = allowedCapturePolicy;
-      return this;
-    }
-
-    /** Creates an {@link AudioAttributes} instance from this builder. */
+    /**
+     * Creates an {@link AudioAttributes} instance from this builder.
+     */
     public AudioAttributes build() {
-      return new AudioAttributes(contentType, flags, usage, allowedCapturePolicy);
+      return new AudioAttributes(contentType, flags, usage);
     }
 
   }
@@ -98,38 +91,24 @@ public final class AudioAttributes {
   public final @C.AudioContentType int contentType;
   public final @C.AudioFlags int flags;
   public final @C.AudioUsage int usage;
-  public final @C.AudioAllowedCapturePolicy int allowedCapturePolicy;
 
-  @Nullable private android.media.AudioAttributes audioAttributesV21;
+  private @Nullable android.media.AudioAttributes audioAttributesV21;
 
-  private AudioAttributes(
-      @C.AudioContentType int contentType,
-      @C.AudioFlags int flags,
-      @C.AudioUsage int usage,
-      @C.AudioAllowedCapturePolicy int allowedCapturePolicy) {
+  private AudioAttributes(@C.AudioContentType int contentType, @C.AudioFlags int flags,
+      @C.AudioUsage int usage) {
     this.contentType = contentType;
     this.flags = flags;
     this.usage = usage;
-    this.allowedCapturePolicy = allowedCapturePolicy;
   }
 
-  /**
-   * Returns a {@link android.media.AudioAttributes} from this instance.
-   *
-   * <p>Field {@link AudioAttributes#allowedCapturePolicy} is ignored for API levels prior to 29.
-   */
   @TargetApi(21)
   public android.media.AudioAttributes getAudioAttributesV21() {
     if (audioAttributesV21 == null) {
-      android.media.AudioAttributes.Builder builder =
-          new android.media.AudioAttributes.Builder()
-              .setContentType(contentType)
-              .setFlags(flags)
-              .setUsage(usage);
-      if (Util.SDK_INT >= 29) {
-        builder.setAllowedCapturePolicy(allowedCapturePolicy);
-      }
-      audioAttributesV21 = builder.build();
+      audioAttributesV21 = new android.media.AudioAttributes.Builder()
+          .setContentType(contentType)
+          .setFlags(flags)
+          .setUsage(usage)
+          .build();
     }
     return audioAttributesV21;
   }
@@ -143,10 +122,8 @@ public final class AudioAttributes {
       return false;
     }
     AudioAttributes other = (AudioAttributes) obj;
-    return this.contentType == other.contentType
-        && this.flags == other.flags
-        && this.usage == other.usage
-        && this.allowedCapturePolicy == other.allowedCapturePolicy;
+    return this.contentType == other.contentType && this.flags == other.flags
+        && this.usage == other.usage;
   }
 
   @Override
@@ -155,7 +132,6 @@ public final class AudioAttributes {
     result = 31 * result + contentType;
     result = 31 * result + flags;
     result = 31 * result + usage;
-    result = 31 * result + allowedCapturePolicy;
     return result;
   }
 

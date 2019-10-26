@@ -29,8 +29,8 @@ import android.os.Handler;
 import android.os.Handler.Callback;
 import android.os.HandlerThread;
 import android.os.Message;
-import android.view.Surface;
 import androidx.annotation.Nullable;
+import android.view.Surface;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.EGLSurfaceTexture;
 import com.google.android.exoplayer2.util.EGLSurfaceTexture.SecureMode;
@@ -158,9 +158,9 @@ public final class DummySurface extends Surface {
 
     private @MonotonicNonNull EGLSurfaceTexture eglSurfaceTexture;
     private @MonotonicNonNull Handler handler;
-    @Nullable private Error initError;
-    @Nullable private RuntimeException initException;
-    @Nullable private DummySurface surface;
+    private @Nullable Error initError;
+    private @Nullable RuntimeException initException;
+    private @Nullable DummySurface surface;
 
     public DummySurfaceThread() {
       super("dummySurface");

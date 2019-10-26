@@ -15,14 +15,11 @@
  */
 package com.google.android.exoplayer2.upstream;
 
-import static com.google.android.exoplayer2.util.Util.castNonNull;
-
 import android.content.Context;
 import android.content.res.AssetManager;
 import android.net.Uri;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
-import com.google.android.exoplayer2.util.Assertions;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -43,8 +40,8 @@ public final class AssetDataSource extends BaseDataSource {
 
   private final AssetManager assetManager;
 
-  @Nullable private Uri uri;
-  @Nullable private InputStream inputStream;
+  private @Nullable Uri uri;
+  private @Nullable InputStream inputStream;
   private long bytesRemaining;
   private boolean opened;
 
@@ -54,11 +51,25 @@ public final class AssetDataSource extends BaseDataSource {
     this.assetManager = context.getAssets();
   }
 
+  /**
+   * @param context A context.
+   * @param listener An optional listener.
+   * @deprecated Use {@link #AssetDataSource(Context)} and {@link
+   *     #addTransferListener(TransferListener)}.
+   */
+  @Deprecated
+  public AssetDataSource(Context context, @Nullable TransferListener listener) {
+    this(context);
+    if (listener != null) {
+      addTransferListener(listener);
+    }
+  }
+
   @Override
   public long open(DataSpec dataSpec) throws AssetDataSourceException {
     try {
       uri = dataSpec.uri;
-      String path = Assertions.checkNotNull(uri.getPath());
+      String path = uri.getPath();
       if (path.startsWith("/android_asset/")) {
         path = path.substring(15);
       } else if (path.startsWith("/")) {
@@ -104,7 +115,7 @@ public final class AssetDataSource extends BaseDataSource {
     try {
       int bytesToRead = bytesRemaining == C.LENGTH_UNSET ? readLength
           : (int) Math.min(bytesRemaining, readLength);
-      bytesRead = castNonNull(inputStream).read(buffer, offset, bytesToRead);
+      bytesRead = inputStream.read(buffer, offset, bytesToRead);
     } catch (IOException e) {
       throw new AssetDataSourceException(e);
     }
@@ -124,8 +135,7 @@ public final class AssetDataSource extends BaseDataSource {
   }
 
   @Override
-  @Nullable
-  public Uri getUri() {
+  public @Nullable Uri getUri() {
     return uri;
   }
 

@@ -23,13 +23,13 @@ import com.google.android.exoplayer2.util.Util;
 public final class WavUtil {
 
   /** Four character code for "RIFF". */
-  public static final int RIFF_FOURCC = 0x52494646;
+  public static final int RIFF_FOURCC = Util.getIntegerCodeForString("RIFF");
   /** Four character code for "WAVE". */
-  public static final int WAVE_FOURCC = 0x57415645;
+  public static final int WAVE_FOURCC = Util.getIntegerCodeForString("WAVE");
   /** Four character code for "fmt ". */
-  public static final int FMT_FOURCC = 0x666d7420;
+  public static final int FMT_FOURCC = Util.getIntegerCodeForString("fmt ");
   /** Four character code for "data". */
-  public static final int DATA_FOURCC = 0x64617461;
+  public static final int DATA_FOURCC = Util.getIntegerCodeForString("data");
 
   /** WAVE type value for integer PCM audio data. */
   private static final int TYPE_PCM = 0x0001;

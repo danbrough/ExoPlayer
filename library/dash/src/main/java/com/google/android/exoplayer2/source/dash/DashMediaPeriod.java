@@ -15,15 +15,13 @@
  */
 package com.google.android.exoplayer2.source.dash;
 
-import android.util.Pair;
-import android.util.SparseIntArray;
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
+import android.util.Pair;
+import android.util.SparseIntArray;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.SeekParameters;
-import com.google.android.exoplayer2.drm.DrmInitData;
-import com.google.android.exoplayer2.drm.DrmSessionManager;
 import com.google.android.exoplayer2.offline.StreamKey;
 import com.google.android.exoplayer2.source.CompositeSequenceableLoaderFactory;
 import com.google.android.exoplayer2.source.EmptySampleStream;
@@ -60,7 +58,6 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.checkerframework.checker.nullness.compatqual.NullableType;
 
 /** A DASH {@link MediaPeriod}. */
 /* package */ final class DashMediaPeriod
@@ -72,8 +69,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
 
   /* package */ final int id;
   private final DashChunkSource.Factory chunkSourceFactory;
-  @Nullable private final TransferListener transferListener;
-  private final DrmSessionManager<?> drmSessionManager;
+  private final @Nullable TransferListener transferListener;
   private final LoadErrorHandlingPolicy loadErrorHandlingPolicy;
   private final long elapsedRealtimeOffsetMs;
   private final LoaderErrorThrower manifestLoaderErrorThrower;
@@ -86,7 +82,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
       trackEmsgHandlerBySampleStream;
   private final EventDispatcher eventDispatcher;
 
-  @Nullable private Callback callback;
+  private @Nullable Callback callback;
   private ChunkSampleStream<DashChunkSource>[] sampleStreams;
   private EventSampleStream[] eventSampleStreams;
   private SequenceableLoader compositeSequenceableLoader;
@@ -101,7 +97,6 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
       int periodIndex,
       DashChunkSource.Factory chunkSourceFactory,
       @Nullable TransferListener transferListener,
-      DrmSessionManager<?> drmSessionManager,
       LoadErrorHandlingPolicy loadErrorHandlingPolicy,
       EventDispatcher eventDispatcher,
       long elapsedRealtimeOffsetMs,
@@ -114,7 +109,6 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
     this.periodIndex = periodIndex;
     this.chunkSourceFactory = chunkSourceFactory;
     this.transferListener = transferListener;
-    this.drmSessionManager = drmSessionManager;
     this.loadErrorHandlingPolicy = loadErrorHandlingPolicy;
     this.eventDispatcher = eventDispatcher;
     this.elapsedRealtimeOffsetMs = elapsedRealtimeOffsetMs;
@@ -129,8 +123,8 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
         compositeSequenceableLoaderFactory.createCompositeSequenceableLoader(sampleStreams);
     Period period = manifest.getPeriod(periodIndex);
     eventStreams = period.eventStreams;
-    Pair<TrackGroupArray, TrackGroupInfo[]> result =
-        buildTrackGroups(drmSessionManager, period.adaptationSets, eventStreams);
+    Pair<TrackGroupArray, TrackGroupInfo[]> result = buildTrackGroups(period.adaptationSets,
+        eventStreams);
     trackGroups = result.first;
     trackGroupInfos = result.second;
     eventDispatcher.mediaPeriodCreated();
@@ -225,8 +219,9 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
       int totalTracksInPreviousAdaptationSets = 0;
       int tracksInCurrentAdaptationSet =
           manifestAdaptationSets.get(adaptationSetIndices[0]).representations.size();
-      for (int trackIndex : trackIndices) {
-        while (trackIndex >= totalTracksInPreviousAdaptationSets + tracksInCurrentAdaptationSet) {
+      for (int i = 0; i < trackIndices.length; i++) {
+        while (trackIndices[i]
+            >= totalTracksInPreviousAdaptationSets + tracksInCurrentAdaptationSet) {
           currentAdaptationSetIndex++;
           totalTracksInPreviousAdaptationSets += tracksInCurrentAdaptationSet;
           tracksInCurrentAdaptationSet =
@@ -239,19 +234,15 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
             new StreamKey(
                 periodIndex,
                 adaptationSetIndices[currentAdaptationSetIndex],
-                trackIndex - totalTracksInPreviousAdaptationSets));
+                trackIndices[i] - totalTracksInPreviousAdaptationSets));
       }
     }
     return streamKeys;
   }
 
   @Override
-  public long selectTracks(
-      @NullableType TrackSelection[] selections,
-      boolean[] mayRetainStreamFlags,
-      @NullableType SampleStream[] streams,
-      boolean[] streamResetFlags,
-      long positionUs) {
+  public long selectTracks(TrackSelection[] selections, boolean[] mayRetainStreamFlags,
+      SampleStream[] streams, boolean[] streamResetFlags, long positionUs) {
     int[] streamIndexToTrackGroupIndex = getStreamIndexToTrackGroupIndex(selections);
     releaseDisabledStreams(selections, mayRetainStreamFlags, streams);
     releaseOrphanEmbeddedStreams(selections, streams, streamIndexToTrackGroupIndex);
@@ -295,11 +286,6 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
   @Override
   public boolean continueLoading(long positionUs) {
     return compositeSequenceableLoader.continueLoading(positionUs);
-  }
-
-  @Override
-  public boolean isLoading() {
-    return compositeSequenceableLoader.isLoading();
   }
 
   @Override
@@ -480,9 +466,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
   }
 
   private static Pair<TrackGroupArray, TrackGroupInfo[]> buildTrackGroups(
-      DrmSessionManager<?> drmSessionManager,
-      List<AdaptationSet> adaptationSets,
-      List<EventStream> eventStreams) {
+      List<AdaptationSet> adaptationSets, List<EventStream> eventStreams) {
     int[][] groupedAdaptationSetIndices = getGroupedAdaptationSetIndices(adaptationSets);
 
     int primaryGroupCount = groupedAdaptationSetIndices.length;
@@ -502,7 +486,6 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
 
     int trackGroupCount =
         buildPrimaryAndEmbeddedTrackGroupInfos(
-            drmSessionManager,
             adaptationSets,
             groupedAdaptationSetIndices,
             primaryGroupCount,
@@ -542,9 +525,10 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
         int[] adaptationSetIndices = new int[1 + extraAdaptationSetIds.length];
         adaptationSetIndices[0] = i;
         int outputIndex = 1;
-        for (String adaptationSetId : extraAdaptationSetIds) {
+        for (int j = 0; j < extraAdaptationSetIds.length; j++) {
           int extraIndex =
-              idToIndexMap.get(Integer.parseInt(adaptationSetId), /* valueIfKeyNotFound= */ -1);
+              idToIndexMap.get(
+                  Integer.parseInt(extraAdaptationSetIds[j]), /* valueIfKeyNotFound= */ -1);
           if (extraIndex != -1) {
             adaptationSetUsedFlags[extraIndex] = true;
             adaptationSetIndices[outputIndex] = extraIndex;
@@ -597,7 +581,6 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
   }
 
   private static int buildPrimaryAndEmbeddedTrackGroupInfos(
-      DrmSessionManager<?> drmSessionManager,
       List<AdaptationSet> adaptationSets,
       int[][] groupedAdaptationSetIndices,
       int primaryGroupCount,
@@ -614,14 +597,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
       }
       Format[] formats = new Format[representations.size()];
       for (int j = 0; j < formats.length; j++) {
-        Format format = representations.get(j).format;
-        DrmInitData drmInitData = format.drmInitData;
-        if (drmInitData != null) {
-          format =
-              format.copyWithExoMediaCryptoType(
-                  drmSessionManager.getExoMediaCryptoType(drmInitData));
-        }
-        formats[j] = format;
+        formats[j] = representations.get(j).format;
       }
 
       AdaptationSet firstAdaptationSet = adaptationSets.get(adaptationSetIndices[0]);
@@ -728,7 +704,6 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
             this,
             allocator,
             positionUs,
-            drmSessionManager,
             loadErrorHandlingPolicy,
             eventDispatcher);
     synchronized (this) {

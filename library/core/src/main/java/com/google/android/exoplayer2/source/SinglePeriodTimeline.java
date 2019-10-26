@@ -35,9 +35,7 @@ public final class SinglePeriodTimeline extends Timeline {
   private final long windowDefaultStartPositionUs;
   private final boolean isSeekable;
   private final boolean isDynamic;
-  private final boolean isLive;
-  @Nullable private final Object tag;
-  @Nullable private final Object manifest;
+  private final @Nullable Object tag;
 
   /**
    * Creates a timeline containing a single period and a window that spans it.
@@ -45,11 +43,9 @@ public final class SinglePeriodTimeline extends Timeline {
    * @param durationUs The duration of the period, in microseconds.
    * @param isSeekable Whether seeking is supported within the period.
    * @param isDynamic Whether the window may change when the timeline is updated.
-   * @param isLive Whether the window is live.
    */
-  public SinglePeriodTimeline(
-      long durationUs, boolean isSeekable, boolean isDynamic, boolean isLive) {
-    this(durationUs, isSeekable, isDynamic, isLive, /* manifest= */ null, /* tag= */ null);
+  public SinglePeriodTimeline(long durationUs, boolean isSeekable, boolean isDynamic) {
+    this(durationUs, isSeekable, isDynamic, /* tag= */ null);
   }
 
   /**
@@ -58,17 +54,10 @@ public final class SinglePeriodTimeline extends Timeline {
    * @param durationUs The duration of the period, in microseconds.
    * @param isSeekable Whether seeking is supported within the period.
    * @param isDynamic Whether the window may change when the timeline is updated.
-   * @param isLive Whether the window is live.
-   * @param manifest The manifest. May be {@code null}.
-   * @param tag A tag used for {@link Window#tag}.
+   * @param tag A tag used for {@link Timeline.Window#tag}.
    */
   public SinglePeriodTimeline(
-      long durationUs,
-      boolean isSeekable,
-      boolean isDynamic,
-      boolean isLive,
-      @Nullable Object manifest,
-      @Nullable Object tag) {
+      long durationUs, boolean isSeekable, boolean isDynamic, @Nullable Object tag) {
     this(
         durationUs,
         durationUs,
@@ -76,8 +65,6 @@ public final class SinglePeriodTimeline extends Timeline {
         /* windowDefaultStartPositionUs= */ 0,
         isSeekable,
         isDynamic,
-        isLive,
-        manifest,
         tag);
   }
 
@@ -93,8 +80,6 @@ public final class SinglePeriodTimeline extends Timeline {
    *     which to begin playback, in microseconds.
    * @param isSeekable Whether seeking is supported within the window.
    * @param isDynamic Whether the window may change when the timeline is updated.
-   * @param isLive Whether the window is live.
-   * @param manifest The manifest. May be (@code null}.
    * @param tag A tag used for {@link Timeline.Window#tag}.
    */
   public SinglePeriodTimeline(
@@ -104,8 +89,6 @@ public final class SinglePeriodTimeline extends Timeline {
       long windowDefaultStartPositionUs,
       boolean isSeekable,
       boolean isDynamic,
-      boolean isLive,
-      @Nullable Object manifest,
       @Nullable Object tag) {
     this(
         /* presentationStartTimeMs= */ C.TIME_UNSET,
@@ -116,8 +99,6 @@ public final class SinglePeriodTimeline extends Timeline {
         windowDefaultStartPositionUs,
         isSeekable,
         isDynamic,
-        isLive,
-        manifest,
         tag);
   }
 
@@ -136,8 +117,6 @@ public final class SinglePeriodTimeline extends Timeline {
    *     which to begin playback, in microseconds.
    * @param isSeekable Whether seeking is supported within the window.
    * @param isDynamic Whether the window may change when the timeline is updated.
-   * @param isLive Whether the window is live.
-   * @param manifest The manifest. May be {@code null}.
    * @param tag A tag used for {@link Timeline.Window#tag}.
    */
   public SinglePeriodTimeline(
@@ -149,8 +128,6 @@ public final class SinglePeriodTimeline extends Timeline {
       long windowDefaultStartPositionUs,
       boolean isSeekable,
       boolean isDynamic,
-      boolean isLive,
-      @Nullable Object manifest,
       @Nullable Object tag) {
     this.presentationStartTimeMs = presentationStartTimeMs;
     this.windowStartTimeMs = windowStartTimeMs;
@@ -160,8 +137,6 @@ public final class SinglePeriodTimeline extends Timeline {
     this.windowDefaultStartPositionUs = windowDefaultStartPositionUs;
     this.isSeekable = isSeekable;
     this.isDynamic = isDynamic;
-    this.isLive = isLive;
-    this.manifest = manifest;
     this.tag = tag;
   }
 
@@ -171,8 +146,10 @@ public final class SinglePeriodTimeline extends Timeline {
   }
 
   @Override
-  public Window getWindow(int windowIndex, Window window, long defaultPositionProjectionUs) {
+  public Window getWindow(
+      int windowIndex, Window window, boolean setTag, long defaultPositionProjectionUs) {
     Assertions.checkIndex(windowIndex, 0, 1);
+    Object tag = setTag ? this.tag : null;
     long windowDefaultStartPositionUs = this.windowDefaultStartPositionUs;
     if (isDynamic && defaultPositionProjectionUs != 0) {
       if (windowDurationUs == C.TIME_UNSET) {
@@ -187,14 +164,11 @@ public final class SinglePeriodTimeline extends Timeline {
       }
     }
     return window.set(
-        Window.SINGLE_WINDOW_UID,
         tag,
-        manifest,
         presentationStartTimeMs,
         windowStartTimeMs,
         isSeekable,
         isDynamic,
-        isLive,
         windowDefaultStartPositionUs,
         windowDurationUs,
         0,

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.google.android.exoplayer2.ui.spherical;
 
 import static com.google.android.exoplayer2.util.GlUtil.checkGlError;
@@ -25,7 +26,7 @@ import java.nio.FloatBuffer;
 /** Renders a pointer. */
 public final class PointerRenderer {
   // The pointer quad is 2 * SIZE units.
-  private static final float SIZE = 0.01f;
+  private static final float SIZE = .01f;
   private static final float DISTANCE = 1;
 
   // Standard vertex shader.

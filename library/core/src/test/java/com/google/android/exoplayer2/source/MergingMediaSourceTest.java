@@ -26,14 +26,15 @@ import com.google.android.exoplayer2.testutil.FakeMediaSource;
 import com.google.android.exoplayer2.testutil.FakeTimeline;
 import com.google.android.exoplayer2.testutil.FakeTimeline.TimelineWindowDefinition;
 import com.google.android.exoplayer2.testutil.MediaSourceTestRunner;
+import com.google.android.exoplayer2.testutil.RobolectricUtil;
 import java.io.IOException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.robolectric.annotation.LooperMode;
+import org.robolectric.annotation.Config;
 
 /** Unit tests for {@link MergingMediaSource}. */
 @RunWith(AndroidJUnit4.class)
-@LooperMode(LooperMode.Mode.PAUSED)
+@Config(shadows = {RobolectricUtil.CustomLooper.class, RobolectricUtil.CustomMessageQueue.class})
 public class MergingMediaSourceTest {
 
   @Test
@@ -68,7 +69,8 @@ public class MergingMediaSourceTest {
   public void testMergingMediaSourcePeriodCreation() throws Exception {
     FakeMediaSource[] mediaSources = new FakeMediaSource[2];
     for (int i = 0; i < mediaSources.length; i++) {
-      mediaSources[i] = new FakeMediaSource(new FakeTimeline(/* windowCount= */ 2));
+      mediaSources[i] =
+          new FakeMediaSource(new FakeTimeline(/* windowCount= */ 2), /* manifest= */ null);
     }
     MergingMediaSource mediaSource = new MergingMediaSource(mediaSources);
     MediaSourceTestRunner testRunner = new MediaSourceTestRunner(mediaSource, null);
@@ -91,7 +93,7 @@ public class MergingMediaSourceTest {
   private static void testMergingMediaSourcePrepare(Timeline... timelines) throws IOException {
     FakeMediaSource[] mediaSources = new FakeMediaSource[timelines.length];
     for (int i = 0; i < timelines.length; i++) {
-      mediaSources[i] = new FakeMediaSource(timelines[i]);
+      mediaSources[i] = new FakeMediaSource(timelines[i], null);
     }
     MergingMediaSource mergingMediaSource = new MergingMediaSource(mediaSources);
     MediaSourceTestRunner testRunner = new MediaSourceTestRunner(mergingMediaSource, null);

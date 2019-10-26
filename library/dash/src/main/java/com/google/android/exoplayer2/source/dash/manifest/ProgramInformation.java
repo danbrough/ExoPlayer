@@ -21,26 +21,22 @@ import com.google.android.exoplayer2.util.Util;
 /** A parsed program information element. */
 public class ProgramInformation {
   /** The title for the media presentation. */
-  @Nullable public final String title;
+  public final String title;
 
   /** Information about the original source of the media presentation. */
-  @Nullable public final String source;
+  public final String source;
 
   /** A copyright statement for the media presentation. */
-  @Nullable public final String copyright;
+  public final String copyright;
 
   /** A URL that provides more information about the media presentation. */
-  @Nullable public final String moreInformationURL;
+  public final String moreInformationURL;
 
   /** Declares the language code(s) for this ProgramInformation. */
-  @Nullable public final String lang;
+  public final String lang;
 
   public ProgramInformation(
-      @Nullable String title,
-      @Nullable String source,
-      @Nullable String copyright,
-      @Nullable String moreInformationURL,
-      @Nullable String lang) {
+      String title, String source, String copyright, String moreInformationURL, String lang) {
     this.title = title;
     this.source = source;
     this.copyright = copyright;

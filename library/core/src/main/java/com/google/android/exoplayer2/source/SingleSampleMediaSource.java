@@ -60,7 +60,7 @@ public final class SingleSampleMediaSource extends BaseMediaSource {
     private LoadErrorHandlingPolicy loadErrorHandlingPolicy;
     private boolean treatLoadErrorsAsEndOfStream;
     private boolean isCreateCalled;
-    @Nullable private Object tag;
+    private @Nullable Object tag;
 
     /**
      * Creates a factory for {@link SingleSampleMediaSource}s.
@@ -186,7 +186,7 @@ public final class SingleSampleMediaSource extends BaseMediaSource {
   private final Timeline timeline;
   @Nullable private final Object tag;
 
-  @Nullable private TransferListener transferListener;
+  private @Nullable TransferListener transferListener;
 
   /**
    * @param uri The {@link Uri} of the media stream.
@@ -290,13 +290,7 @@ public final class SingleSampleMediaSource extends BaseMediaSource {
     this.tag = tag;
     dataSpec = new DataSpec(uri, DataSpec.FLAG_ALLOW_GZIP);
     timeline =
-        new SinglePeriodTimeline(
-            durationUs,
-            /* isSeekable= */ true,
-            /* isDynamic= */ false,
-            /* isLive= */ false,
-            /* manifest= */ null,
-            tag);
+        new SinglePeriodTimeline(durationUs, /* isSeekable= */ true, /* isDynamic= */ false, tag);
   }
 
   // MediaSource implementation.
@@ -308,9 +302,9 @@ public final class SingleSampleMediaSource extends BaseMediaSource {
   }
 
   @Override
-  protected void prepareSourceInternal(@Nullable TransferListener mediaTransferListener) {
+  public void prepareSourceInternal(@Nullable TransferListener mediaTransferListener) {
     transferListener = mediaTransferListener;
-    refreshSourceInfo(timeline);
+    refreshSourceInfo(timeline, /* manifest= */ null);
   }
 
   @Override
@@ -337,7 +331,7 @@ public final class SingleSampleMediaSource extends BaseMediaSource {
   }
 
   @Override
-  protected void releaseSourceInternal() {
+  public void releaseSourceInternal() {
     // Do nothing.
   }
 

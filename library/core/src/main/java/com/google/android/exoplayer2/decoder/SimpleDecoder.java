@@ -15,7 +15,6 @@
  */
 package com.google.android.exoplayer2.decoder;
 
-import androidx.annotation.CallSuper;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.util.Assertions;
@@ -87,7 +86,6 @@ public abstract class SimpleDecoder<
   }
 
   @Override
-  @Nullable
   public final I dequeueInputBuffer() throws E {
     synchronized (lock) {
       maybeThrowException();
@@ -110,7 +108,6 @@ public abstract class SimpleDecoder<
   }
 
   @Override
-  @Nullable
   public final O dequeueOutputBuffer() throws E {
     synchronized (lock) {
       maybeThrowException();
@@ -126,7 +123,6 @@ public abstract class SimpleDecoder<
    *
    * @param outputBuffer The output buffer being released.
    */
-  @CallSuper
   protected void releaseOutputBuffer(O outputBuffer) {
     synchronized (lock) {
       releaseOutputBufferInternal(outputBuffer);
@@ -152,7 +148,6 @@ public abstract class SimpleDecoder<
     }
   }
 
-  @CallSuper
   @Override
   public void release() {
     synchronized (lock) {

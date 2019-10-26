@@ -23,9 +23,8 @@ import android.media.MediaDrm;
 import android.media.MediaDrmException;
 import android.media.NotProvisionedException;
 import android.media.UnsupportedSchemeException;
-import android.text.TextUtils;
 import androidx.annotation.Nullable;
-import androidx.annotation.RequiresApi;
+import android.text.TextUtils;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.drm.DrmInitData.SchemeData;
 import com.google.android.exoplayer2.extractor.mp4.PsshAtomUtil;
@@ -43,42 +42,23 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** An {@link ExoMediaDrm} implementation that wraps the framework {@link MediaDrm}. */
+/**
+ * An {@link ExoMediaDrm} implementation that wraps the framework {@link MediaDrm}.
+ */
 @TargetApi(23)
-@RequiresApi(18)
 public final class FrameworkMediaDrm implements ExoMediaDrm<FrameworkMediaCrypto> {
-
-  private static final String TAG = "FrameworkMediaDrm";
-
-  /**
-   * {@link ExoMediaDrm.Provider} that returns a new {@link FrameworkMediaDrm} for the requested
-   * UUID. Returns a {@link DummyExoMediaDrm} if the protection scheme identified by the given UUID
-   * is not supported by the device.
-   *
-   * <p>This provider should be used to make ExoPlayer handle {@link ExoMediaDrm} resources.
-   */
-  public static final Provider<FrameworkMediaCrypto> DEFAULT_PROVIDER =
-      uuid -> {
-        try {
-          return newInstance(uuid);
-        } catch (UnsupportedDrmException e) {
-          Log.e(TAG, "Failed to instantiate a FrameworkMediaDrm for uuid: " + uuid + ".");
-          return new DummyExoMediaDrm<>();
-        }
-      };
 
   private static final String CENC_SCHEME_MIME_TYPE = "cenc";
   private static final String MOCK_LA_URL_VALUE = "https://x";
   private static final String MOCK_LA_URL = "<LA_URL>" + MOCK_LA_URL_VALUE + "</LA_URL>";
   private static final int UTF_16_BYTES_PER_CHARACTER = 2;
+  private static final String TAG = "FrameworkMediaDrm";
 
   private final UUID uuid;
   private final MediaDrm mediaDrm;
-  private int referenceCount;
 
   /**
-   * Creates an instance with an {@link #acquire() acquired reference} for the specified scheme
-   * UUID.
+   * Creates an instance for the specified scheme UUID.
    *
    * @param uuid The scheme uuid.
    * @return The created instance.
@@ -99,8 +79,6 @@ public final class FrameworkMediaDrm implements ExoMediaDrm<FrameworkMediaCrypto
     Assertions.checkArgument(!C.COMMON_PSSH_UUID.equals(uuid), "Use C.CLEARKEY_UUID instead");
     this.uuid = uuid;
     this.mediaDrm = new MediaDrm(adjustUuid(uuid));
-    // Creators of an instance automatically acquire ownership of the created instance.
-    referenceCount = 1;
     if (C.WIDEVINE_UUID.equals(uuid) && needsForceWidevineL3Workaround()) {
       forceWidevineL3(mediaDrm);
     }
@@ -208,16 +186,8 @@ public final class FrameworkMediaDrm implements ExoMediaDrm<FrameworkMediaCrypto
   }
 
   @Override
-  public synchronized void acquire() {
-    Assertions.checkState(referenceCount > 0);
-    referenceCount++;
-  }
-
-  @Override
-  public synchronized void release() {
-    if (--referenceCount == 0) {
-      mediaDrm.release();
-    }
+  public void release() {
+    mediaDrm.release();
   }
 
   @Override
@@ -255,11 +225,6 @@ public final class FrameworkMediaDrm implements ExoMediaDrm<FrameworkMediaCrypto
         adjustUuid(uuid), initData, forceAllowInsecureDecoderComponents);
   }
 
-  @Override
-  public Class<FrameworkMediaCrypto> getExoMediaCryptoType() {
-    return FrameworkMediaCrypto.class;
-  }
-
   private static SchemeData getSchemeData(UUID uuid, List<SchemeData> schemeDatas) {
     if (!C.WIDEVINE_UUID.equals(uuid)) {
       // For non-Widevine CDMs always use the first scheme data.
@@ -274,7 +239,8 @@ public final class FrameworkMediaDrm implements ExoMediaDrm<FrameworkMediaCrypto
       for (int i = 0; i < schemeDatas.size(); i++) {
         SchemeData schemeData = schemeDatas.get(i);
         byte[] schemeDataData = Util.castNonNull(schemeData.data);
-        if (Util.areEqual(schemeData.mimeType, firstSchemeData.mimeType)
+        if (schemeData.requiresSecureDecryption == firstSchemeData.requiresSecureDecryption
+            && Util.areEqual(schemeData.mimeType, firstSchemeData.mimeType)
             && Util.areEqual(schemeData.licenseServerUrl, firstSchemeData.licenseServerUrl)
             && PsshAtomUtil.isPsshAtom(schemeDataData)) {
           concatenatedDataLength += schemeDataData.length;

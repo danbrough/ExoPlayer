@@ -15,13 +15,12 @@
  */
 package com.google.android.exoplayer2.text.subrip;
 
+import androidx.annotation.Nullable;
 import android.text.Html;
 import android.text.Spanned;
 import android.text.TextUtils;
-import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.text.Cue;
 import com.google.android.exoplayer2.text.SimpleSubtitleDecoder;
-import com.google.android.exoplayer2.text.Subtitle;
 import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.LongArray;
 import com.google.android.exoplayer2.util.ParsableByteArray;
@@ -35,9 +34,9 @@ import java.util.regex.Pattern;
 public final class SubripDecoder extends SimpleSubtitleDecoder {
 
   // Fractional positions for use when alignment tags are present.
-  private static final float START_FRACTION = 0.08f;
-  private static final float END_FRACTION = 1 - START_FRACTION;
-  private static final float MID_FRACTION = 0.5f;
+  /* package */ static final float START_FRACTION = 0.08f;
+  /* package */ static final float END_FRACTION = 1 - START_FRACTION;
+  /* package */ static final float MID_FRACTION = 0.5f;
 
   private static final String TAG = "SubripDecoder";
 
@@ -69,7 +68,7 @@ public final class SubripDecoder extends SimpleSubtitleDecoder {
   }
 
   @Override
-  protected Subtitle decode(byte[] bytes, int length, boolean reset) {
+  protected SubripSubtitle decode(byte[] bytes, int length, boolean reset) {
     ArrayList<Cue> cues = new ArrayList<>();
     LongArray cueTimesUs = new LongArray();
     ParsableByteArray subripData = new ParsableByteArray(bytes, length);

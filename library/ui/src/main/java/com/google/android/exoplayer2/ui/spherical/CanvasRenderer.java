@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.google.android.exoplayer2.ui.spherical;
 
 import static com.google.android.exoplayer2.util.GlUtil.checkGlError;
@@ -23,8 +24,8 @@ import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
 import android.opengl.GLES11Ext;
 import android.opengl.GLES20;
-import android.view.Surface;
 import androidx.annotation.Nullable;
+import android.view.Surface;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.util.GlUtil;
 import java.nio.FloatBuffer;
@@ -100,8 +101,8 @@ public final class CanvasRenderer {
   // GL initialization. The client of this class acquires a Canvas from the Surface, writes to it
   // and posts it. This marks the Surface as dirty. The GL code then updates the SurfaceTexture
   // when rendering only if it is dirty.
-  private @MonotonicNonNull SurfaceTexture displaySurfaceTexture;
-  private @MonotonicNonNull Surface displaySurface;
+  @MonotonicNonNull private SurfaceTexture displaySurfaceTexture;
+  @MonotonicNonNull private Surface displaySurface;
 
   public CanvasRenderer() {
     vertexBuffer = GlUtil.createBuffer(COORDS_PER_VERTEX * VERTEX_COUNT);

@@ -1,6 +1,112 @@
 # Release notes #
 
-### 2.10.6 (2019-10-18) ###
+### dev-v2 (not yet released) ###
+
+* MediaSession extension: Update shuffle and repeat modes when playback state
+  is invalidated ([#6582](https://github.com/google/ExoPlayer/issues/6582)).
+* AV1 extension: Uses libgav1 to decode AV1 videos. Android 10 includes an AV1
+  decoder, but the older versions of Android require this extension for playback
+  of AV1 streams ([#3353](https://github.com/google/ExoPlayer/issues/3353)).
+* DRM:
+  * Inject `DrmSessionManager` into the `MediaSources` instead of `Renderers`
+    ([#5619](https://github.com/google/ExoPlayer/issues/5619)).
+  * Add a `DefaultDrmSessionManager.Builder`.
+  * Add support for the use of secure decoders in clear sections of content
+    ([#4867](https://github.com/google/ExoPlayer/issues/4867)).
+  * Add basic DRM support to the Cast demo app.
+  * Add support for custom `LoadErrorHandlingPolicies` in key and provisioning
+    requests ([#6334](https://github.com/google/ExoPlayer/issues/6334)).
+  * Remove `DefaultDrmSessionManager` factory methods that leak `ExoMediaDrm`
+    instances ([#4721](https://github.com/google/ExoPlayer/issues/4721)).
+* Remove the `DataSpec.FLAG_ALLOW_ICY_METADATA` flag. Instead, set the header
+  `IcyHeaders.REQUEST_HEADER_ENABLE_METADATA_NAME` in the `DataSpec`
+  `httpRequestHeaders`.
+* DASH: Support negative @r values in segment timelines
+  ([#1787](https://github.com/google/ExoPlayer/issues/1787)).
+* Add `allowedCapturePolicy` field to `AudioAttributes` wrapper to allow to
+  opt-out of audio recording.
+* Add `DataSpec.httpRequestHeaders` to set HTTP request headers when connecting
+  to an HTTP source. `DefaultHttpDataSource`, `CronetDataSource` and
+  `OkHttpDataSource` include headers set in the DataSpec when connecting to the
+  source.
+* Surface information provided by methods `isHardwareAccelerated`,
+  `isSoftwareOnly` and `isVendor` added in Android 10 in `MediaCodecInfo` class
+  ([#5839](https://github.com/google/ExoPlayer/issues/5839)).
+* Update `DefaultTrackSelector` to apply a viewport constraint for the default
+  display by default.
+* Add `PlaybackStatsListener` to collect `PlaybackStats` for playbacks analysis
+  and analytics reporting (TODO: link to developer guide page/blog post).
+* Assume that encrypted content requires secure decoders in renderer support
+  checks ([#5568](https://github.com/google/ExoPlayer/issues/5568)).
+* Decoders: Prefer decoders that advertise format support over ones that do not,
+  even if they are listed lower in the `MediaCodecList`.
+* Add a workaround for broken raw audio decoding on Oppo R9
+  ([#5782](https://github.com/google/ExoPlayer/issues/5782)).
+* Wrap decoder exceptions in a new `DecoderException` class and report as
+  renderer error.
+* Do not pass the manifest to callbacks of `Player.EventListener` and
+  `SourceInfoRefreshListener` anymore. Instead make it accessible through
+  `Player.getCurrentManifest()` and `Timeline.Window.manifest`. Also rename
+  `SourceInfoRefreshListener` to `MediaSourceCaller`.
+* Set `compileSdkVersion` to 29 to use Android 10 APIs.
+* Add `enable` and `disable` methods to `MediaSource` to improve resource
+  management in playlists.
+* Text selection logic:
+  * Allow to set preferred role flags using
+    `DefaultTrackSelector.ParametersBuilder.setPreferredTextRoleFlags`.
+  * Default text language and role flags to accessibility captioning settings
+    ([#5749](https://github.com/google/ExoPlayer/issues/5749)).
+* Remove `AnalyticsCollector.Factory`. Instances can be created directly and
+  the `Player` set later using `AnalyticsCollector.setPlayer`.
+* Replace `ExoPlayerFactory` by `SimpleExoPlayer.Builder` and
+  `ExoPlayer.Builder`.
+* Fix issue where player errors are thrown too early at playlist transitions
+  ([#5407](https://github.com/google/ExoPlayer/issues/5407)).
+* Deprecate `setTag` parameter of `Timeline.getWindow`. Tags will always be set.
+* Support out-of-band HDR10+ metadata for VP9 in WebM/Matroska.
+* Fix issue where HLS streams get stuck in infinite buffering state after
+  postroll ad ([#6314](https://github.com/google/ExoPlayer/issues/6314)).
+* Publish `testutils` module to simplify unit testing with ExoPlayer
+  ([#6267](https://github.com/google/ExoPlayer/issues/6267)).
+* Add `uid` to `Timeline.Window` to uniquely identify window instances.
+* Fix Dolby Vision fallback to AVC and HEVC.
+* Add top-level playlist API
+  ([#6161](https://github.com/google/ExoPlayer/issues/6161)).
+* Add demo app to show how to use the Android 10 `SurfaceControl` API with
+  ExoPlayer ([#677](https://github.com/google/ExoPlayer/issues/677)).
+* Add automatic `WakeLock` handling to `SimpleExoPlayer` through calling
+  `setEnableWakeLock`, which requires the
+  `android.Manifest.permission#WAKE_LOCK` permission
+  ([#5846](https://github.com/google/ExoPlayer/issues/5846)).
+* VP9 extension:
+  * Rename `VpxVideoSurfaceView` to `VideoDecoderSurfaceView`
+    and move it to the core library.
+  * Move `LibvpxVideoRenderer.MSG_SET_OUTPUT_BUFFER_RENDERER` to
+    `C.MSG_SET_OUTPUT_BUFFER_RENDERER`.
+  * Use `VideoDecoderRenderer` as an implementation of
+    `VideoDecoderOutputBufferRenderer`, instead of `VideoDecoderSurfaceView`.
+* Add automatic audio becoming noisy handling to `SimpleExoPlayer`,
+  available through `SimpleExoPlayer.setHandleAudioBecomingNoisy`.
+* Post `AudioFocusManager.onAudioFocusChange` events to eventHandler, avoiding
+  multithreaded access to the player or audio focus manager.
+* Add `Timeline.Window.isLive` to indicate that a window is a live stream
+  ([#2668](https://github.com/google/ExoPlayer/issues/2668) and
+  [#5973](https://github.com/google/ExoPlayer/issues/5973)).
+* Fail more explicitly when local-file Uris contain invalid parts (e.g.
+  fragment) ([#6470](https://github.com/google/ExoPlayer/issues/6470)).
+* Add `MediaPeriod.isLoading` to improve `Player.isLoading` state.
+* Make show and hide player controls accessible for TalkBack in `PlayerView`.
+* Add workaround to avoid truncating MP3 live streams with ICY metadata and
+  introductions that have a seeking header
+  ([#6537](https://github.com/google/ExoPlayer/issues/6537),
+  [#6315](https://github.com/google/ExoPlayer/issues/6315) and
+  [#5658](https://github.com/google/ExoPlayer/issues/5658)).
+* Pass the codec output `MediaFormat` to `VideoFrameMetadataListener`.
+* Deprecate the GVR extension.
+* Fix the start of audio getting truncated when transitioning to a new
+  item in a playlist of opus streams.
+
+### 2.10.6 (2019-10-17) ###
 
 * Add `Player.onPlaybackSuppressionReasonChanged` to allow listeners to
   detect playbacks suppressions (e.g. transient audio focus loss) directly
@@ -12,10 +118,6 @@
     ([#6523](https://github.com/google/ExoPlayer/issues/6523)).
 * HLS: Add support for ID3 in EMSG when using FMP4 streams
   ([spec](https://aomediacodec.github.io/av1-id3/)).
-* MP3: Add workaround to avoid prematurely ending playback of some SHOUTcast
-  live streams ([#6537](https://github.com/google/ExoPlayer/issues/6537),
-  [#6315](https://github.com/google/ExoPlayer/issues/6315) and
-  [#5658](https://github.com/google/ExoPlayer/issues/5658)).
 * Metadata: Expose the raw ICY metadata through `IcyInfo`
   ([#6476](https://github.com/google/ExoPlayer/issues/6476)).
 * UI:

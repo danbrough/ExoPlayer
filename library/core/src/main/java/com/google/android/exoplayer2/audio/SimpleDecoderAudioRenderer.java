@@ -17,7 +17,6 @@ package com.google.android.exoplayer2.audio;
 
 import android.media.audiofx.Virtualizer;
 import android.os.Handler;
-import android.os.Looper;
 import android.os.SystemClock;
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
@@ -95,7 +94,6 @@ public abstract class SimpleDecoderAudioRenderer extends BaseRenderer implements
   private final boolean playClearSamplesWithoutKeys;
   private final EventDispatcher eventDispatcher;
   private final AudioSink audioSink;
-  private final FormatHolder formatHolder;
   private final DecoderInputBuffer flagsOnlyBuffer;
 
   private DecoderCounters decoderCounters;
@@ -213,7 +211,6 @@ public abstract class SimpleDecoderAudioRenderer extends BaseRenderer implements
     eventDispatcher = new EventDispatcher(eventHandler, eventListener);
     this.audioSink = audioSink;
     audioSink.setListener(new AudioSinkListener());
-    formatHolder = new FormatHolder();
     flagsOnlyBuffer = DecoderInputBuffer.newFlagsOnlyInstance();
     decoderReinitializationState = REINITIALIZATION_STATE_NONE;
     audioTrackNeedsConfigure = true;
@@ -246,7 +243,7 @@ public abstract class SimpleDecoderAudioRenderer extends BaseRenderer implements
    * @return The extent to which the renderer supports the format itself.
    */
   protected abstract int supportsFormatInternal(
-      DrmSessionManager<ExoMediaCrypto> drmSessionManager, Format format);
+      @Nullable DrmSessionManager<ExoMediaCrypto> drmSessionManager, Format format);
 
   /**
    * Returns whether the sink supports the audio format.
@@ -271,10 +268,11 @@ public abstract class SimpleDecoderAudioRenderer extends BaseRenderer implements
     // Try and read a format if we don't have one already.
     if (inputFormat == null) {
       // We don't have a format yet, so try and read one.
+      FormatHolder formatHolder = getFormatHolder();
       flagsOnlyBuffer.clear();
       int result = readSource(formatHolder, flagsOnlyBuffer, true);
       if (result == C.RESULT_FORMAT_READ) {
-        onInputFormatChanged(formatHolder.format);
+        onInputFormatChanged(formatHolder);
       } else if (result == C.RESULT_BUFFER_READ) {
         // End of stream read having not read a format.
         Assertions.checkState(flagsOnlyBuffer.isEndOfStream());
@@ -341,9 +339,10 @@ public abstract class SimpleDecoderAudioRenderer extends BaseRenderer implements
    * @return The decoder.
    * @throws AudioDecoderException If an error occurred creating a suitable decoder.
    */
-  protected abstract SimpleDecoder<DecoderInputBuffer, ? extends SimpleOutputBuffer,
-      ? extends AudioDecoderException> createDecoder(Format format, ExoMediaCrypto mediaCrypto)
-      throws AudioDecoderException;
+  protected abstract SimpleDecoder<
+          DecoderInputBuffer, ? extends SimpleOutputBuffer, ? extends AudioDecoderException>
+      createDecoder(Format format, @Nullable ExoMediaCrypto mediaCrypto)
+          throws AudioDecoderException;
 
   /**
    * Returns the format of audio buffers output by the decoder. Will not be called until the first
@@ -356,6 +355,17 @@ public abstract class SimpleDecoderAudioRenderer extends BaseRenderer implements
     return Format.createAudioSampleFormat(null, MimeTypes.AUDIO_RAW, null, Format.NO_VALUE,
         Format.NO_VALUE, inputFormat.channelCount, inputFormat.sampleRate, C.ENCODING_PCM_16BIT,
         null, null, 0, null);
+  }
+
+  /**
+   * Returns whether the existing decoder can be kept for a new format.
+   *
+   * @param oldFormat The previous format.
+   * @param newFormat The new format.
+   * @return True if the existing decoder can be kept.
+   */
+  protected boolean canKeepCodec(Format oldFormat, Format newFormat) {
+    return false;
   }
 
   private boolean drainOutputBuffer() throws ExoPlaybackException, AudioDecoderException,
@@ -427,6 +437,7 @@ public abstract class SimpleDecoderAudioRenderer extends BaseRenderer implements
     }
 
     int result;
+    FormatHolder formatHolder = getFormatHolder();
     if (waitingForKeys) {
       // We've already read an encrypted sample into buffer, and are waiting for keys.
       result = C.RESULT_BUFFER_READ;
@@ -438,7 +449,7 @@ public abstract class SimpleDecoderAudioRenderer extends BaseRenderer implements
       return false;
     }
     if (result == C.RESULT_FORMAT_READ) {
-      onInputFormatChanged(formatHolder.format);
+      onInputFormatChanged(formatHolder);
       return true;
     }
     if (inputBuffer.isEndOfStream()) {
@@ -517,8 +528,8 @@ public abstract class SimpleDecoderAudioRenderer extends BaseRenderer implements
   }
 
   @Override
-  public PlaybackParameters setPlaybackParameters(PlaybackParameters playbackParameters) {
-    return audioSink.setPlaybackParameters(playbackParameters);
+  public void setPlaybackParameters(PlaybackParameters playbackParameters) {
+    audioSink.setPlaybackParameters(playbackParameters);
   }
 
   @Override
@@ -646,62 +657,43 @@ public abstract class SimpleDecoderAudioRenderer extends BaseRenderer implements
   }
 
   private void setSourceDrmSession(@Nullable DrmSession<ExoMediaCrypto> session) {
-    DrmSession<ExoMediaCrypto> previous = sourceDrmSession;
+    DrmSession.replaceSessionReferences(sourceDrmSession, session);
     sourceDrmSession = session;
-    releaseDrmSessionIfUnused(previous);
   }
 
   private void setDecoderDrmSession(@Nullable DrmSession<ExoMediaCrypto> session) {
-    DrmSession<ExoMediaCrypto> previous = decoderDrmSession;
+    DrmSession.replaceSessionReferences(decoderDrmSession, session);
     decoderDrmSession = session;
-    releaseDrmSessionIfUnused(previous);
   }
 
-  private void releaseDrmSessionIfUnused(@Nullable DrmSession<ExoMediaCrypto> session) {
-    if (session != null && session != decoderDrmSession && session != sourceDrmSession) {
-      drmSessionManager.releaseSession(session);
+  @SuppressWarnings("unchecked")
+  private void onInputFormatChanged(FormatHolder formatHolder) throws ExoPlaybackException {
+    Format newFormat = Assertions.checkNotNull(formatHolder.format);
+    if (formatHolder.includesDrmSession) {
+      setSourceDrmSession((DrmSession<ExoMediaCrypto>) formatHolder.drmSession);
+    } else {
+      sourceDrmSession =
+          getUpdatedSourceDrmSession(inputFormat, newFormat, drmSessionManager, sourceDrmSession);
     }
-  }
-
-  private void onInputFormatChanged(Format newFormat) throws ExoPlaybackException {
     Format oldFormat = inputFormat;
     inputFormat = newFormat;
 
-    boolean drmInitDataChanged = !Util.areEqual(inputFormat.drmInitData, oldFormat == null ? null
-        : oldFormat.drmInitData);
-    if (drmInitDataChanged) {
-      if (inputFormat.drmInitData != null) {
-        if (drmSessionManager == null) {
-          throw ExoPlaybackException.createForRenderer(
-              new IllegalStateException("Media requires a DrmSessionManager"), getIndex());
-        }
-        DrmSession<ExoMediaCrypto> session =
-            drmSessionManager.acquireSession(Looper.myLooper(), newFormat.drmInitData);
-        if (session == decoderDrmSession || session == sourceDrmSession) {
-          // We already had this session. The manager must be reference counting, so release it once
-          // to get the count attributed to this renderer back down to 1.
-          drmSessionManager.releaseSession(session);
-        }
-        setSourceDrmSession(session);
+    if (!canKeepCodec(oldFormat, inputFormat)) {
+      if (decoderReceivedBuffers) {
+        // Signal end of stream and wait for any final output buffers before re-initialization.
+        decoderReinitializationState = REINITIALIZATION_STATE_SIGNAL_END_OF_STREAM;
       } else {
-        setSourceDrmSession(null);
+        // There aren't any final output buffers, so release the decoder immediately.
+        releaseDecoder();
+        maybeInitDecoder();
+        audioTrackNeedsConfigure = true;
       }
     }
 
-    if (decoderReceivedBuffers) {
-      // Signal end of stream and wait for any final output buffers before re-initialization.
-      decoderReinitializationState = REINITIALIZATION_STATE_SIGNAL_END_OF_STREAM;
-    } else {
-      // There aren't any final output buffers, so release the decoder immediately.
-      releaseDecoder();
-      maybeInitDecoder();
-      audioTrackNeedsConfigure = true;
-    }
+    encoderDelay = inputFormat.encoderDelay;
+    encoderPadding = inputFormat.encoderPadding;
 
-    encoderDelay = newFormat.encoderDelay;
-    encoderPadding = newFormat.encoderPadding;
-
-    eventDispatcher.inputFormatChanged(newFormat);
+    eventDispatcher.inputFormatChanged(inputFormat);
   }
 
   private void onQueueInputBuffer(DecoderInputBuffer buffer) {

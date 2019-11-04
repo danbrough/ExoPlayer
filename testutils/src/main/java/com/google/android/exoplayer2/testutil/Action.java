@@ -15,9 +15,11 @@
  */
 package com.google.android.exoplayer2.testutil;
 
+import android.content.Intent;
 import android.os.Handler;
-import androidx.annotation.Nullable;
 import android.view.Surface;
+import androidx.annotation.Nullable;
+import androidx.test.core.app.ApplicationProvider;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.ExoPlayer;
@@ -27,6 +29,7 @@ import com.google.android.exoplayer2.PlayerMessage;
 import com.google.android.exoplayer2.PlayerMessage.Target;
 import com.google.android.exoplayer2.SimpleExoPlayer;
 import com.google.android.exoplayer2.Timeline;
+import com.google.android.exoplayer2.audio.AudioAttributes;
 import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.testutil.ActionSchedule.ActionNode;
 import com.google.android.exoplayer2.testutil.ActionSchedule.PlayerRunnable;
@@ -37,13 +40,11 @@ import com.google.android.exoplayer2.util.ConditionVariable;
 import com.google.android.exoplayer2.util.HandlerWrapper;
 import com.google.android.exoplayer2.util.Log;
 
-/**
- * Base class for actions to perform during playback tests.
- */
+/** Base class for actions to perform during playback tests. */
 public abstract class Action {
 
   private final String tag;
-  private final @Nullable String description;
+  @Nullable private final String description;
 
   /**
    * @param tag A tag to use for logging.
@@ -109,9 +110,7 @@ public abstract class Action {
   protected abstract void doActionImpl(
       SimpleExoPlayer player, DefaultTrackSelector trackSelector, Surface surface);
 
-  /**
-   * Calls {@link Player#seekTo(long)} or {@link Player#seekTo(int, long)}.
-   */
+  /** Calls {@link Player#seekTo(long)} or {@link Player#seekTo(int, long)}. */
   public static final class Seek extends Action {
 
     private final Integer windowIndex;
@@ -151,12 +150,9 @@ public abstract class Action {
         player.seekTo(windowIndex, positionMs);
       }
     }
-
   }
 
-  /**
-   * Calls {@link Player#stop()} or {@link Player#stop(boolean)}.
-   */
+  /** Calls {@link Player#stop()} or {@link Player#stop(boolean)}. */
   public static final class Stop extends Action {
 
     private static final String STOP_ACTION_TAG = "Stop";
@@ -192,14 +188,10 @@ public abstract class Action {
       } else {
         player.stop(reset);
       }
-
     }
-
   }
 
-  /**
-   * Calls {@link Player#setPlayWhenReady(boolean)}.
-   */
+  /** Calls {@link Player#setPlayWhenReady(boolean)}. */
   public static final class SetPlayWhenReady extends Action {
 
     private final boolean playWhenReady;
@@ -219,6 +211,26 @@ public abstract class Action {
       player.setPlayWhenReady(playWhenReady);
     }
 
+  }
+
+  /** Broadcasts an {@link Intent}. */
+  public static final class SendBroadcast extends Action {
+    private final Intent intent;
+
+    /**
+     * @param tag A tag to use for logging.
+     * @param intent The {@link Intent} to broadcast.
+     */
+    public SendBroadcast(String tag, Intent intent) {
+      super(tag, "SendBroadcast: " + intent.getAction());
+      this.intent = intent;
+    }
+
+    @Override
+    protected void doActionImpl(
+        SimpleExoPlayer player, DefaultTrackSelector trackSelector, Surface surface) {
+      ApplicationProvider.getApplicationContext().sendBroadcast(intent);
+    }
   }
 
   /**
@@ -247,17 +259,12 @@ public abstract class Action {
       trackSelector.setParameters(
           trackSelector.buildUponParameters().setRendererDisabled(rendererIndex, disabled));
     }
-
   }
 
-  /**
-   * Calls {@link SimpleExoPlayer#clearVideoSurface()}.
-   */
+  /** Calls {@link SimpleExoPlayer#clearVideoSurface()}. */
   public static final class ClearVideoSurface extends Action {
 
-    /**
-     * @param tag A tag to use for logging.
-     */
+    /** @param tag A tag to use for logging. */
     public ClearVideoSurface(String tag) {
       super(tag, "ClearVideoSurface");
     }
@@ -267,17 +274,12 @@ public abstract class Action {
         SimpleExoPlayer player, DefaultTrackSelector trackSelector, Surface surface) {
       player.clearVideoSurface();
     }
-
   }
 
-  /**
-   * Calls {@link SimpleExoPlayer#setVideoSurface(Surface)}.
-   */
+  /** Calls {@link SimpleExoPlayer#setVideoSurface(Surface)}. */
   public static final class SetVideoSurface extends Action {
 
-    /**
-     * @param tag A tag to use for logging.
-     */
+    /** @param tag A tag to use for logging. */
     public SetVideoSurface(String tag) {
       super(tag, "SetVideoSurface");
     }
@@ -287,12 +289,34 @@ public abstract class Action {
         SimpleExoPlayer player, DefaultTrackSelector trackSelector, Surface surface) {
       player.setVideoSurface(surface);
     }
-
   }
 
-  /**
-   * Calls {@link ExoPlayer#prepare(MediaSource)}.
-   */
+  /** Calls {@link SimpleExoPlayer#setAudioAttributes(AudioAttributes, boolean)}. */
+  public static final class SetAudioAttributes extends Action {
+
+    private final AudioAttributes audioAttributes;
+    private final boolean handleAudioFocus;
+
+    /**
+     * @param tag A tag to use for logging.
+     * @param audioAttributes The attributes to use for audio playback.
+     * @param handleAudioFocus True if the player should handle audio focus, false otherwise.
+     */
+    public SetAudioAttributes(
+        String tag, AudioAttributes audioAttributes, boolean handleAudioFocus) {
+      super(tag, "SetAudioAttributes");
+      this.audioAttributes = audioAttributes;
+      this.handleAudioFocus = handleAudioFocus;
+    }
+
+    @Override
+    protected void doActionImpl(
+        SimpleExoPlayer player, DefaultTrackSelector trackSelector, Surface surface) {
+      player.setAudioAttributes(audioAttributes, handleAudioFocus);
+    }
+  }
+
+  /** Calls {@link ExoPlayer#prepare(MediaSource)}. */
   public static final class PrepareSource extends Action {
 
     private final MediaSource mediaSource;
@@ -301,6 +325,7 @@ public abstract class Action {
 
     /**
      * @param tag A tag to use for logging.
+     * @param mediaSource The {@link MediaSource} to prepare the player with.
      */
     public PrepareSource(String tag, MediaSource mediaSource) {
       this(tag, mediaSource, true, true);
@@ -308,9 +333,11 @@ public abstract class Action {
 
     /**
      * @param tag A tag to use for logging.
+     * @param mediaSource The {@link MediaSource} to prepare the player with.
+     * @param resetPosition Whether the player's position should be reset.
      */
-    public PrepareSource(String tag, MediaSource mediaSource, boolean resetPosition,
-        boolean resetState) {
+    public PrepareSource(
+        String tag, MediaSource mediaSource, boolean resetPosition, boolean resetState) {
       super(tag, "PrepareSource");
       this.mediaSource = mediaSource;
       this.resetPosition = resetPosition;
@@ -322,18 +349,16 @@ public abstract class Action {
         SimpleExoPlayer player, DefaultTrackSelector trackSelector, Surface surface) {
       player.prepare(mediaSource, resetPosition, resetState);
     }
-
   }
 
-  /**
-   * Calls {@link Player#setRepeatMode(int)}.
-   */
+  /** Calls {@link Player#setRepeatMode(int)}. */
   public static final class SetRepeatMode extends Action {
 
     private final @Player.RepeatMode int repeatMode;
 
     /**
      * @param tag A tag to use for logging.
+     * @param repeatMode The repeat mode.
      */
     public SetRepeatMode(String tag, @Player.RepeatMode int repeatMode) {
       super(tag, "SetRepeatMode:" + repeatMode);
@@ -345,18 +370,16 @@ public abstract class Action {
         SimpleExoPlayer player, DefaultTrackSelector trackSelector, Surface surface) {
       player.setRepeatMode(repeatMode);
     }
-
   }
 
-  /**
-   * Calls {@link Player#setShuffleModeEnabled(boolean)}.
-   */
+  /** Calls {@link Player#setShuffleModeEnabled(boolean)}. */
   public static final class SetShuffleModeEnabled extends Action {
 
     private final boolean shuffleModeEnabled;
 
     /**
      * @param tag A tag to use for logging.
+     * @param shuffleModeEnabled Whether shuffling is enabled.
      */
     public SetShuffleModeEnabled(String tag, boolean shuffleModeEnabled) {
       super(tag, "SetShuffleModeEnabled:" + shuffleModeEnabled);
@@ -427,9 +450,7 @@ public abstract class Action {
     }
   }
 
-  /**
-   * Calls {@link Player#setPlaybackParameters(PlaybackParameters)}.
-   */
+  /** Calls {@link Player#setPlaybackParameters(PlaybackParameters)}. */
   public static final class SetPlaybackParameters extends Action {
 
     private final PlaybackParameters playbackParameters;
@@ -542,12 +563,10 @@ public abstract class Action {
     }
   }
 
-  /**
-   * Waits for {@link Player.EventListener#onTimelineChanged(Timeline, Object, int)}.
-   */
+  /** Waits for {@link Player.EventListener#onTimelineChanged(Timeline, int)}. */
   public static final class WaitForTimelineChanged extends Action {
 
-    private final @Nullable Timeline expectedTimeline;
+    @Nullable private final Timeline expectedTimeline;
 
     /**
      * Creates action waiting for a timeline change.
@@ -575,9 +594,7 @@ public abstract class Action {
           new Player.EventListener() {
             @Override
             public void onTimelineChanged(
-                Timeline timeline,
-                @Nullable Object manifest,
-                @Player.TimelineChangeReason int reason) {
+                Timeline timeline, @Player.TimelineChangeReason int reason) {
               if (expectedTimeline == null || timeline.equals(expectedTimeline)) {
                 player.removeListener(this);
                 nextAction.schedule(player, trackSelector, surface, handler);
@@ -598,14 +615,10 @@ public abstract class Action {
     }
   }
 
-  /**
-   * Waits for {@link Player.EventListener#onPositionDiscontinuity(int)}.
-   */
+  /** Waits for {@link Player.EventListener#onPositionDiscontinuity(int)}. */
   public static final class WaitForPositionDiscontinuity extends Action {
 
-    /**
-     * @param tag A tag to use for logging.
-     */
+    /** @param tag A tag to use for logging. */
     public WaitForPositionDiscontinuity(String tag) {
       super(tag, "WaitForPositionDiscontinuity");
     }
@@ -638,16 +651,14 @@ public abstract class Action {
   }
 
   /**
-   * Waits for a specified playback state, returning either immediately or after a call to
-   * {@link Player.EventListener#onPlayerStateChanged(boolean, int)}.
+   * Waits for a specified playback state, returning either immediately or after a call to {@link
+   * Player.EventListener#onPlayerStateChanged(boolean, int)}.
    */
   public static final class WaitForPlaybackState extends Action {
 
     private final int targetPlaybackState;
 
-    /**
-     * @param tag A tag to use for logging.
-     */
+    /** @param tag A tag to use for logging. */
     public WaitForPlaybackState(String tag, int targetPlaybackState) {
       super(tag, "WaitForPlaybackState");
       this.targetPlaybackState = targetPlaybackState;
@@ -669,7 +680,8 @@ public abstract class Action {
         player.addListener(
             new Player.EventListener() {
               @Override
-              public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
+              public void onPlayerStateChanged(
+                  boolean playWhenReady, @Player.State int playbackState) {
                 if (targetPlaybackState == playbackState) {
                   player.removeListener(this);
                   nextAction.schedule(player, trackSelector, surface, handler);
@@ -736,14 +748,10 @@ public abstract class Action {
     }
   }
 
-  /**
-   * Waits for {@link Player.EventListener#onSeekProcessed()}.
-   */
+  /** Waits for {@link Player.EventListener#onSeekProcessed()}. */
   public static final class WaitForSeekProcessed extends Action {
 
-    /**
-     * @param tag A tag to use for logging.
-     */
+    /** @param tag A tag to use for logging. */
     public WaitForSeekProcessed(String tag) {
       super(tag, "WaitForSeekProcessed");
     }
@@ -775,16 +783,12 @@ public abstract class Action {
     }
   }
 
-  /**
-   * Calls {@link Runnable#run()}.
-   */
+  /** Calls {@link Runnable#run()}. */
   public static final class ExecuteRunnable extends Action {
 
     private final Runnable runnable;
 
-    /**
-     * @param tag A tag to use for logging.
-     */
+    /** @param tag A tag to use for logging. */
     public ExecuteRunnable(String tag, Runnable runnable) {
       super(tag, "ExecuteRunnable");
       this.runnable = runnable;
@@ -798,7 +802,5 @@ public abstract class Action {
       }
       runnable.run();
     }
-
   }
-
 }

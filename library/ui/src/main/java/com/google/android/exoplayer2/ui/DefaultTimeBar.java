@@ -25,8 +25,6 @@ import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
-import androidx.annotation.ColorInt;
-import androidx.annotation.Nullable;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
 import android.view.KeyEvent;
@@ -36,6 +34,8 @@ import android.view.ViewParent;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction;
+import androidx.annotation.ColorInt;
+import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.Util;
@@ -196,7 +196,7 @@ public class DefaultTimeBar extends View implements TimeBar {
   private final Paint adMarkerPaint;
   private final Paint playedAdMarkerPaint;
   private final Paint scrubberPaint;
-  private final @Nullable Drawable scrubberDrawable;
+  @Nullable private final Drawable scrubberDrawable;
   private final int barHeight;
   private final int touchTargetHeight;
   private final int adMarkerWidth;
@@ -223,8 +223,8 @@ public class DefaultTimeBar extends View implements TimeBar {
   private long position;
   private long bufferedPosition;
   private int adGroupCount;
-  private @Nullable long[] adGroupTimesMs;
-  private @Nullable boolean[] playedAdGroups;
+  @Nullable private long[] adGroupTimesMs;
+  @Nullable private boolean[] playedAdGroups;
 
   public DefaultTimeBar(Context context) {
     this(context, null);

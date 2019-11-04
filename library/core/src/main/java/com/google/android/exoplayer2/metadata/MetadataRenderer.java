@@ -36,12 +36,6 @@ import java.util.List;
  */
 public final class MetadataRenderer extends BaseRenderer implements Callback {
 
-  /**
-   * @deprecated Use {@link MetadataOutput}.
-   */
-  @Deprecated
-  public interface Output extends MetadataOutput {}
-
   private static final int MSG_INVOKE_RENDERER = 0;
   // TODO: Holding multiple pending metadata objects is temporary mitigation against
   // https://github.com/google/ExoPlayer/issues/1874. It should be removed once this issue has been
@@ -50,8 +44,7 @@ public final class MetadataRenderer extends BaseRenderer implements Callback {
 
   private final MetadataDecoderFactory decoderFactory;
   private final MetadataOutput output;
-  private final @Nullable Handler outputHandler;
-  private final FormatHolder formatHolder;
+  @Nullable private final Handler outputHandler;
   private final MetadataInputBuffer buffer;
   private final Metadata[] pendingMetadata;
   private final long[] pendingMetadataTimestamps;
@@ -90,7 +83,6 @@ public final class MetadataRenderer extends BaseRenderer implements Callback {
     this.outputHandler =
         outputLooper == null ? null : Util.createHandler(outputLooper, /* callback= */ this);
     this.decoderFactory = Assertions.checkNotNull(decoderFactory);
-    formatHolder = new FormatHolder();
     buffer = new MetadataInputBuffer();
     pendingMetadata = new Metadata[MAX_PENDING_METADATA_COUNT];
     pendingMetadataTimestamps = new long[MAX_PENDING_METADATA_COUNT];
@@ -120,6 +112,7 @@ public final class MetadataRenderer extends BaseRenderer implements Callback {
   public void render(long positionUs, long elapsedRealtimeUs) throws ExoPlaybackException {
     if (!inputStreamEnded && pendingMetadataCount < MAX_PENDING_METADATA_COUNT) {
       buffer.clear();
+      FormatHolder formatHolder = getFormatHolder();
       int result = readSource(formatHolder, buffer, false);
       if (result == C.RESULT_BUFFER_READ) {
         if (buffer.isEndOfStream()) {
@@ -218,7 +211,6 @@ public final class MetadataRenderer extends BaseRenderer implements Callback {
     pendingMetadataCount = 0;
   }
 
-  @SuppressWarnings("unchecked")
   @Override
   public boolean handleMessage(Message msg) {
     switch (msg.what) {

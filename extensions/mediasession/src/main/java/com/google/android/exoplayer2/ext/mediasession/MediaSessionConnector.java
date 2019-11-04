@@ -23,9 +23,6 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.ResultReceiver;
 import android.os.SystemClock;
-import androidx.annotation.LongDef;
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import android.support.v4.media.MediaDescriptionCompat;
 import android.support.v4.media.MediaMetadataCompat;
 import android.support.v4.media.RatingCompat;
@@ -33,6 +30,8 @@ import android.support.v4.media.session.MediaControllerCompat;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
 import android.util.Pair;
+import androidx.annotation.LongDef;
+import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ControlDispatcher;
 import com.google.android.exoplayer2.DefaultControlDispatcher;
@@ -52,6 +51,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.checkerframework.checker.nullness.qual.EnsuresNonNullIf;
 
 /**
  * Connects a {@link MediaSessionCompat} to a {@link Player}.
@@ -368,7 +368,7 @@ public final class MediaSessionConnector {
      * @param extras Optional extras sent by a media controller.
      */
     void onCustomAction(
-        Player player, ControlDispatcher controlDispatcher, String action, Bundle extras);
+        Player player, ControlDispatcher controlDispatcher, String action, @Nullable Bundle extras);
 
     /**
      * Returns a {@link PlaybackStateCompat.CustomAction} which will be published to the media
@@ -566,7 +566,7 @@ public final class MediaSessionConnector {
    *
    * @param queueNavigator The queue navigator.
    */
-  public void setQueueNavigator(QueueNavigator queueNavigator) {
+  public void setQueueNavigator(@Nullable QueueNavigator queueNavigator) {
     if (this.queueNavigator != queueNavigator) {
       unregisterCommandReceiver(this.queueNavigator);
       this.queueNavigator = queueNavigator;
@@ -579,7 +579,7 @@ public final class MediaSessionConnector {
    *
    * @param queueEditor The queue editor.
    */
-  public void setQueueEditor(QueueEditor queueEditor) {
+  public void setQueueEditor(@Nullable QueueEditor queueEditor) {
     if (this.queueEditor != queueEditor) {
       unregisterCommandReceiver(this.queueEditor);
       this.queueEditor = queueEditor;
@@ -681,7 +681,7 @@ public final class MediaSessionConnector {
         mediaMetadataProvider != null && player != null
             ? mediaMetadataProvider.getMetadata(player)
             : METADATA_EMPTY;
-    mediaSession.setMetadata(metadata != null ? metadata : METADATA_EMPTY);
+    mediaSession.setMetadata(metadata);
   }
 
   /**
@@ -692,6 +692,7 @@ public final class MediaSessionConnector {
    */
   public final void invalidateMediaSessionPlaybackState() {
     PlaybackStateCompat.Builder builder = new PlaybackStateCompat.Builder();
+    @Nullable Player player = this.player;
     if (player == null) {
       builder
           .setActions(buildPrepareActions())
@@ -706,6 +707,7 @@ public final class MediaSessionConnector {
 
     Map<String, CustomActionProvider> currentActions = new HashMap<>();
     for (CustomActionProvider customActionProvider : customActionProviders) {
+      @Nullable
       PlaybackStateCompat.CustomAction customAction = customActionProvider.getCustomAction(player);
       if (customAction != null) {
         currentActions.put(customAction.getAction(), customActionProvider);
@@ -748,6 +750,18 @@ public final class MediaSessionConnector {
             sessionPlaybackSpeed,
             /* updateTime= */ SystemClock.elapsedRealtime())
         .setExtras(extras);
+
+    @Player.RepeatMode int repeatMode = player.getRepeatMode();
+    mediaSession.setRepeatMode(
+        repeatMode == Player.REPEAT_MODE_ONE
+            ? PlaybackStateCompat.REPEAT_MODE_ONE
+            : repeatMode == Player.REPEAT_MODE_ALL
+                ? PlaybackStateCompat.REPEAT_MODE_ALL
+                : PlaybackStateCompat.REPEAT_MODE_NONE);
+    mediaSession.setShuffleMode(
+        player.getShuffleModeEnabled()
+            ? PlaybackStateCompat.SHUFFLE_MODE_ALL
+            : PlaybackStateCompat.SHUFFLE_MODE_NONE);
     mediaSession.setPlaybackState(builder.build());
   }
 
@@ -772,8 +786,8 @@ public final class MediaSessionConnector {
    *
    * @param commandReceiver The command receiver to register.
    */
-  public void registerCustomCommandReceiver(CommandReceiver commandReceiver) {
-    if (!customCommandReceivers.contains(commandReceiver)) {
+  public void registerCustomCommandReceiver(@Nullable CommandReceiver commandReceiver) {
+    if (commandReceiver != null && !customCommandReceivers.contains(commandReceiver)) {
       customCommandReceivers.add(commandReceiver);
     }
   }
@@ -783,18 +797,22 @@ public final class MediaSessionConnector {
    *
    * @param commandReceiver The command receiver to unregister.
    */
-  public void unregisterCustomCommandReceiver(CommandReceiver commandReceiver) {
-    customCommandReceivers.remove(commandReceiver);
+  public void unregisterCustomCommandReceiver(@Nullable CommandReceiver commandReceiver) {
+    if (commandReceiver != null) {
+      customCommandReceivers.remove(commandReceiver);
+    }
   }
 
-  private void registerCommandReceiver(CommandReceiver commandReceiver) {
-    if (!commandReceivers.contains(commandReceiver)) {
+  private void registerCommandReceiver(@Nullable CommandReceiver commandReceiver) {
+    if (commandReceiver != null && !commandReceivers.contains(commandReceiver)) {
       commandReceivers.add(commandReceiver);
     }
   }
 
-  private void unregisterCommandReceiver(CommandReceiver commandReceiver) {
-    commandReceivers.remove(commandReceiver);
+  private void unregisterCommandReceiver(@Nullable CommandReceiver commandReceiver) {
+    if (commandReceiver != null) {
+      commandReceivers.remove(commandReceiver);
+    }
   }
 
   private long buildPrepareActions() {
@@ -839,29 +857,43 @@ public final class MediaSessionConnector {
     return actions;
   }
 
+  @EnsuresNonNullIf(result = true, expression = "player")
   private boolean canDispatchPlaybackAction(long action) {
     return player != null && (enabledPlaybackActions & action) != 0;
   }
 
+  @EnsuresNonNullIf(result = true, expression = "playbackPreparer")
   private boolean canDispatchToPlaybackPreparer(long action) {
     return playbackPreparer != null
         && (playbackPreparer.getSupportedPrepareActions() & action) != 0;
   }
 
+  @EnsuresNonNullIf(
+      result = true,
+      expression = {"player", "queueNavigator"})
   private boolean canDispatchToQueueNavigator(long action) {
     return player != null
         && queueNavigator != null
         && (queueNavigator.getSupportedQueueNavigatorActions(player) & action) != 0;
   }
 
+  @EnsuresNonNullIf(
+      result = true,
+      expression = {"player", "ratingCallback"})
   private boolean canDispatchSetRating() {
     return player != null && ratingCallback != null;
   }
 
+  @EnsuresNonNullIf(
+      result = true,
+      expression = {"player", "queueEditor"})
   private boolean canDispatchQueueEdit() {
     return player != null && queueEditor != null;
   }
 
+  @EnsuresNonNullIf(
+      result = true,
+      expression = {"player", "mediaButtonEventHandler"})
   private boolean canDispatchMediaButtonEvent() {
     return player != null && mediaButtonEventHandler != null;
   }
@@ -893,7 +925,7 @@ public final class MediaSessionConnector {
   }
 
   private static int getMediaSessionPlaybackState(
-      int exoPlayerPlaybackState, boolean playWhenReady) {
+      @Player.State int exoPlayerPlaybackState, boolean playWhenReady) {
     switch (exoPlayerPlaybackState) {
       case Player.STATE_BUFFERING:
         return PlaybackStateCompat.STATE_BUFFERING;
@@ -949,10 +981,10 @@ public final class MediaSessionConnector {
           MediaSessionCompat.QueueItem queueItem = queue.get(i);
           if (queueItem.getQueueId() == activeQueueItemId) {
             MediaDescriptionCompat description = queueItem.getDescription();
-            Bundle extras = description.getExtras();
+            @Nullable Bundle extras = description.getExtras();
             if (extras != null) {
               for (String key : extras.keySet()) {
-                Object value = extras.get(key);
+                @Nullable Object value = extras.get(key);
                 if (value instanceof String) {
                   builder.putString(metadataExtrasPrefix + key, (String) value);
                 } else if (value instanceof CharSequence) {
@@ -968,39 +1000,40 @@ public final class MediaSessionConnector {
                 }
               }
             }
-            if (description.getTitle() != null) {
-              String title = String.valueOf(description.getTitle());
-              builder.putString(MediaMetadataCompat.METADATA_KEY_TITLE, title);
-              builder.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, title);
+            @Nullable CharSequence title = description.getTitle();
+            if (title != null) {
+              String titleString = String.valueOf(title);
+              builder.putString(MediaMetadataCompat.METADATA_KEY_TITLE, titleString);
+              builder.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, titleString);
             }
-            if (description.getSubtitle() != null) {
+            @Nullable CharSequence subtitle = description.getSubtitle();
+            if (subtitle != null) {
               builder.putString(
-                  MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE,
-                  String.valueOf(description.getSubtitle()));
+                  MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, String.valueOf(subtitle));
             }
-            if (description.getDescription() != null) {
+            @Nullable CharSequence displayDescription = description.getDescription();
+            if (displayDescription != null) {
               builder.putString(
                   MediaMetadataCompat.METADATA_KEY_DISPLAY_DESCRIPTION,
-                  String.valueOf(description.getDescription()));
+                  String.valueOf(displayDescription));
             }
-            if (description.getIconBitmap() != null) {
-              builder.putBitmap(
-                  MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, description.getIconBitmap());
+            @Nullable Bitmap iconBitmap = description.getIconBitmap();
+            if (iconBitmap != null) {
+              builder.putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, iconBitmap);
             }
-            if (description.getIconUri() != null) {
+            @Nullable Uri iconUri = description.getIconUri();
+            if (iconUri != null) {
               builder.putString(
-                  MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON_URI,
-                  String.valueOf(description.getIconUri()));
+                  MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON_URI, String.valueOf(iconUri));
             }
-            if (description.getMediaId() != null) {
-              builder.putString(
-                  MediaMetadataCompat.METADATA_KEY_MEDIA_ID,
-                  String.valueOf(description.getMediaId()));
+            @Nullable String mediaId = description.getMediaId();
+            if (mediaId != null) {
+              builder.putString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID, mediaId);
             }
-            if (description.getMediaUri() != null) {
+            @Nullable Uri mediaUri = description.getMediaUri();
+            if (mediaUri != null) {
               builder.putString(
-                  MediaMetadataCompat.METADATA_KEY_MEDIA_URI,
-                  String.valueOf(description.getMediaUri()));
+                  MediaMetadataCompat.METADATA_KEY_MEDIA_URI, String.valueOf(mediaUri));
             }
             break;
           }
@@ -1019,8 +1052,8 @@ public final class MediaSessionConnector {
     // Player.EventListener implementation.
 
     @Override
-    public void onTimelineChanged(
-        Timeline timeline, @Nullable Object manifest, @Player.TimelineChangeReason int reason) {
+    public void onTimelineChanged(Timeline timeline, @Player.TimelineChangeReason int reason) {
+      Player player = Assertions.checkNotNull(MediaSessionConnector.this.player);
       int windowCount = player.getCurrentTimeline().getWindowCount();
       int windowIndex = player.getCurrentWindowIndex();
       if (queueNavigator != null) {
@@ -1036,7 +1069,7 @@ public final class MediaSessionConnector {
     }
 
     @Override
-    public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
+    public void onPlayerStateChanged(boolean playWhenReady, @Player.State int playbackState) {
       invalidateMediaSessionPlaybackState();
     }
 
@@ -1047,27 +1080,18 @@ public final class MediaSessionConnector {
 
     @Override
     public void onRepeatModeChanged(@Player.RepeatMode int repeatMode) {
-      mediaSession.setRepeatMode(
-          repeatMode == Player.REPEAT_MODE_ONE
-              ? PlaybackStateCompat.REPEAT_MODE_ONE
-              : repeatMode == Player.REPEAT_MODE_ALL
-                  ? PlaybackStateCompat.REPEAT_MODE_ALL
-                  : PlaybackStateCompat.REPEAT_MODE_NONE);
       invalidateMediaSessionPlaybackState();
     }
 
     @Override
     public void onShuffleModeEnabledChanged(boolean shuffleModeEnabled) {
-      mediaSession.setShuffleMode(
-          shuffleModeEnabled
-              ? PlaybackStateCompat.SHUFFLE_MODE_ALL
-              : PlaybackStateCompat.SHUFFLE_MODE_NONE);
       invalidateMediaSessionPlaybackState();
       invalidateMediaSessionQueue();
     }
 
     @Override
     public void onPositionDiscontinuity(@Player.DiscontinuityReason int reason) {
+      Player player = Assertions.checkNotNull(MediaSessionConnector.this.player);
       if (currentWindowIndex != player.getCurrentWindowIndex()) {
         if (queueNavigator != null) {
           queueNavigator.onCurrentWindowIndexChanged(player);
@@ -1202,7 +1226,7 @@ public final class MediaSessionConnector {
     }
 
     @Override
-    public void onCustomAction(@NonNull String action, @Nullable Bundle extras) {
+    public void onCustomAction(String action, @Nullable Bundle extras) {
       if (player != null && customActionMap.containsKey(action)) {
         customActionMap.get(action).onCustomAction(player, controlDispatcher, action, extras);
         invalidateMediaSessionPlaybackState();

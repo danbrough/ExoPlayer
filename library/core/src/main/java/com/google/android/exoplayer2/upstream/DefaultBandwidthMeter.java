@@ -22,8 +22,8 @@ import android.content.IntentFilter;
 import android.net.ConnectivityManager;
 import android.os.Handler;
 import android.os.Looper;
-import androidx.annotation.Nullable;
 import android.util.SparseArray;
+import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.Clock;
@@ -78,6 +78,8 @@ public final class DefaultBandwidthMeter implements BandwidthMeter, TransferList
 
   /** Default maximum weight for the sliding window. */
   public static final int DEFAULT_SLIDING_WINDOW_MAX_WEIGHT = 2000;
+
+  @Nullable private static DefaultBandwidthMeter singletonInstance;
 
   /** Builder for a bandwidth meter. */
   public static final class Builder {
@@ -214,6 +216,19 @@ public final class DefaultBandwidthMeter implements BandwidthMeter, TransferList
     }
   }
 
+  /**
+   * Returns a singleton instance of a {@link DefaultBandwidthMeter} with default configuration.
+   *
+   * @param context A {@link Context}.
+   * @return The singleton instance.
+   */
+  public static synchronized DefaultBandwidthMeter getSingletonInstance(Context context) {
+    if (singletonInstance == null) {
+      singletonInstance = new DefaultBandwidthMeter.Builder(context).build();
+    }
+    return singletonInstance;
+  }
+
   private static final int ELAPSED_MILLIS_FOR_ESTIMATE = 2000;
   private static final int BYTES_TRANSFERRED_FOR_ESTIMATE = 512 * 1024;
 
@@ -341,7 +356,7 @@ public final class DefaultBandwidthMeter implements BandwidthMeter, TransferList
     totalElapsedTimeMs += sampleElapsedTimeMs;
     totalBytesTransferred += sampleBytesTransferred;
     if (sampleElapsedTimeMs > 0) {
-      float bitsPerSecond = (sampleBytesTransferred * 8000) / sampleElapsedTimeMs;
+      float bitsPerSecond = (sampleBytesTransferred * 8000f) / sampleElapsedTimeMs;
       slidingPercentile.addSample((int) Math.sqrt(sampleBytesTransferred), bitsPerSecond);
       if (totalElapsedTimeMs >= ELAPSED_MILLIS_FOR_ESTIMATE
           || totalBytesTransferred >= BYTES_TRANSFERRED_FOR_ESTIMATE) {
@@ -412,7 +427,7 @@ public final class DefaultBandwidthMeter implements BandwidthMeter, TransferList
    */
   private static class ConnectivityActionReceiver extends BroadcastReceiver {
 
-    @MonotonicNonNull private static ConnectivityActionReceiver staticInstance;
+    private static @MonotonicNonNull ConnectivityActionReceiver staticInstance;
 
     private final Handler mainHandler;
     private final ArrayList<WeakReference<DefaultBandwidthMeter>> bandwidthMeters;

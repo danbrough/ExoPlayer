@@ -15,6 +15,7 @@
  */
 package com.google.android.exoplayer2.source;
 
+import androidx.annotation.IntDef;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.FormatHolder;
@@ -22,6 +23,9 @@ import com.google.android.exoplayer2.decoder.DecoderInputBuffer;
 import com.google.android.exoplayer2.extractor.TrackOutput.CryptoData;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.Util;
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 
 /**
  * A queue of metadata describing the contents of a media buffer.
@@ -38,6 +42,27 @@ import com.google.android.exoplayer2.util.Util;
     public CryptoData cryptoData;
 
   }
+
+  /** Values returned by {@link #peekNext} ()}. */
+  @Documented
+  @Retention(RetentionPolicy.SOURCE)
+  @IntDef(
+      value = {
+        PEEK_RESULT_NOTHING,
+        PEEK_RESULT_FORMAT,
+        PEEK_RESULT_BUFFER_CLEAR,
+        PEEK_RESULT_BUFFER_ENCRYPTED
+      })
+  public @interface PeekResult {}
+
+  /** Nothing is available for reading. */
+  public static final int PEEK_RESULT_NOTHING = 0;
+  /** A format change is available for reading */
+  public static final int PEEK_RESULT_FORMAT = 1;
+  /** A clear buffer is available for reading. */
+  public static final int PEEK_RESULT_BUFFER_CLEAR = 2;
+  /** An encrypted buffer is available for reading. */
+  public static final int PEEK_RESULT_BUFFER_ENCRYPTED = 3;
 
   private static final int SAMPLE_CAPACITY_INCREMENT = 1000;
 
@@ -61,6 +86,7 @@ import com.google.android.exoplayer2.util.Util;
   private boolean upstreamKeyframeRequired;
   private boolean upstreamFormatRequired;
   private Format upstreamFormat;
+  private Format upstreamCommittedFormat;
   private int upstreamSourceId;
 
   public SampleMetadataQueue() {
@@ -95,6 +121,7 @@ import com.google.android.exoplayer2.util.Util;
     largestDiscardedTimestampUs = Long.MIN_VALUE;
     largestQueuedTimestampUs = Long.MIN_VALUE;
     isLastSampleQueued = false;
+    upstreamCommittedFormat = null;
     if (resetUpstreamFormat) {
       upstreamFormat = null;
       upstreamFormatRequired = true;
@@ -215,6 +242,27 @@ import com.google.android.exoplayer2.util.Util;
   }
 
   /**
+   * Returns a {@link PeekResult} depending on what a following call to {@link #read
+   * read(formatHolder, decoderInputBuffer, formatRequired= false, allowOnlyClearBuffers= false,
+   * loadingFinished= false, decodeOnlyUntilUs= 0)} would result in.
+   */
+  @SuppressWarnings("ReferenceEquality")
+  @PeekResult
+  public synchronized int peekNext(Format downstreamFormat) {
+    if (readPosition == length) {
+      return PEEK_RESULT_NOTHING;
+    }
+    int relativeReadIndex = getRelativeIndex(readPosition);
+    if (formats[relativeReadIndex] != downstreamFormat) {
+      return PEEK_RESULT_FORMAT;
+    } else {
+      return (flags[relativeReadIndex] & C.BUFFER_FLAG_ENCRYPTED) != 0
+          ? PEEK_RESULT_BUFFER_ENCRYPTED
+          : PEEK_RESULT_BUFFER_CLEAR;
+    }
+  }
+
+  /**
    * Attempts to read from the queue.
    *
    * @param formatHolder A {@link FormatHolder} to populate in the case of reading a format.
@@ -230,6 +278,8 @@ import com.google.android.exoplayer2.util.Util;
    * @param formatRequired Whether the caller requires that the format of the stream be read even if
    *     it's not changing. A sample will never be read if set to true, however it is still possible
    *     for the end of stream or nothing to be read.
+   * @param allowOnlyClearBuffers If set to true, this method will not return encrypted buffers,
+   *     returning {@link C#RESULT_NOTHING_READ} (without advancing the read position) instead.
    * @param loadingFinished True if an empty queue should be considered the end of the stream.
    * @param downstreamFormat The current downstream {@link Format}. If the format of the next sample
    *     is different to the current downstream format then a format will be read.
@@ -242,6 +292,7 @@ import com.google.android.exoplayer2.util.Util;
       FormatHolder formatHolder,
       DecoderInputBuffer buffer,
       boolean formatRequired,
+      boolean allowOnlyClearBuffers,
       boolean loadingFinished,
       Format downstreamFormat,
       SampleExtrasHolder extrasHolder) {
@@ -249,8 +300,7 @@ import com.google.android.exoplayer2.util.Util;
       if (loadingFinished || isLastSampleQueued) {
         buffer.setFlags(C.BUFFER_FLAG_END_OF_STREAM);
         return C.RESULT_BUFFER_READ;
-      } else if (upstreamFormat != null
-          && (formatRequired || upstreamFormat != downstreamFormat)) {
+      } else if (upstreamFormat != null && (formatRequired || upstreamFormat != downstreamFormat)) {
         formatHolder.format = upstreamFormat;
         return C.RESULT_FORMAT_READ;
       } else {
@@ -262,6 +312,10 @@ import com.google.android.exoplayer2.util.Util;
     if (formatRequired || formats[relativeReadIndex] != downstreamFormat) {
       formatHolder.format = formats[relativeReadIndex];
       return C.RESULT_FORMAT_READ;
+    }
+
+    if (allowOnlyClearBuffers && (flags[relativeReadIndex] & C.BUFFER_FLAG_ENCRYPTED) != 0) {
+      return C.RESULT_NOTHING_READ;
     }
 
     buffer.setFlags(flags[relativeReadIndex]);
@@ -393,8 +447,16 @@ import com.google.android.exoplayer2.util.Util;
     }
     upstreamFormatRequired = false;
     if (Util.areEqual(format, upstreamFormat)) {
-      // Suppress changes between equal formats so we can use referential equality in readData.
+      // The format is unchanged. If format and upstreamFormat are different objects, we keep the
+      // current upstreamFormat so we can detect format changes in read() using cheap referential
+      // equality.
       return false;
+    } else if (Util.areEqual(format, upstreamCommittedFormat)) {
+      // The format has changed back to the format of the last committed sample. If they are
+      // different objects, we revert back to using upstreamCommittedFormat as the upstreamFormat so
+      // we can detect format changes in read() using cheap referential equality.
+      upstreamFormat = upstreamCommittedFormat;
+      return true;
     } else {
       upstreamFormat = format;
       return true;
@@ -422,6 +484,7 @@ import com.google.android.exoplayer2.util.Util;
     cryptoDatas[relativeEndIndex] = cryptoData;
     formats[relativeEndIndex] = upstreamFormat;
     sourceIds[relativeEndIndex] = upstreamSourceId;
+    upstreamCommittedFormat = upstreamFormat;
 
     length++;
     if (length == capacity) {

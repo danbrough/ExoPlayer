@@ -22,7 +22,6 @@ import android.content.res.TypedArray;
 import android.graphics.drawable.Drawable;
 import android.os.Looper;
 import android.os.SystemClock;
-import androidx.annotation.Nullable;
 import android.util.AttributeSet;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -32,6 +31,7 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
+import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlayerLibraryInfo;
 import com.google.android.exoplayer2.PlaybackPreparer;
@@ -43,6 +43,7 @@ import com.google.android.exoplayer2.util.Util;
 import java.util.Arrays;
 import java.util.Formatter;
 import java.util.Locale;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * A view for controlling {@link Player} instances.
@@ -231,6 +232,7 @@ public class PlayerControlView extends FrameLayout {
   private static final int MAX_UPDATE_INTERVAL_MS = 1000;
 
   private final ComponentListener componentListener;
+  private final CopyOnWriteArrayList<VisibilityListener> visibilityListeners;
   private final View previousButton;
   private final View nextButton;
   private final View playButton;
@@ -265,7 +267,6 @@ public class PlayerControlView extends FrameLayout {
 
   @Nullable private Player player;
   private com.google.android.exoplayer2.ControlDispatcher controlDispatcher;
-  @Nullable private VisibilityListener visibilityListener;
   @Nullable private ProgressUpdateListener progressUpdateListener;
   @Nullable private PlaybackPreparer playbackPreparer;
 
@@ -291,7 +292,7 @@ public class PlayerControlView extends FrameLayout {
   }
 
   public PlayerControlView(Context context, @Nullable AttributeSet attrs) {
-    this(context, attrs, 0);
+    this(context, attrs, /* defStyleAttr= */ 0);
   }
 
   public PlayerControlView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
@@ -335,6 +336,7 @@ public class PlayerControlView extends FrameLayout {
         a.recycle();
       }
     }
+    visibilityListeners = new CopyOnWriteArrayList<>();
     period = new Timeline.Period();
     window = new Timeline.Window();
     formatBuilder = new StringBuilder();
@@ -510,12 +512,21 @@ public class PlayerControlView extends FrameLayout {
   }
 
   /**
-   * Sets the {@link VisibilityListener}.
+   * Adds a {@link VisibilityListener}.
    *
    * @param listener The listener to be notified about visibility changes.
    */
-  public void setVisibilityListener(VisibilityListener listener) {
-    this.visibilityListener = listener;
+  public void addVisibilityListener(VisibilityListener listener) {
+    visibilityListeners.add(listener);
+  }
+
+  /**
+   * Removes a {@link VisibilityListener}.
+   *
+   * @param listener The listener to be removed.
+   */
+  public void removeVisibilityListener(VisibilityListener listener) {
+    visibilityListeners.remove(listener);
   }
 
   /**
@@ -530,7 +541,8 @@ public class PlayerControlView extends FrameLayout {
   /**
    * Sets the {@link PlaybackPreparer}.
    *
-   * @param playbackPreparer The {@link PlaybackPreparer}.
+   * @param playbackPreparer The {@link PlaybackPreparer}, or null to remove the current playback
+   *     preparer.
    */
   public void setPlaybackPreparer(@Nullable PlaybackPreparer playbackPreparer) {
     this.playbackPreparer = playbackPreparer;
@@ -695,7 +707,7 @@ public class PlayerControlView extends FrameLayout {
   public void show() {
     if (!isVisible()) {
       setVisibility(VISIBLE);
-      if (visibilityListener != null) {
+      for (VisibilityListener visibilityListener : visibilityListeners) {
         visibilityListener.onVisibilityChange(getVisibility());
       }
       updateAll();
@@ -709,7 +721,7 @@ public class PlayerControlView extends FrameLayout {
   public void hide() {
     if (isVisible()) {
       setVisibility(GONE);
-      if (visibilityListener != null) {
+      for (VisibilityListener visibilityListener : visibilityListeners) {
         visibilityListener.onVisibilityChange(getVisibility());
       }
       removeCallbacks(updateProgressAction);
@@ -1215,7 +1227,7 @@ public class PlayerControlView extends FrameLayout {
     }
 
     @Override
-    public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
+    public void onPlayerStateChanged(boolean playWhenReady, @Player.State int playbackState) {
       updatePlayPauseButton();
       updateProgress();
     }
@@ -1244,8 +1256,7 @@ public class PlayerControlView extends FrameLayout {
     }
 
     @Override
-    public void onTimelineChanged(
-        Timeline timeline, @Nullable Object manifest, @Player.TimelineChangeReason int reason) {
+    public void onTimelineChanged(Timeline timeline, @Player.TimelineChangeReason int reason) {
       updateNavigation();
       updateTimeline();
     }

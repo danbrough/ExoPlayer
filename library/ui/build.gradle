@@ -36,6 +36,7 @@ android {
     }
 
     testOptions.unitTests.includeAndroidResources = true
+
     task sourcesJar(type: Jar) {
         from android.sourceSets.main.java.srcDirs
         classifier = 'sources'
@@ -45,14 +46,16 @@ android {
         archives sourcesJar
     }
 
+
 }
 
 dependencies {
     implementation project(modulePrefix + 'library-core')
-    implementation 'androidx.media:media:1.0.1'
-    implementation 'androidx.annotation:annotation:1.1.0'
+    api 'androidx.media:media:' + androidxMediaVersion
+    implementation 'androidx.annotation:annotation:' + androidxAnnotationVersion
     compileOnly 'org.checkerframework:checker-qual:' + checkerframeworkVersion
-    testImplementation project(modulePrefix + 'testutils-robolectric')
+    testImplementation project(modulePrefix + 'testutils')
+    testImplementation 'org.robolectric:robolectric:' + robolectricVersion
 }
 
 ext {

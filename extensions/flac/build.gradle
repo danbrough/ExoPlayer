@@ -39,11 +39,12 @@ android {
 
 dependencies {
     implementation project(modulePrefix + 'library-core')
-    implementation 'androidx.annotation:annotation:1.1.0'
+    implementation 'androidx.annotation:annotation:' + androidxAnnotationVersion
     compileOnly 'org.checkerframework:checker-qual:' + checkerframeworkVersion
     androidTestImplementation project(modulePrefix + 'testutils')
-    androidTestImplementation 'androidx.test:runner:' + androidXTestVersion
-    testImplementation project(modulePrefix + 'testutils-robolectric')
+    androidTestImplementation 'androidx.test:runner:' + androidxTestVersion
+    testImplementation project(modulePrefix + 'testutils')
+    testImplementation 'org.robolectric:robolectric:' + robolectricVersion
 }
 
 ext {

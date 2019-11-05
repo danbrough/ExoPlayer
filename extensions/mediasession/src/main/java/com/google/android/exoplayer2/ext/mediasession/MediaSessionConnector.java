@@ -647,6 +647,8 @@ public final class MediaSessionConnector {
    * @param customActionProviders The custom action providers, or null to remove all existing custom
    *     action providers.
    */
+  // incompatible types in assignment.
+  @SuppressWarnings("nullness:assignment.type.incompatible")
   public void setCustomActionProviders(@Nullable CustomActionProvider... customActionProviders) {
     this.customActionProviders =
         customActionProviders == null ? new CustomActionProvider[0] : customActionProviders;
@@ -701,6 +703,9 @@ public final class MediaSessionConnector {
               /* position= */ 0,
               /* playbackSpeed= */ 0,
               /* updateTime= */ SystemClock.elapsedRealtime());
+
+      mediaSession.setRepeatMode(PlaybackStateCompat.REPEAT_MODE_NONE);
+      mediaSession.setShuffleMode(PlaybackStateCompat.SHUFFLE_MODE_NONE);
       mediaSession.setPlaybackState(builder.build());
       return;
     }
@@ -933,6 +938,7 @@ public final class MediaSessionConnector {
         return playWhenReady ? PlaybackStateCompat.STATE_PLAYING : PlaybackStateCompat.STATE_PAUSED;
       case Player.STATE_ENDED:
         return PlaybackStateCompat.STATE_STOPPED;
+      case Player.STATE_IDLE:
       default:
         return PlaybackStateCompat.STATE_NONE;
     }

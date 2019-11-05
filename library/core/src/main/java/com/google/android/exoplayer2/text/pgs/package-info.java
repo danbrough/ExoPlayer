@@ -12,27 +12,8 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
-package com.google.android.exoplayer2.source.hls;
+@NonNullApi
+package com.google.android.exoplayer2.text.pgs;
 
-import static java.lang.annotation.RetentionPolicy.SOURCE;
-
-import androidx.annotation.IntDef;
-import java.lang.annotation.Documented;
-import java.lang.annotation.Retention;
-
-/**
- * The types of metadata that can be extracted from HLS streams.
- *
- * <p>See {@link HlsMediaSource.Factory#setMetadataType(int)}.
- */
-@Documented
-@Retention(SOURCE)
-@IntDef({HlsMetadataType.ID3, HlsMetadataType.EMSG})
-public @interface HlsMetadataType {
-  /** Type for ID3 metadata in HLS streams. */
-  int ID3 = 1;
-  /** Type for ESMG metadata in HLS streams. */
-  int EMSG = 3;
-}
+import com.google.android.exoplayer2.util.NonNullApi;

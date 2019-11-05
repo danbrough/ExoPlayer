@@ -20,15 +20,11 @@ import android.media.MediaCodecInfo.AudioCapabilities;
 import android.media.MediaCodecInfo.CodecCapabilities;
 import android.media.MediaCodecInfo.CodecProfileLevel;
 import android.media.MediaCodecInfo.VideoCapabilities;
+import androidx.annotation.Nullable;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import com.google.android.exoplayer2.mediacodec.MediaCodecInfo;
 import com.google.android.exoplayer2.mediacodec.MediaCodecUtil;
 import com.google.android.exoplayer2.mediacodec.MediaCodecUtil.DecoderQueryException;
-<<<<<<< HEAD
-import com.google.android.exoplayer2.testutil.MetricsLogger;
-import com.google.android.exoplayer2.util.Assertions;
-=======
->>>>>>> release-v2
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.Util;
 import java.util.Arrays;
@@ -100,14 +96,17 @@ public class EnumerateDecodersTest {
     List<MediaCodecInfo> mediaCodecInfos =
         MediaCodecUtil.getDecoderInfos(mimeType, secure, tunneling);
     for (MediaCodecInfo mediaCodecInfo : mediaCodecInfos) {
-      CodecCapabilities capabilities = Assertions.checkNotNull(mediaCodecInfo.capabilities);
+      CodecCapabilities capabilities = mediaCodecInfo.capabilities;
       metricsLogger.logMetric(
           "capabilities_" + mediaCodecInfo.name, codecCapabilitiesToString(mimeType, capabilities));
     }
   }
 
   private static String codecCapabilitiesToString(
-      String requestedMimeType, CodecCapabilities codecCapabilities) {
+      String requestedMimeType, @Nullable CodecCapabilities codecCapabilities) {
+    if (codecCapabilities == null) {
+      return "[null]";
+    }
     boolean isVideo = MimeTypes.isVideo(requestedMimeType);
     boolean isAudio = MimeTypes.isAudio(requestedMimeType);
     StringBuilder result = new StringBuilder();

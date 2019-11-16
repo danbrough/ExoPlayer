@@ -18,6 +18,7 @@ package com.google.android.exoplayer2.drm;
 import android.os.Looper;
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
+import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.drm.DrmInitData.SchemeData;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
@@ -104,27 +105,29 @@ public interface DrmSessionManager<T extends ExoMediaCrypto> {
   boolean canAcquireSession(DrmInitData drmInitData);
 
   /**
-   * Returns a {@link DrmSession} with an acquired reference that does not execute key requests.
-   * Returns null if placeholder sessions are not supported by this DRM session manager.
+   * Returns a {@link DrmSession} that does not execute key requests, with an incremented reference
+   * count. When the caller no longer needs to use the instance, it must call {@link
+   * DrmSession#release()} to decrement the reference count.
    *
    * <p>Placeholder {@link DrmSession DrmSessions} may be used to configure secure decoders for
    * playback of clear samples, which reduces the costs of transitioning between clear and encrypted
    * content periods.
    *
    * @param playbackLooper The looper associated with the media playback thread.
+   * @param trackType The type of the track to acquire a placeholder session for. Must be one of the
+   *     {@link C}{@code .TRACK_TYPE_*} constants.
    * @return The placeholder DRM session, or null if this DRM session manager does not support
    *     placeholder sessions.
    */
   @Nullable
-  default DrmSession<T> acquirePlaceholderSession(Looper playbackLooper) {
+  default DrmSession<T> acquirePlaceholderSession(Looper playbackLooper, int trackType) {
     return null;
   }
 
   /**
-   * Returns a {@link DrmSession} with an acquired reference for the specified {@link DrmInitData}.
-   *
-   * <p>The caller must call {@link DrmSession#releaseReference} to decrement the session's
-   * reference count when the session is no longer required.
+   * Returns a {@link DrmSession} for the specified {@link DrmInitData}, with an incremented
+   * reference count. When the caller no longer needs to use the instance, it must call {@link
+   * DrmSession#release()} to decrement the reference count.
    *
    * @param playbackLooper The looper associated with the media playback thread.
    * @param drmInitData DRM initialization data. All contained {@link SchemeData}s must contain

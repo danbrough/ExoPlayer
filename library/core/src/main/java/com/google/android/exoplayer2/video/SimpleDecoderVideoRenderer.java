@@ -580,6 +580,7 @@ public abstract class SimpleDecoderVideoRenderer extends BaseRenderer {
       // The output has changed.
       this.surface = surface;
       if (surface != null) {
+        outputBufferRenderer = null;
         outputMode = C.VIDEO_OUTPUT_MODE_SURFACE_YUV;
         if (decoder != null) {
           setDecoderOutputMode(outputMode);
@@ -608,6 +609,7 @@ public abstract class SimpleDecoderVideoRenderer extends BaseRenderer {
       // The output has changed.
       this.outputBufferRenderer = outputBufferRenderer;
       if (outputBufferRenderer != null) {
+        surface = null;
         outputMode = C.VIDEO_OUTPUT_MODE_YUV;
         if (decoder != null) {
           setDecoderOutputMode(outputMode);
@@ -635,12 +637,12 @@ public abstract class SimpleDecoderVideoRenderer extends BaseRenderer {
   // Internal methods.
 
   private void setSourceDrmSession(@Nullable DrmSession<ExoMediaCrypto> session) {
-    DrmSession.replaceSessionReferences(sourceDrmSession, session);
+    DrmSession.replaceSession(sourceDrmSession, session);
     sourceDrmSession = session;
   }
 
   private void setDecoderDrmSession(@Nullable DrmSession<ExoMediaCrypto> session) {
-    DrmSession.replaceSessionReferences(decoderDrmSession, session);
+    DrmSession.replaceSession(decoderDrmSession, session);
     decoderDrmSession = session;
   }
 

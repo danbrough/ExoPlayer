@@ -57,7 +57,7 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto> implements DrmSe
     private UUID uuid;
     private ExoMediaDrm.Provider<ExoMediaCrypto> exoMediaDrmProvider;
     private boolean multiSession;
-    private boolean preferSecureDecoders;
+    private int[] useDrmSessionsForClearContentTrackTypes;
     @Flags private int flags;
     private LoadErrorHandlingPolicy loadErrorHandlingPolicy;
 
@@ -70,7 +70,7 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto> implements DrmSe
      *   <li>{@link #setUuidAndExoMediaDrmProvider ExoMediaDrm.Provider}: {@link
      *       FrameworkMediaDrm#DEFAULT_PROVIDER}.
      *   <li>{@link #setMultiSession multiSession}: {@code false}.
-     *   <li>{@link #setPreferSecureDecoders preferSecureDecoders}: {@code false}.
+     *   <li>{@link #setUseDrmSessionsForClearContent useDrmSessionsForClearContent}: No tracks.
      *   <li>{@link #setPlayClearSamplesWithoutKeys playClearSamplesWithoutKeys}: {@code false}.
      *   <li>{@link #setLoadErrorHandlingPolicy LoadErrorHandlingPolicy}: {@link
      *       DefaultLoadErrorHandlingPolicy}.
@@ -82,10 +82,14 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto> implements DrmSe
       uuid = C.WIDEVINE_UUID;
       exoMediaDrmProvider = (ExoMediaDrm.Provider) FrameworkMediaDrm.DEFAULT_PROVIDER;
       loadErrorHandlingPolicy = new DefaultLoadErrorHandlingPolicy();
+      useDrmSessionsForClearContentTrackTypes = new int[0];
     }
 
     /**
-     * Sets the parameters to pass to {@link ExoMediaDrm#getKeyRequest(byte[], List, int, HashMap)}.
+     * Sets the key request parameters to pass as the last argument to {@link
+     * ExoMediaDrm#getKeyRequest(byte[], List, int, HashMap)}.
+     *
+     * <p>Custom data for PlayReady should be set under {@link #PLAYREADY_CUSTOM_DATA_KEY}.
      *
      * @param keyRequestParameters A map with parameters.
      * @return This builder.
@@ -127,14 +131,27 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto> implements DrmSe
     }
 
     /**
-     * Sets whether this session manager should hint the use of secure decoders for clear content.
+     * Sets whether this session manager should attach {@link DrmSession DrmSessions} to the clear
+     * sections of the media content.
      *
-     * @param preferSecureDecoders Whether this session manager should hint the use of secure
-     *     decoders for clear content.
+     * <p>Using {@link DrmSession DrmSessions} for clear content avoids the recreation of decoders
+     * when transitioning between clear and encrypted sections of content.
+     *
+     * @param useDrmSessionsForClearContentTrackTypes The track types ({@link C#TRACK_TYPE_AUDIO}
+     *     and/or {@link C#TRACK_TYPE_VIDEO}) for which to use a {@link DrmSession} regardless of
+     *     whether the content is clear or encrypted.
      * @return This builder.
+     * @throws IllegalArgumentException If {@code useDrmSessionsForClearContentTrackTypes} contains
+     *     track types other than {@link C#TRACK_TYPE_AUDIO} and {@link C#TRACK_TYPE_VIDEO}.
      */
-    public Builder setPreferSecureDecoders(boolean preferSecureDecoders) {
-      this.preferSecureDecoders = preferSecureDecoders;
+    public Builder setUseDrmSessionsForClearContent(
+        int... useDrmSessionsForClearContentTrackTypes) {
+      for (int trackType : useDrmSessionsForClearContentTrackTypes) {
+        Assertions.checkArgument(
+            trackType == C.TRACK_TYPE_VIDEO || trackType == C.TRACK_TYPE_AUDIO);
+      }
+      this.useDrmSessionsForClearContentTrackTypes =
+          useDrmSessionsForClearContentTrackTypes.clone();
       return this;
     }
 
@@ -174,7 +191,7 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto> implements DrmSe
           mediaDrmCallback,
           keyRequestParameters,
           multiSession,
-          preferSecureDecoders,
+          useDrmSessionsForClearContentTrackTypes,
           flags,
           loadErrorHandlingPolicy);
     }
@@ -192,7 +209,8 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto> implements DrmSe
   }
 
   /**
-   * The key to use when passing CustomData to a PlayReady instance in an optional parameter map.
+   * A key for specifying PlayReady custom data in the key request parameters passed to {@link
+   * Builder#setKeyRequestParameters(Map)}.
    */
   public static final String PLAYREADY_CUSTOM_DATA_KEY = "PRCustomData";
 
@@ -223,10 +241,10 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto> implements DrmSe
   private final UUID uuid;
   private final ExoMediaDrm.Provider<T> exoMediaDrmProvider;
   private final MediaDrmCallback callback;
-  @Nullable private final HashMap<String, String> optionalKeyRequestParameters;
+  private final HashMap<String, String> keyRequestParameters;
   private final EventDispatcher<DefaultDrmSessionEventListener> eventDispatcher;
   private final boolean multiSession;
-  private final boolean preferSecureDecoders;
+  private final int[] useDrmSessionsForClearContentTrackTypes;
   @Flags private final int flags;
   private final ProvisioningManagerImpl provisioningManagerImpl;
   private final LoadErrorHandlingPolicy loadErrorHandlingPolicy;
@@ -248,8 +266,8 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto> implements DrmSe
    * @param uuid The UUID of the drm scheme.
    * @param exoMediaDrm An underlying {@link ExoMediaDrm} for use by the manager.
    * @param callback Performs key and provisioning requests.
-   * @param optionalKeyRequestParameters An optional map of parameters to pass as the last argument
-   *     to {@link ExoMediaDrm#getKeyRequest(byte[], List, int, HashMap)}. May be null.
+   * @param keyRequestParameters An optional map of parameters to pass as the last argument to
+   *     {@link ExoMediaDrm#getKeyRequest(byte[], List, int, HashMap)}. May be null.
    * @deprecated Use {@link Builder} instead.
    */
   @SuppressWarnings("deprecation")
@@ -258,12 +276,12 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto> implements DrmSe
       UUID uuid,
       ExoMediaDrm<T> exoMediaDrm,
       MediaDrmCallback callback,
-      @Nullable HashMap<String, String> optionalKeyRequestParameters) {
+      @Nullable HashMap<String, String> keyRequestParameters) {
     this(
         uuid,
         exoMediaDrm,
         callback,
-        optionalKeyRequestParameters,
+        keyRequestParameters == null ? new HashMap<>() : keyRequestParameters,
         /* multiSession= */ false,
         INITIAL_DRM_REQUEST_RETRY_COUNT);
   }
@@ -272,8 +290,8 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto> implements DrmSe
    * @param uuid The UUID of the drm scheme.
    * @param exoMediaDrm An underlying {@link ExoMediaDrm} for use by the manager.
    * @param callback Performs key and provisioning requests.
-   * @param optionalKeyRequestParameters An optional map of parameters to pass as the last argument
-   *     to {@link ExoMediaDrm#getKeyRequest(byte[], List, int, HashMap)}. May be null.
+   * @param keyRequestParameters An optional map of parameters to pass as the last argument to
+   *     {@link ExoMediaDrm#getKeyRequest(byte[], List, int, HashMap)}. May be null.
    * @param multiSession A boolean that specify whether multiple key session support is enabled.
    *     Default is false.
    * @deprecated Use {@link Builder} instead.
@@ -283,13 +301,13 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto> implements DrmSe
       UUID uuid,
       ExoMediaDrm<T> exoMediaDrm,
       MediaDrmCallback callback,
-      @Nullable HashMap<String, String> optionalKeyRequestParameters,
+      @Nullable HashMap<String, String> keyRequestParameters,
       boolean multiSession) {
     this(
         uuid,
         exoMediaDrm,
         callback,
-        optionalKeyRequestParameters,
+        keyRequestParameters == null ? new HashMap<>() : keyRequestParameters,
         multiSession,
         INITIAL_DRM_REQUEST_RETRY_COUNT);
   }
@@ -298,8 +316,8 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto> implements DrmSe
    * @param uuid The UUID of the drm scheme.
    * @param exoMediaDrm An underlying {@link ExoMediaDrm} for use by the manager.
    * @param callback Performs key and provisioning requests.
-   * @param optionalKeyRequestParameters An optional map of parameters to pass as the last argument
-   *     to {@link ExoMediaDrm#getKeyRequest(byte[], List, int, HashMap)}. May be null.
+   * @param keyRequestParameters An optional map of parameters to pass as the last argument to
+   *     {@link ExoMediaDrm#getKeyRequest(byte[], List, int, HashMap)}. May be null.
    * @param multiSession A boolean that specify whether multiple key session support is enabled.
    *     Default is false.
    * @param initialDrmRequestRetryCount The number of times to retry for initial provisioning and
@@ -311,16 +329,16 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto> implements DrmSe
       UUID uuid,
       ExoMediaDrm<T> exoMediaDrm,
       MediaDrmCallback callback,
-      @Nullable HashMap<String, String> optionalKeyRequestParameters,
+      @Nullable HashMap<String, String> keyRequestParameters,
       boolean multiSession,
       int initialDrmRequestRetryCount) {
     this(
         uuid,
         new ExoMediaDrm.AppManagedProvider<>(exoMediaDrm),
         callback,
-        optionalKeyRequestParameters,
+        keyRequestParameters == null ? new HashMap<>() : keyRequestParameters,
         multiSession,
-        /* preferSecureDecoders= */ false,
+        /* useDrmSessionsForClearContentTrackTypes= */ new int[0],
         /* flags= */ 0,
         new DefaultLoadErrorHandlingPolicy(initialDrmRequestRetryCount));
   }
@@ -331,9 +349,9 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto> implements DrmSe
       UUID uuid,
       ExoMediaDrm.Provider<T> exoMediaDrmProvider,
       MediaDrmCallback callback,
-      @Nullable HashMap<String, String> optionalKeyRequestParameters,
+      HashMap<String, String> keyRequestParameters,
       boolean multiSession,
-      boolean preferSecureDecoders,
+      int[] useDrmSessionsForClearContentTrackTypes,
       @Flags int flags,
       LoadErrorHandlingPolicy loadErrorHandlingPolicy) {
     Assertions.checkNotNull(uuid);
@@ -341,10 +359,10 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto> implements DrmSe
     this.uuid = uuid;
     this.exoMediaDrmProvider = exoMediaDrmProvider;
     this.callback = callback;
-    this.optionalKeyRequestParameters = optionalKeyRequestParameters;
+    this.keyRequestParameters = keyRequestParameters;
     this.eventDispatcher = new EventDispatcher<>();
     this.multiSession = multiSession;
-    this.preferSecureDecoders = preferSecureDecoders;
+    this.useDrmSessionsForClearContentTrackTypes = useDrmSessionsForClearContentTrackTypes;
     this.flags = flags;
     this.loadErrorHandlingPolicy = loadErrorHandlingPolicy;
     provisioningManagerImpl = new ProvisioningManagerImpl();
@@ -375,7 +393,7 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto> implements DrmSe
   /**
    * Sets the mode, which determines the role of sessions acquired from the instance. This must be
    * called before {@link #acquireSession(Looper, DrmInitData)} or {@link
-   * #acquirePlaceholderSession(Looper)} is called.
+   * #acquirePlaceholderSession} is called.
    *
    * <p>By default, the mode is {@link #MODE_PLAYBACK} and a streaming license is requested when
    * required.
@@ -460,15 +478,13 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto> implements DrmSe
   @Nullable
   public DrmSession<T> acquirePlaceholderSession(Looper playbackLooper, int trackType) {
     assertExpectedPlaybackLooper(playbackLooper);
-    Assertions.checkNotNull(exoMediaDrm);
+    ExoMediaDrm<T> exoMediaDrm = Assertions.checkNotNull(this.exoMediaDrm);
     boolean avoidPlaceholderDrmSessions =
         FrameworkMediaCrypto.class.equals(exoMediaDrm.getExoMediaCryptoType())
             && FrameworkMediaCrypto.WORKAROUND_DEVICE_NEEDS_KEYS_TO_CONFIGURE_CODEC;
     // Avoid attaching a session to sparse formats.
-    avoidPlaceholderDrmSessions |=
-        trackType != C.TRACK_TYPE_VIDEO && trackType != C.TRACK_TYPE_AUDIO;
     if (avoidPlaceholderDrmSessions
-        || !preferSecureDecoders
+        || Util.linearSearch(useDrmSessionsForClearContentTrackTypes, trackType) == C.INDEX_UNSET
         || exoMediaDrm.getExoMediaCryptoType() == null) {
       return null;
     }
@@ -564,7 +580,7 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto> implements DrmSe
         mode,
         isPlaceholderSession,
         offlineLicenseKeySetId,
-        optionalKeyRequestParameters,
+        keyRequestParameters,
         callback,
         Assertions.checkNotNull(playbackLooper),
         eventDispatcher,

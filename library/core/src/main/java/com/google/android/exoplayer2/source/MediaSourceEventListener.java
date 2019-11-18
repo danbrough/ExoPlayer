@@ -18,7 +18,6 @@ package com.google.android.exoplayer2.source;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.SystemClock;
 import androidx.annotation.CheckResult;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
@@ -35,57 +34,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 /** Interface for callbacks to be notified of {@link MediaSource} events. */
 public interface MediaSourceEventListener {
-
-  /** Media source load event information. */
-  final class LoadEventInfo {
-
-    /** Defines the requested data. */
-    public final DataSpec dataSpec;
-    /**
-     * The {@link Uri} from which data is being read. The uri will be identical to the one in {@link
-     * #dataSpec}.uri unless redirection has occurred. If redirection has occurred, this is the uri
-     * after redirection.
-     */
-    public final Uri uri;
-    /** The response headers associated with the load, or an empty map if unavailable. */
-    public final Map<String, List<String>> responseHeaders;
-    /** The value of {@link SystemClock#elapsedRealtime} at the time of the load event. */
-    public final long elapsedRealtimeMs;
-    /** The duration of the load up to the event time. */
-    public final long loadDurationMs;
-    /** The number of bytes that were loaded up to the event time. */
-    public final long bytesLoaded;
-
-    /**
-     * Creates load event info.
-     *
-     * @param dataSpec Defines the requested data.
-     * @param uri The {@link Uri} from which data is being read. The uri must be identical to the
-     *     one in {@code dataSpec.uri} unless redirection has occurred. If redirection has occurred,
-     *     this is the uri after redirection.
-     * @param responseHeaders The response headers associated with the load, or an empty map if
-     *     unavailable.
-     * @param elapsedRealtimeMs The value of {@link SystemClock#elapsedRealtime} at the time of the
-     *     load event.
-     * @param loadDurationMs The duration of the load up to the event time.
-     * @param bytesLoaded The number of bytes that were loaded up to the event time. For compressed
-     *     network responses, this is the decompressed size.
-     */
-    public LoadEventInfo(
-        DataSpec dataSpec,
-        Uri uri,
-        Map<String, List<String>> responseHeaders,
-        long elapsedRealtimeMs,
-        long loadDurationMs,
-        long bytesLoaded) {
-      this.dataSpec = dataSpec;
-      this.uri = uri;
-      this.responseHeaders = responseHeaders;
-      this.elapsedRealtimeMs = elapsedRealtimeMs;
-      this.loadDurationMs = loadDurationMs;
-      this.bytesLoaded = bytesLoaded;
-    }
-  }
 
   /** Descriptor for data being loaded or selected by a media source. */
   final class MediaLoadData {
@@ -164,7 +112,7 @@ public interface MediaSourceEventListener {
    * @param windowIndex The window index in the timeline this media period belongs to.
    * @param mediaPeriodId The {@link MediaPeriodId} of the created media period.
    */
-  void onMediaPeriodCreated(int windowIndex, MediaPeriodId mediaPeriodId);
+  default void onMediaPeriodCreated(int windowIndex, MediaPeriodId mediaPeriodId) {}
 
   /**
    * Called when a media period is released by the media source.
@@ -172,7 +120,7 @@ public interface MediaSourceEventListener {
    * @param windowIndex The window index in the timeline this media period belongs to.
    * @param mediaPeriodId The {@link MediaPeriodId} of the released media period.
    */
-  void onMediaPeriodReleased(int windowIndex, MediaPeriodId mediaPeriodId);
+  default void onMediaPeriodReleased(int windowIndex, MediaPeriodId mediaPeriodId) {}
 
   /**
    * Called when a load begins.
@@ -185,11 +133,11 @@ public interface MediaSourceEventListener {
    *     LoadEventInfo#responseHeaders} will be empty.
    * @param mediaLoadData The {@link MediaLoadData} defining the data being loaded.
    */
-  void onLoadStarted(
+  default void onLoadStarted(
       int windowIndex,
       @Nullable MediaPeriodId mediaPeriodId,
       LoadEventInfo loadEventInfo,
-      MediaLoadData mediaLoadData);
+      MediaLoadData mediaLoadData) {}
 
   /**
    * Called when a load ends.
@@ -203,11 +151,11 @@ public interface MediaSourceEventListener {
    *     event.
    * @param mediaLoadData The {@link MediaLoadData} defining the data being loaded.
    */
-  void onLoadCompleted(
+  default void onLoadCompleted(
       int windowIndex,
       @Nullable MediaPeriodId mediaPeriodId,
       LoadEventInfo loadEventInfo,
-      MediaLoadData mediaLoadData);
+      MediaLoadData mediaLoadData) {}
 
   /**
    * Called when a load is canceled.
@@ -221,11 +169,11 @@ public interface MediaSourceEventListener {
    *     event.
    * @param mediaLoadData The {@link MediaLoadData} defining the data being loaded.
    */
-  void onLoadCanceled(
+  default void onLoadCanceled(
       int windowIndex,
       @Nullable MediaPeriodId mediaPeriodId,
       LoadEventInfo loadEventInfo,
-      MediaLoadData mediaLoadData);
+      MediaLoadData mediaLoadData) {}
 
   /**
    * Called when a load error occurs.
@@ -252,13 +200,13 @@ public interface MediaSourceEventListener {
    * @param error The load error.
    * @param wasCanceled Whether the load was canceled as a result of the error.
    */
-  void onLoadError(
+  default void onLoadError(
       int windowIndex,
       @Nullable MediaPeriodId mediaPeriodId,
       LoadEventInfo loadEventInfo,
       MediaLoadData mediaLoadData,
       IOException error,
-      boolean wasCanceled);
+      boolean wasCanceled) {}
 
   /**
    * Called when a media period is first being read from.
@@ -266,7 +214,7 @@ public interface MediaSourceEventListener {
    * @param windowIndex The window index in the timeline this media period belongs to.
    * @param mediaPeriodId The {@link MediaPeriodId} of the media period being read from.
    */
-  void onReadingStarted(int windowIndex, MediaPeriodId mediaPeriodId);
+  default void onReadingStarted(int windowIndex, MediaPeriodId mediaPeriodId) {}
 
   /**
    * Called when data is removed from the back of a media buffer, typically so that it can be
@@ -276,8 +224,8 @@ public interface MediaSourceEventListener {
    * @param mediaPeriodId The {@link MediaPeriodId} the media belongs to.
    * @param mediaLoadData The {@link MediaLoadData} defining the media being discarded.
    */
-  void onUpstreamDiscarded(
-      int windowIndex, MediaPeriodId mediaPeriodId, MediaLoadData mediaLoadData);
+  default void onUpstreamDiscarded(
+      int windowIndex, MediaPeriodId mediaPeriodId, MediaLoadData mediaLoadData) {}
 
   /**
    * Called when a downstream format change occurs (i.e. when the format of the media being read
@@ -287,8 +235,8 @@ public interface MediaSourceEventListener {
    * @param mediaPeriodId The {@link MediaPeriodId} the media belongs to.
    * @param mediaLoadData The {@link MediaLoadData} defining the newly selected downstream data.
    */
-  void onDownstreamFormatChanged(
-      int windowIndex, @Nullable MediaPeriodId mediaPeriodId, MediaLoadData mediaLoadData);
+  default void onDownstreamFormatChanged(
+      int windowIndex, @Nullable MediaPeriodId mediaPeriodId, MediaLoadData mediaLoadData) {}
 
   /** Dispatches events to {@link MediaSourceEventListener}s. */
   final class EventDispatcher {

@@ -455,23 +455,27 @@
       },
       {
         "name": "Clear -> Enc -> Clear -> Enc -> Enc",
-        "drm_scheme": "widevine",
-        "drm_license_url": "https://proxy.uat.widevine.com/proxy?provider=widevine_test",
         "playlist": [
           {
             "uri": "https://html5demos.com/assets/dizzy.mp4"
           },
           {
-            "uri": "https://storage.googleapis.com/wvmedia/cenc/h264/tears/tears_sd.mpd"
+            "uri": "https://storage.googleapis.com/wvmedia/cenc/h264/tears/tears_sd.mpd",
+            "drm_scheme": "widevine",
+            "drm_license_url": "https://proxy.uat.widevine.com/proxy?provider=widevine_test"
           },
           {
             "uri": "https://html5demos.com/assets/dizzy.mp4"
           },
           {
-            "uri": "https://storage.googleapis.com/wvmedia/cenc/h264/tears/tears_sd.mpd"
+            "uri": "https://storage.googleapis.com/wvmedia/cenc/h264/tears/tears_sd.mpd",
+            "drm_scheme": "widevine",
+            "drm_license_url": "https://proxy.uat.widevine.com/proxy?provider=widevine_test"
           },
           {
-            "uri": "https://storage.googleapis.com/wvmedia/cenc/h264/tears/tears_sd.mpd"
+            "uri": "https://storage.googleapis.com/wvmedia/cenc/h264/tears/tears_sd.mpd",
+            "drm_scheme": "widevine",
+            "drm_license_url": "https://proxy.uat.widevine.com/proxy?provider=widevine_test"
           }
         ]
       }
@@ -595,6 +599,13 @@
         "uri": "https://html5demos.com/assets/dizzy.mp4",
         "subtitle_uri": "https://storage.googleapis.com/exoplayer-test-media-1/ttml/netflix_ttml_sample.xml",
         "subtitle_mime_type": "application/ttml+xml",
+        "subtitle_language": "en"
+      },
+      {
+        "name": "SSA/ASS position & alignment",
+        "uri": "https://storage.googleapis.com/exoplayer-test-media-1/gen-3/screens/dash-vod-single-segment/video-avc-baseline-480.mp4",
+        "subtitle_uri": "https://storage.googleapis.com/exoplayer-test-media-1/ssa/test-subs-position.ass",
+        "subtitle_mime_type": "text/x-ssa",
         "subtitle_language": "en"
       }
     ]

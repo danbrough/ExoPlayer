@@ -77,13 +77,9 @@ public interface DrmSession<T extends ExoMediaCrypto> {
    * The session is being opened.
    */
   int STATE_OPENING = 2;
-  /**
-   * The session is open, but does not yet have the keys required for decryption.
-   */
+  /** The session is open, but does not have keys required for decryption. */
   int STATE_OPENED = 3;
-  /**
-   * The session is open and has the keys required for decryption.
-   */
+  /** The session is open and has keys required for decryption. */
   int STATE_OPENED_WITH_KEYS = 4;
 
   /**
@@ -92,6 +88,11 @@ public interface DrmSession<T extends ExoMediaCrypto> {
    * {@link #STATE_OPENED_WITH_KEYS}.
    */
   @State int getState();
+
+  /** Returns whether this session allows playback of clear samples prior to keys being loaded. */
+  default boolean playClearSamplesWithoutKeys() {
+    return false;
+  }
 
   /**
    * Returns the cause of the error state, or null if {@link #getState()} is not {@link

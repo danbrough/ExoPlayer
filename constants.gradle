@@ -16,9 +16,11 @@ project.ext {
     releaseVersion = '2.11.0'
     releaseVersionCode = 2011000
     minSdkVersion = 16
-    targetSdkVersion = 29
+    appTargetSdkVersion = 29
+    targetSdkVersion = 28 // TODO: Bump once b/143232359 is resolved
     compileSdkVersion = 29
     dexmakerVersion = '2.21.0'
+    guavaVersion = '23.5-android'
     mockitoVersion = '2.25.0'
     robolectricVersion = '4.3'
     autoValueVersion = '1.6'
@@ -35,7 +37,7 @@ project.ext {
     androidxTestJUnitVersion = '1.1.1'
     androidxTestRunnerVersion = '1.2.0'
     androidxTestRulesVersion = '1.2.0'
-    truthVersion = '0.44'
+    truthVersion = '1.0'
     modulePrefix = ':'
     if (gradle.ext.has('exoplayerModulePrefix')) {
         modulePrefix += gradle.ext.exoplayerModulePrefix

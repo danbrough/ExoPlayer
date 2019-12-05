@@ -37,6 +37,7 @@ import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.FormatHolder;
 import com.google.android.exoplayer2.PlayerMessage.Target;
+import com.google.android.exoplayer2.RendererCapabilities;
 import com.google.android.exoplayer2.decoder.DecoderInputBuffer;
 import com.google.android.exoplayer2.drm.DrmInitData;
 import com.google.android.exoplayer2.drm.DrmSessionManager;
@@ -143,9 +144,9 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
   private int buffersInCodecCount;
   private long lastRenderTimeUs;
 
+  private int pendingRotationDegrees;
+  private float pendingPixelWidthHeightRatio;
   @Nullable private MediaFormat currentMediaFormat;
-  private int mediaFormatWidth;
-  private int mediaFormatHeight;
   private int currentWidth;
   private int currentHeight;
   private int currentUnappliedRotationDegrees;
@@ -353,14 +354,14 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
     joiningDeadlineMs = C.TIME_UNSET;
     currentWidth = Format.NO_VALUE;
     currentHeight = Format.NO_VALUE;
-    mediaFormatWidth = Format.NO_VALUE;
-    mediaFormatHeight = Format.NO_VALUE;
     currentPixelWidthHeightRatio = Format.NO_VALUE;
+    pendingPixelWidthHeightRatio = Format.NO_VALUE;
     scalingMode = C.VIDEO_SCALING_MODE_DEFAULT;
     clearReportedVideoSize();
   }
 
   @Override
+  @Capabilities
   protected int supportsFormat(
       MediaCodecSelector mediaCodecSelector,
       @Nullable DrmSessionManager<FrameworkMediaCrypto> drmSessionManager,
@@ -368,7 +369,7 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
       throws DecoderQueryException {
     String mimeType = format.sampleMimeType;
     if (!MimeTypes.isVideo(mimeType)) {
-      return FORMAT_UNSUPPORTED_TYPE;
+      return RendererCapabilities.create(FORMAT_UNSUPPORTED_TYPE);
     }
     @Nullable DrmInitData drmInitData = format.drmInitData;
     // Assume encrypted content requires secure decoders.
@@ -389,7 +390,7 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
               /* requiresTunnelingDecoder= */ false);
     }
     if (decoderInfos.isEmpty()) {
-      return FORMAT_UNSUPPORTED_SUBTYPE;
+      return RendererCapabilities.create(FORMAT_UNSUPPORTED_SUBTYPE);
     }
     boolean supportsFormatDrm =
         drmInitData == null
@@ -397,16 +398,17 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
             || (format.exoMediaCryptoType == null
                 && supportsFormatDrm(drmSessionManager, drmInitData));
     if (!supportsFormatDrm) {
-      return FORMAT_UNSUPPORTED_DRM;
+      return RendererCapabilities.create(FORMAT_UNSUPPORTED_DRM);
     }
     // Check capabilities for the first decoder in the list, which takes priority.
     MediaCodecInfo decoderInfo = decoderInfos.get(0);
     boolean isFormatSupported = decoderInfo.isFormatSupported(format);
+    @AdaptiveSupport
     int adaptiveSupport =
         decoderInfo.isSeamlessAdaptationSupported(format)
             ? ADAPTIVE_SEAMLESS
             : ADAPTIVE_NOT_SEAMLESS;
-    int tunnelingSupport = TUNNELING_NOT_SUPPORTED;
+    @TunnelingSupport int tunnelingSupport = TUNNELING_NOT_SUPPORTED;
     if (isFormatSupported) {
       List<MediaCodecInfo> tunnelingDecoderInfos =
           getDecoderInfos(
@@ -422,8 +424,9 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
         }
       }
     }
+    @FormatSupport
     int formatSupport = isFormatSupported ? FORMAT_HANDLED : FORMAT_EXCEEDS_CAPABILITIES;
-    return adaptiveSupport | tunnelingSupport | formatSupport;
+    return RendererCapabilities.create(formatSupport, adaptiveSupport, tunnelingSupport);
   }
 
   @Override
@@ -750,7 +753,10 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
   @Override
   protected void onInputFormatChanged(FormatHolder formatHolder) throws ExoPlaybackException {
     super.onInputFormatChanged(formatHolder);
-    eventDispatcher.inputFormatChanged(formatHolder.format);
+    Format newFormat = formatHolder.format;
+    eventDispatcher.inputFormatChanged(newFormat);
+    pendingPixelWidthHeightRatio = newFormat.pixelWidthHeightRatio;
+    pendingRotationDegrees = newFormat.rotationDegrees;
   }
 
   /**
@@ -761,7 +767,11 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
   @CallSuper
   @Override
   protected void onQueueInputBuffer(DecoderInputBuffer buffer) {
-    buffersInCodecCount++;
+    // In tunneling mode the device may do frame rate conversion, so in general we can't keep track
+    // of the number of buffers in the codec.
+    if (!tunneling) {
+      buffersInCodecCount++;
+    }
     lastInputTimeUs = Math.max(buffer.timeUs, lastInputTimeUs);
     if (Util.SDK_INT < 23 && tunneling) {
       // In tunneled mode before API 23 we don't have a way to know when the buffer is output, so
@@ -773,54 +783,24 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
   @Override
   protected void onOutputMediaFormatChanged(MediaCodec codec, MediaFormat outputMediaFormat) {
     currentMediaFormat = outputMediaFormat;
-
     boolean hasCrop =
         outputMediaFormat.containsKey(KEY_CROP_RIGHT)
             && outputMediaFormat.containsKey(KEY_CROP_LEFT)
             && outputMediaFormat.containsKey(KEY_CROP_BOTTOM)
             && outputMediaFormat.containsKey(KEY_CROP_TOP);
-    mediaFormatWidth =
+    int mediaFormatWidth =
         hasCrop
             ? outputMediaFormat.getInteger(KEY_CROP_RIGHT)
                 - outputMediaFormat.getInteger(KEY_CROP_LEFT)
                 + 1
             : outputMediaFormat.getInteger(MediaFormat.KEY_WIDTH);
-    mediaFormatHeight =
+    int mediaFormatHeight =
         hasCrop
             ? outputMediaFormat.getInteger(KEY_CROP_BOTTOM)
                 - outputMediaFormat.getInteger(KEY_CROP_TOP)
                 + 1
             : outputMediaFormat.getInteger(MediaFormat.KEY_HEIGHT);
-
-    // Must be applied each time the output MediaFormat changes.
-    codec.setVideoScalingMode(scalingMode);
-  }
-
-  @Override
-  protected void onOutputFormatChanged(Format outputFormat) {
-    if (tunneling) {
-      currentWidth = outputFormat.width;
-      currentHeight = outputFormat.height;
-    } else {
-      currentWidth = mediaFormatWidth;
-      currentHeight = mediaFormatHeight;
-    }
-
-    currentPixelWidthHeightRatio = outputFormat.pixelWidthHeightRatio;
-    if (Util.SDK_INT >= 21) {
-      // On API level 21 and above the decoder applies the rotation when rendering to the surface.
-      // Hence currentUnappliedRotation should always be 0. For 90 and 270 degree rotations, we need
-      // to flip the width, height and pixel aspect ratio to reflect the rotation that was applied.
-      if (outputFormat.rotationDegrees == 90 || outputFormat.rotationDegrees == 270) {
-        int rotatedHeight = currentWidth;
-        currentWidth = currentHeight;
-        currentHeight = rotatedHeight;
-        currentPixelWidthHeightRatio = 1 / currentPixelWidthHeightRatio;
-      }
-    } else {
-      // On API level 20 and below the decoder does not apply the rotation.
-      currentUnappliedRotationDegrees = outputFormat.rotationDegrees;
-    }
+    processOutputFormat(codec, mediaFormatWidth, mediaFormatHeight);
   }
 
   @Override
@@ -973,6 +953,28 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
     return false;
   }
 
+  private void processOutputFormat(MediaCodec codec, int width, int height) {
+    currentWidth = width;
+    currentHeight = height;
+    currentPixelWidthHeightRatio = pendingPixelWidthHeightRatio;
+    if (Util.SDK_INT >= 21) {
+      // On API level 21 and above the decoder applies the rotation when rendering to the surface.
+      // Hence currentUnappliedRotation should always be 0. For 90 and 270 degree rotations, we need
+      // to flip the width, height and pixel aspect ratio to reflect the rotation that was applied.
+      if (pendingRotationDegrees == 90 || pendingRotationDegrees == 270) {
+        int rotatedHeight = currentWidth;
+        currentWidth = currentHeight;
+        currentHeight = rotatedHeight;
+        currentPixelWidthHeightRatio = 1 / currentPixelWidthHeightRatio;
+      }
+    } else {
+      // On API level 20 and below the decoder does not apply the rotation.
+      currentUnappliedRotationDegrees = pendingRotationDegrees;
+    }
+    // Must be applied each time the output MediaFormat changes.
+    codec.setVideoScalingMode(scalingMode);
+  }
+
   private void notifyFrameMetadataListener(
       long presentationTimeUs, long releaseTimeNs, Format format, MediaFormat mediaFormat) {
     if (frameMetadataListener != null) {
@@ -992,7 +994,10 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
 
   /** Called when a buffer was processed in tunneling mode. */
   protected void onProcessedTunneledBuffer(long presentationTimeUs) {
-    updateOutputFormatForTime(presentationTimeUs);
+    @Nullable Format format = updateOutputFormatForTime(presentationTimeUs);
+    if (format != null) {
+      processOutputFormat(getCodec(), format.width, format.height);
+    }
     maybeNotifyVideoSizeChanged();
     maybeNotifyRenderedFirstFrame();
     onProcessedOutputBuffer(presentationTimeUs);
@@ -1011,7 +1016,9 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
   @CallSuper
   @Override
   protected void onProcessedOutputBuffer(long presentationTimeUs) {
-    buffersInCodecCount--;
+    if (!tunneling) {
+      buffersInCodecCount--;
+    }
     while (pendingOutputStreamOffsetCount != 0
         && presentationTimeUs >= pendingOutputStreamSwitchTimesUs[0]) {
       outputStreamOffsetUs = pendingOutputStreamOffsetsUs[0];
@@ -1802,7 +1809,7 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
   private final class OnFrameRenderedListenerV23 implements MediaCodec.OnFrameRenderedListener {
 
     private OnFrameRenderedListenerV23(MediaCodec codec) {
-      codec.setOnFrameRenderedListener(this, new Handler());
+      codec.setOnFrameRenderedListener(/* listener= */ this, Util.createHandler());
     }
 
     @Override

@@ -50,6 +50,7 @@ import com.google.android.exoplayer2.upstream.LoaderErrorThrower;
 import com.google.android.exoplayer2.upstream.ParsingLoadable;
 import com.google.android.exoplayer2.upstream.TransferListener;
 import com.google.android.exoplayer2.util.Assertions;
+import com.google.android.exoplayer2.util.Util;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -118,20 +119,6 @@ public final class SsMediaSource extends BaseMediaSource
     public Factory setTag(@Nullable Object tag) {
       Assertions.checkState(!isCreateCalled);
       this.tag = tag;
-      return this;
-    }
-
-    /**
-     * Sets the {@link DrmSessionManager} to use for acquiring {@link DrmSession DrmSessions}. The
-     * default value is {@link DrmSessionManager#DUMMY}.
-     *
-     * @param drmSessionManager The {@link DrmSessionManager}.
-     * @return This factory, for convenience.
-     * @throws IllegalStateException If one of the {@code create} methods has already been called.
-     */
-    public Factory setDrmSessionManager(DrmSessionManager<?> drmSessionManager) {
-      Assertions.checkState(!isCreateCalled);
-      this.drmSessionManager = drmSessionManager;
       return this;
     }
 
@@ -274,6 +261,21 @@ public final class SsMediaSource extends BaseMediaSource
         mediaSource.addEventListener(eventHandler, eventListener);
       }
       return mediaSource;
+    }
+
+    /**
+     * Sets the {@link DrmSessionManager} to use for acquiring {@link DrmSession DrmSessions}. The
+     * default value is {@link DrmSessionManager#DUMMY}.
+     *
+     * @param drmSessionManager The {@link DrmSessionManager}.
+     * @return This factory, for convenience.
+     * @throws IllegalStateException If one of the {@code create} methods has already been called.
+     */
+    @Override
+    public Factory setDrmSessionManager(DrmSessionManager<?> drmSessionManager) {
+      Assertions.checkState(!isCreateCalled);
+      this.drmSessionManager = drmSessionManager;
+      return this;
     }
 
     /**
@@ -560,7 +562,7 @@ public final class SsMediaSource extends BaseMediaSource
       manifestDataSource = manifestDataSourceFactory.createDataSource();
       manifestLoader = new Loader("Loader:Manifest");
       manifestLoaderErrorThrower = manifestLoader;
-      manifestRefreshHandler = new Handler();
+      manifestRefreshHandler = Util.createHandler();
       startLoadingManifest();
     }
   }

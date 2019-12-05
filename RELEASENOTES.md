@@ -10,19 +10,22 @@
 * Require an end time or duration for SubRip (SRT) and SubStation Alpha
   (SSA/ASS) subtitles. This applies to both sidecar files & subtitles
   [embedded in Matroska streams](https://matroska.org/technical/specs/subtitles/index.html).
-* Improve `Format` propagation within the `MediaCodecRenderer` and subclasses.
-  For example, fix handling of pixel aspect ratio changes in playlists where
-  video resolution does not change.
-  ([#6646](https://github.com/google/ExoPlayer/issues/6646)).
-* Rename `MediaCodecRenderer.onOutputFormatChanged` to
-  `MediaCodecRenderer.onOutputMediaFormatChanged`, further
-  clarifying the distinction between `Format` and `MediaFormat`.
 * Reconfigure audio sink when PCM encoding changes
   ([#6601](https://github.com/google/ExoPlayer/issues/6601)).
 * Make `MediaSourceEventListener.LoadEventInfo` and
   `MediaSourceEventListener.MediaLoadData` top-level classes.
+* Rename `MediaCodecRenderer.onOutputFormatChanged` to
+  `MediaCodecRenderer.onOutputMediaFormatChanged`, further
+  clarifying the distinction between `Format` and `MediaFormat`.
 * Downloads: Merge downloads in `SegmentDownloader` to improve overall download
   speed ([#5978](https://github.com/google/ExoPlayer/issues/5978)).
+* Allow `AdtsExtractor` to encounter EoF when calculating average frame size
+  ([#6700](https://github.com/google/ExoPlayer/issues/6700)).
+* Make media session connector dispatch ACTION_SET_CAPTIONING_ENABLED.
+* Add support for position and overlapping start/end times in SSA/ASS subtitles
+  ([#6320](https://github.com/google/ExoPlayer/issues/6320)).
+* Add `play` and `pause` methods to `Player`.
+* Upgrade Truth dependency from 0.44 to 1.0.
 
 ### 2.11.0 (not yet released) ###
 
@@ -109,6 +112,9 @@
   * Make showing and hiding player controls accessible to TalkBack in
     `PlayerView`.
   * Rename `spherical_view` surface type to `spherical_gl_surface_view`.
+  * Make it easier to override the shuffle, repeat, fullscreen, VR and small
+    notification icon assets
+    ([#6709](https://github.com/google/ExoPlayer/issues/6709)).
 * Analytics:
   * Remove `AnalyticsCollector.Factory`. Instances should be created directly,
     and the `Player` should be set by calling `AnalyticsCollector.setPlayer`.
@@ -124,9 +130,11 @@
     fragment) ([#6470](https://github.com/google/ExoPlayer/issues/6470)).
 * DASH: Support negative @r values in segment timelines
   ([#1787](https://github.com/google/ExoPlayer/issues/1787)).
-* HLS: Fix issue where streams could get stuck in an infinite buffering state
-  after a postroll ad
-  ([#6314](https://github.com/google/ExoPlayer/issues/6314)).
+* HLS:
+  * Use peak bitrate rather than average bitrate for adaptive track selection.
+  * Fix issue where streams could get stuck in an infinite buffering state
+    after a postroll ad
+    ([#6314](https://github.com/google/ExoPlayer/issues/6314)).
 * AV1 extension:
   * New in this release. The AV1 extension allows use of the
     [libgav1 software decoder](https://chromium.googlesource.com/codecs/libgav1/)
@@ -164,6 +172,9 @@
     [Cast demo app](https://github.com/google/ExoPlayer/tree/dev-v2/demos/cast).
 * TestUtils: Publish the `testutils` module to simplify unit testing with
   ExoPlayer ([#6267](https://github.com/google/ExoPlayer/issues/6267)).
+* IMA extension: Remove `AdsManager` listeners on release to avoid leaking an
+  `AdEventListener` provided by the app
+  ([#6687](https://github.com/google/ExoPlayer/issues/6687)).
 
 ### 2.10.8 (2019-11-19) ###
 

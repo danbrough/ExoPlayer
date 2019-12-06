@@ -54,8 +54,6 @@ import com.google.android.exoplayer2.RendererCapabilities;
 import com.google.android.exoplayer2.RenderersFactory;
 import com.google.android.exoplayer2.SeekParameters;
 import com.google.android.exoplayer2.audio.AudioRendererEventListener;
-import com.google.android.exoplayer2.drm.DrmSessionManager;
-import com.google.android.exoplayer2.drm.FrameworkMediaCrypto;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.video.VideoRendererEventListener;
 import java.io.ByteArrayOutputStream;
@@ -1940,7 +1938,7 @@ public final class Util {
    * @return The physical display size, in pixels.
    */
   public static Point getPhysicalDisplaySize(Context context, Display display) {
-    if (Util.SDK_INT <= 28 && display.getDisplayId() == Display.DEFAULT_DISPLAY && isTv(context)) {
+    if (Util.SDK_INT <= 29 && display.getDisplayId() == Display.DEFAULT_DISPLAY && isTv(context)) {
       // On Android TVs it is common for the UI to be configured for a lower resolution than
       // SurfaceViews can output. Before API 26 the Display object does not provide a way to
       // identify this case, and up to and including API 28 many devices still do not correctly set
@@ -1992,13 +1990,10 @@ public final class Util {
    * Extract renderer capabilities for the renderers created by the provided renderers factory.
    *
    * @param renderersFactory A {@link RenderersFactory}.
-   * @param drmSessionManager An optional {@link DrmSessionManager} used by the renderers.
    * @return The {@link RendererCapabilities} for each renderer created by the {@code
    *     renderersFactory}.
    */
-  public static RendererCapabilities[] getRendererCapabilities(
-      RenderersFactory renderersFactory,
-      @Nullable DrmSessionManager<FrameworkMediaCrypto> drmSessionManager) {
+  public static RendererCapabilities[] getRendererCapabilities(RenderersFactory renderersFactory) {
     Renderer[] renderers =
         renderersFactory.createRenderers(
             Util.createHandler(),
@@ -2006,12 +2001,39 @@ public final class Util {
             new AudioRendererEventListener() {},
             (cues) -> {},
             (metadata) -> {},
-            drmSessionManager);
+            /* drmSessionManager= */ null);
     RendererCapabilities[] capabilities = new RendererCapabilities[renderers.length];
     for (int i = 0; i < renderers.length; i++) {
       capabilities[i] = renderers[i].getCapabilities();
     }
     return capabilities;
+  }
+
+  /**
+   * Returns a string representation of a {@code TRACK_TYPE_*} constant defined in {@link C}.
+   *
+   * @param trackType A {@code TRACK_TYPE_*} constant,
+   * @return A string representation of this constant.
+   */
+  public static String getTrackTypeString(int trackType) {
+    switch (trackType) {
+      case C.TRACK_TYPE_AUDIO:
+        return "audio";
+      case C.TRACK_TYPE_DEFAULT:
+        return "default";
+      case C.TRACK_TYPE_METADATA:
+        return "metadata";
+      case C.TRACK_TYPE_CAMERA_MOTION:
+        return "camera motion";
+      case C.TRACK_TYPE_NONE:
+        return "none";
+      case C.TRACK_TYPE_TEXT:
+        return "text";
+      case C.TRACK_TYPE_VIDEO:
+        return "video";
+      default:
+        return trackType >= C.TRACK_TYPE_CUSTOM_BASE ? "custom (" + trackType + ")" : "?";
+    }
   }
 
   @Nullable

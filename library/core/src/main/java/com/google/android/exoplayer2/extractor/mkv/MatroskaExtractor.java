@@ -224,7 +224,7 @@ public class MatroskaExtractor implements Extractor {
    * BlockAddID value for ITU T.35 metadata in a VP9 track. See also
    * https://www.webmproject.org/docs/container/.
    */
-  private static final int BLOCK_ADD_ID_VP9_ITU_T_35 = 4;
+  private static final int BLOCK_ADDITIONAL_ID_VP9_ITU_T_35 = 4;
 
   private static final int LACING_NONE = 0;
   private static final int LACING_XIPH = 1;
@@ -332,7 +332,7 @@ public class MatroskaExtractor implements Extractor {
   private final ParsableByteArray subtitleSample;
   private final ParsableByteArray encryptionInitializationVector;
   private final ParsableByteArray encryptionSubsampleData;
-  private final ParsableByteArray blockAddData;
+  private final ParsableByteArray blockAdditionalData;
   private ByteBuffer encryptionSubsampleDataBuffer;
 
   private long segmentContentSize;
@@ -360,31 +360,33 @@ public class MatroskaExtractor implements Extractor {
   private LongArray cueClusterPositions;
   private boolean seenClusterPositionForCurrentCuePoint;
 
+  // Reading state.
+  private boolean haveOutputSample;
+
   // Block reading state.
   private int blockState;
   private long blockTimeUs;
   private long blockDurationUs;
-  private int blockLacingSampleIndex;
-  private int blockLacingSampleCount;
-  private int[] blockLacingSampleSizes;
+  private int blockSampleIndex;
+  private int blockSampleCount;
+  private int[] blockSampleSizes;
   private int blockTrackNumber;
   private int blockTrackNumberLength;
   @C.BufferFlags
   private int blockFlags;
-  private int blockAddId;
+  private int blockAdditionalId;
+  private boolean blockHasReferenceBlock;
 
   // Sample reading state.
   private int sampleBytesRead;
+  private int sampleBytesWritten;
+  private int sampleCurrentNalBytesRemaining;
   private boolean sampleEncodingHandled;
   private boolean sampleSignalByteRead;
-  private boolean sampleInitializationVectorRead;
   private boolean samplePartitionCountRead;
-  private byte sampleSignalByte;
   private int samplePartitionCount;
-  private int sampleCurrentNalBytesRemaining;
-  private int sampleBytesWritten;
-  private boolean sampleRead;
-  private boolean sampleSeenReferenceBlock;
+  private byte sampleSignalByte;
+  private boolean sampleInitializationVectorRead;
 
   // Extractor outputs.
   private ExtractorOutput extractorOutput;
@@ -412,7 +414,7 @@ public class MatroskaExtractor implements Extractor {
     subtitleSample = new ParsableByteArray();
     encryptionInitializationVector = new ParsableByteArray(ENCRYPTION_IV_SIZE);
     encryptionSubsampleData = new ParsableByteArray();
-    blockAddData = new ParsableByteArray();
+    blockAdditionalData = new ParsableByteArray();
   }
 
   @Override
@@ -446,9 +448,9 @@ public class MatroskaExtractor implements Extractor {
   @Override
   public final int read(ExtractorInput input, PositionHolder seekPosition)
       throws IOException, InterruptedException {
-    sampleRead = false;
+    haveOutputSample = false;
     boolean continueReading = true;
-    while (continueReading && !sampleRead) {
+    while (continueReading && !haveOutputSample) {
       continueReading = reader.read(input);
       if (continueReading && maybeSeekForCues(seekPosition, input.getPosition())) {
         return Extractor.RESULT_SEEK;
@@ -623,7 +625,7 @@ public class MatroskaExtractor implements Extractor {
         }
         break;
       case ID_BLOCK_GROUP:
-        sampleSeenReferenceBlock = false;
+        blockHasReferenceBlock = false;
         break;
       case ID_CONTENT_ENCODING:
         // TODO: check and fail if more than one content encoding is present.
@@ -681,7 +683,7 @@ public class MatroskaExtractor implements Extractor {
           return;
         }
         // If the ReferenceBlock element was not found for this sample, then it is a keyframe.
-        if (!sampleSeenReferenceBlock) {
+        if (!blockHasReferenceBlock) {
           blockFlags |= C.BUFFER_FLAG_KEY_FRAME;
         }
         commitSampleToOutput(tracks.get(blockTrackNumber), blockTimeUs);
@@ -793,7 +795,7 @@ public class MatroskaExtractor implements Extractor {
         currentTrack.audioBitDepth = (int) value;
         break;
       case ID_REFERENCE_BLOCK:
-        sampleSeenReferenceBlock = true;
+        blockHasReferenceBlock = true;
         break;
       case ID_CONTENT_ENCODING_ORDER:
         // This extractor only supports one ContentEncoding element and hence the order has to be 0.
@@ -935,7 +937,7 @@ public class MatroskaExtractor implements Extractor {
         }
         break;
       case ID_BLOCK_ADD_ID:
-        blockAddId = (int) value;
+        blockAdditionalId = (int) value;
         break;
       default:
         break;
@@ -1091,9 +1093,9 @@ public class MatroskaExtractor implements Extractor {
           readScratch(input, 3);
           int lacing = (scratch.data[2] & 0x06) >> 1;
           if (lacing == LACING_NONE) {
-            blockLacingSampleCount = 1;
-            blockLacingSampleSizes = ensureArrayCapacity(blockLacingSampleSizes, 1);
-            blockLacingSampleSizes[0] = contentSize - blockTrackNumberLength - 3;
+            blockSampleCount = 1;
+            blockSampleSizes = ensureArrayCapacity(blockSampleSizes, 1);
+            blockSampleSizes[0] = contentSize - blockTrackNumberLength - 3;
           } else {
             if (id != ID_SIMPLE_BLOCK) {
               throw new ParserException("Lacing only supported in SimpleBlocks.");
@@ -1101,33 +1103,32 @@ public class MatroskaExtractor implements Extractor {
 
             // Read the sample count (1 byte).
             readScratch(input, 4);
-            blockLacingSampleCount = (scratch.data[3] & 0xFF) + 1;
-            blockLacingSampleSizes =
-                ensureArrayCapacity(blockLacingSampleSizes, blockLacingSampleCount);
+            blockSampleCount = (scratch.data[3] & 0xFF) + 1;
+            blockSampleSizes = ensureArrayCapacity(blockSampleSizes, blockSampleCount);
             if (lacing == LACING_FIXED_SIZE) {
               int blockLacingSampleSize =
-                  (contentSize - blockTrackNumberLength - 4) / blockLacingSampleCount;
-              Arrays.fill(blockLacingSampleSizes, 0, blockLacingSampleCount, blockLacingSampleSize);
+                  (contentSize - blockTrackNumberLength - 4) / blockSampleCount;
+              Arrays.fill(blockSampleSizes, 0, blockSampleCount, blockLacingSampleSize);
             } else if (lacing == LACING_XIPH) {
               int totalSamplesSize = 0;
               int headerSize = 4;
-              for (int sampleIndex = 0; sampleIndex < blockLacingSampleCount - 1; sampleIndex++) {
-                blockLacingSampleSizes[sampleIndex] = 0;
+              for (int sampleIndex = 0; sampleIndex < blockSampleCount - 1; sampleIndex++) {
+                blockSampleSizes[sampleIndex] = 0;
                 int byteValue;
                 do {
                   readScratch(input, ++headerSize);
                   byteValue = scratch.data[headerSize - 1] & 0xFF;
-                  blockLacingSampleSizes[sampleIndex] += byteValue;
+                  blockSampleSizes[sampleIndex] += byteValue;
                 } while (byteValue == 0xFF);
-                totalSamplesSize += blockLacingSampleSizes[sampleIndex];
+                totalSamplesSize += blockSampleSizes[sampleIndex];
               }
-              blockLacingSampleSizes[blockLacingSampleCount - 1] =
+              blockSampleSizes[blockSampleCount - 1] =
                   contentSize - blockTrackNumberLength - headerSize - totalSamplesSize;
             } else if (lacing == LACING_EBML) {
               int totalSamplesSize = 0;
               int headerSize = 4;
-              for (int sampleIndex = 0; sampleIndex < blockLacingSampleCount - 1; sampleIndex++) {
-                blockLacingSampleSizes[sampleIndex] = 0;
+              for (int sampleIndex = 0; sampleIndex < blockSampleCount - 1; sampleIndex++) {
+                blockSampleSizes[sampleIndex] = 0;
                 readScratch(input, ++headerSize);
                 if (scratch.data[headerSize - 1] == 0) {
                   throw new ParserException("No valid varint length mask found");
@@ -1155,11 +1156,13 @@ public class MatroskaExtractor implements Extractor {
                   throw new ParserException("EBML lacing sample size out of range.");
                 }
                 int intReadValue = (int) readValue;
-                blockLacingSampleSizes[sampleIndex] = sampleIndex == 0
-                    ? intReadValue : blockLacingSampleSizes[sampleIndex - 1] + intReadValue;
-                totalSamplesSize += blockLacingSampleSizes[sampleIndex];
+                blockSampleSizes[sampleIndex] =
+                    sampleIndex == 0
+                        ? intReadValue
+                        : blockSampleSizes[sampleIndex - 1] + intReadValue;
+                totalSamplesSize += blockSampleSizes[sampleIndex];
               }
-              blockLacingSampleSizes[blockLacingSampleCount - 1] =
+              blockSampleSizes[blockSampleCount - 1] =
                   contentSize - blockTrackNumberLength - headerSize - totalSamplesSize;
             } else {
               // Lacing is always in the range 0--3.
@@ -1175,23 +1178,23 @@ public class MatroskaExtractor implements Extractor {
           blockFlags = (isKeyframe ? C.BUFFER_FLAG_KEY_FRAME : 0)
               | (isInvisible ? C.BUFFER_FLAG_DECODE_ONLY : 0);
           blockState = BLOCK_STATE_DATA;
-          blockLacingSampleIndex = 0;
+          blockSampleIndex = 0;
         }
 
         if (id == ID_SIMPLE_BLOCK) {
           // For SimpleBlock, we have metadata for each sample here.
-          while (blockLacingSampleIndex < blockLacingSampleCount) {
-            writeSampleData(input, track, blockLacingSampleSizes[blockLacingSampleIndex]);
-            long sampleTimeUs = blockTimeUs
-                + (blockLacingSampleIndex * track.defaultSampleDurationNs) / 1000;
+          while (blockSampleIndex < blockSampleCount) {
+            writeSampleData(input, track, blockSampleSizes[blockSampleIndex]);
+            long sampleTimeUs =
+                blockTimeUs + (blockSampleIndex * track.defaultSampleDurationNs) / 1000;
             commitSampleToOutput(track, sampleTimeUs);
-            blockLacingSampleIndex++;
+            blockSampleIndex++;
           }
           blockState = BLOCK_STATE_START;
         } else {
           // For Block, we send the metadata at the end of the BlockGroup element since we'll know
           // if the sample is a keyframe or not only at that point.
-          writeSampleData(input, track, blockLacingSampleSizes[0]);
+          writeSampleData(input, track, blockSampleSizes[0]);
         }
 
         break;
@@ -1199,7 +1202,8 @@ public class MatroskaExtractor implements Extractor {
         if (blockState != BLOCK_STATE_DATA) {
           return;
         }
-        handleBlockAdditionalData(tracks.get(blockTrackNumber), blockAddId, input, contentSize);
+        handleBlockAdditionalData(
+            tracks.get(blockTrackNumber), blockAdditionalId, input, contentSize);
         break;
       default:
         throw new ParserException("Unexpected id: " + id);
@@ -1207,11 +1211,12 @@ public class MatroskaExtractor implements Extractor {
   }
 
   protected void handleBlockAdditionalData(
-      Track track, int blockAddId, ExtractorInput input, int contentSize)
+      Track track, int blockAdditionalId, ExtractorInput input, int contentSize)
       throws IOException, InterruptedException {
-    if (blockAddId == BLOCK_ADD_ID_VP9_ITU_T_35 && CODEC_ID_VP9.equals(track.codecId)) {
-      blockAddData.reset(contentSize);
-      input.readFully(blockAddData.data, 0, contentSize);
+    if (blockAdditionalId == BLOCK_ADDITIONAL_ID_VP9_ITU_T_35
+        && CODEC_ID_VP9.equals(track.codecId)) {
+      blockAdditionalData.reset(contentSize);
+      input.readFully(blockAdditionalData.data, 0, contentSize);
     } else {
       // Unhandled block additional data.
       input.skipFully(contentSize);
@@ -1236,13 +1241,13 @@ public class MatroskaExtractor implements Extractor {
 
       if ((blockFlags & C.BUFFER_FLAG_HAS_SUPPLEMENTAL_DATA) != 0) {
         // Append supplemental data.
-        int size = blockAddData.limit();
-        track.output.sampleData(blockAddData, size);
-        sampleBytesWritten += size;
+        int blockAdditionalSize = blockAdditionalData.limit();
+        track.output.sampleData(blockAdditionalData, blockAdditionalSize);
+        sampleBytesWritten += blockAdditionalSize;
       }
       track.output.sampleMetadata(timeUs, blockFlags, sampleBytesWritten, 0, track.cryptoData);
     }
-    sampleRead = true;
+    haveOutputSample = true;
     resetSample();
   }
 
@@ -1375,7 +1380,7 @@ public class MatroskaExtractor implements Extractor {
 
       if (track.maxBlockAdditionId > 0) {
         blockFlags |= C.BUFFER_FLAG_HAS_SUPPLEMENTAL_DATA;
-        blockAddData.reset();
+        blockAdditionalData.reset();
         // If there is supplemental data, the structure of the sample data is:
         // sample size (4 bytes) || sample data || supplemental data
         scratch.reset(/* limit= */ 4);

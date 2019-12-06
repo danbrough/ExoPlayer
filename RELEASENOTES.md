@@ -21,11 +21,14 @@
   speed ([#5978](https://github.com/google/ExoPlayer/issues/5978)).
 * Allow `AdtsExtractor` to encounter EoF when calculating average frame size
   ([#6700](https://github.com/google/ExoPlayer/issues/6700)).
+* In MP4 streams, store the Android capture frame rate only in
+  `Format.metadata`. `Format.frameRate` now stores the calculated frame rate.
 * Make media session connector dispatch ACTION_SET_CAPTIONING_ENABLED.
 * Add support for position and overlapping start/end times in SSA/ASS subtitles
   ([#6320](https://github.com/google/ExoPlayer/issues/6320)).
 * Add `play` and `pause` methods to `Player`.
 * Upgrade Truth dependency from 0.44 to 1.0.
+* Upgrade to JUnit 4.13-rc-2.
 
 ### 2.11.0 (not yet released) ###
 
@@ -56,6 +59,7 @@
   * Add `MediaPeriod.isLoading` to improve `Player.isLoading` state.
   * Fix issue where player errors are thrown too early at playlist transitions
     ([#5407](https://github.com/google/ExoPlayer/issues/5407)).
+  * Add `Format` and renderer support flags to renderer `ExoPlaybackException`s.
 * DRM:
   * Inject `DrmSessionManager` into the `MediaSources` instead of `Renderers`.
     This allows each `MediaSource` in a `ConcatenatingMediaSource` to use a

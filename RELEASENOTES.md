@@ -2,8 +2,6 @@
 
 ### dev-v2 (not yet released) ###
 
-* Matroska: Support lacing in Blocks
-  ([#3026](https://github.com/google/ExoPlayer/issues/3026)).
 * Add Java FLAC extractor
   ([#6406](https://github.com/google/ExoPlayer/issues/6406)).
   This extractor does not support seeking and live streams. If
@@ -22,6 +20,8 @@
 * Upgrade Truth dependency from 0.44 to 1.0.
 * Upgrade to JUnit 4.13-rc-2.
 * Add support for attaching DRM sessions to clear content in the demo app.
+* UI: Exclude `DefaultTimeBar` region from system gesture detection
+  ([#6685](https://github.com/google/ExoPlayer/issues/6685)).
 
 ### 2.11.0 (2019-12-11) ###
 
@@ -140,6 +140,8 @@
   * Fix issue where streams could get stuck in an infinite buffering state
     after a postroll ad
     ([#6314](https://github.com/google/ExoPlayer/issues/6314)).
+* Matroska: Support lacing in Blocks
+  ([#3026](https://github.com/google/ExoPlayer/issues/3026)).
 * AV1 extension:
   * New in this release. The AV1 extension allows use of the
     [libgav1 software decoder](https://chromium.googlesource.com/codecs/libgav1/)

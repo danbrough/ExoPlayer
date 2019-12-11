@@ -4,8 +4,7 @@
 
 * Add Java FLAC extractor
   ([#6406](https://github.com/google/ExoPlayer/issues/6406)).
-  This extractor does not support seeking and live streams. If
-  `DefaultExtractorsFactory` is used, this extractor is only used if the FLAC
+  If `DefaultExtractorsFactory` is used, this extractor is only used if the FLAC
   extension is not loaded.
 * Make `MediaSourceEventListener.LoadEventInfo` and
   `MediaSourceEventListener.MediaLoadData` top-level classes.
@@ -22,6 +21,9 @@
 * Add support for attaching DRM sessions to clear content in the demo app.
 * UI: Exclude `DefaultTimeBar` region from system gesture detection
   ([#6685](https://github.com/google/ExoPlayer/issues/6685)).
+* Add `SpannedSubject` to testutils, for assertions on
+  [Span-styled text]( https://developer.android.com/guide/topics/text/spans)
+  (e.g. subtitles).
 
 ### 2.11.0 (2019-12-11) ###
 
@@ -98,6 +100,9 @@
   * Fix Dolby Vision fallback to AVC and HEVC.
   * Fix early end-of-stream detection when using video tunneling, on API level
     23 and above.
+  * Fix an issue where a keyframe was rendered rather than skipped when
+    performing an exact seek to a non-zero position close to the start of the
+    stream.
 * Audio:
   * Fix the start of audio getting truncated when transitioning to a new
     item in a playlist of Opus streams.
@@ -446,6 +451,7 @@
   * Update `TrackSelection.Factory` interface to support creating all track
     selections together.
   * Allow to specify a selection reason for a `SelectionOverride`.
+  * Select audio track based on system language if no preference is provided.
   * When no text language preference matches, only select forced text tracks
     whose language matches the selected audio language.
 * UI:

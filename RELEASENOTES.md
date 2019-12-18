@@ -30,6 +30,15 @@
   Also change `IcyInfo.rawMetadata` from `String` to `byte[]` to allow
   developers to handle data that's neither UTF-8 nor ISO-8859-1
   ([#6753](https://github.com/google/ExoPlayer/issues/6753)).
+* AV1 extension: Fix ProGuard rules
+  ([6773](https://github.com/google/ExoPlayer/issues/6773)).
+* Suppress ProGuard warnings for compile-time `javax.annotation` package
+  ([#6771](https://github.com/google/ExoPlayer/issues/6771)).
+* Add playlist API ([#6161](https://github.com/google/ExoPlayer/issues/6161)).
+* Fix proguard rules for R8 to ensure raw resources used with
+  `RawResourceDataSource` are kept.
+* Fix proguard rules to keep `VideoDecoderOutputBuffer` for video decoder
+  extensions.
 
 ### 2.11.0 (2019-12-11) ###
 
@@ -61,6 +70,10 @@
   * Fix issue where player errors are thrown too early at playlist transitions
     ([#5407](https://github.com/google/ExoPlayer/issues/5407)).
   * Add `Format` and renderer support flags to renderer `ExoPlaybackException`s.
+  * Where there are multiple platform decoders for a given MIME type, prefer to
+    use one that advertises support for the profile and level of the media being
+    played over one that does not, even if it does not come first in the
+    `MediaCodecList`.
 * DRM:
   * Inject `DrmSessionManager` into the `MediaSources` instead of `Renderers`.
     This allows each `MediaSource` in a `ConcatenatingMediaSource` to use a

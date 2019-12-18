@@ -57,6 +57,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import org.checkerframework.checker.nullness.compatqual.NullableType;
+import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
 /** Extracts data from the Matroska and WebM container formats. */
 public class MatroskaExtractor implements Extractor {
@@ -342,7 +344,7 @@ public class MatroskaExtractor implements Extractor {
   private long durationUs = C.TIME_UNSET;
 
   // The track corresponding to the current TrackEntry element, or null.
-  private Track currentTrack;
+  @Nullable private Track currentTrack;
 
   // Whether a seek map has been sent to the output.
   private boolean sentSeekMap;
@@ -356,8 +358,8 @@ public class MatroskaExtractor implements Extractor {
   private long cuesContentPosition = C.POSITION_UNSET;
   private long seekPositionAfterBuildingCues = C.POSITION_UNSET;
   private long clusterTimecodeUs = C.TIME_UNSET;
-  private LongArray cueTimesUs;
-  private LongArray cueClusterPositions;
+  @Nullable private LongArray cueTimesUs;
+  @Nullable private LongArray cueClusterPositions;
   private boolean seenClusterPositionForCurrentCuePoint;
 
   // Reading state.
@@ -372,8 +374,7 @@ public class MatroskaExtractor implements Extractor {
   private int[] blockSampleSizes;
   private int blockTrackNumber;
   private int blockTrackNumberLength;
-  @C.BufferFlags
-  private int blockFlags;
+  @C.BufferFlags private int blockFlags;
   private int blockAdditionalId;
   private boolean blockHasReferenceBlock;
 
@@ -389,7 +390,7 @@ public class MatroskaExtractor implements Extractor {
   private boolean sampleInitializationVectorRead;
 
   // Extractor outputs.
-  private ExtractorOutput extractorOutput;
+  @MonotonicNonNull private ExtractorOutput extractorOutput;
 
   public MatroskaExtractor() {
     this(0);
@@ -415,6 +416,7 @@ public class MatroskaExtractor implements Extractor {
     encryptionInitializationVector = new ParsableByteArray(ENCRYPTION_IV_SIZE);
     encryptionSubsampleData = new ParsableByteArray();
     blockAdditionalData = new ParsableByteArray();
+    blockSampleSizes = new int[1];
   }
 
   @Override
@@ -1635,6 +1637,16 @@ public class MatroskaExtractor implements Extractor {
     sizes[cuePointsSize - 1] =
         (int) (segmentContentPosition + segmentContentSize - offsets[cuePointsSize - 1]);
     durationsUs[cuePointsSize - 1] = durationUs - timesUs[cuePointsSize - 1];
+
+    long lastDurationUs = durationsUs[cuePointsSize - 1];
+    if (lastDurationUs <= 0) {
+      Log.w(TAG, "Discarding last cue point with unexpected duration: " + lastDurationUs);
+      sizes = Arrays.copyOf(sizes, sizes.length - 1);
+      offsets = Arrays.copyOf(offsets, offsets.length - 1);
+      durationsUs = Arrays.copyOf(durationsUs, durationsUs.length - 1);
+      timesUs = Arrays.copyOf(timesUs, timesUs.length - 1);
+    }
+
     cueTimesUs = null;
     cueClusterPositions = null;
     return new ChunkIndex(sizes, offsets, durationsUs, timesUs);
@@ -1914,7 +1926,7 @@ public class MatroskaExtractor implements Extractor {
       String mimeType;
       int maxInputSize = Format.NO_VALUE;
       @C.PcmEncoding int pcmEncoding = Format.NO_VALUE;
-      List<byte[]> initializationData = null;
+      @Nullable List<byte[]> initializationData = null;
       switch (codecId) {
         case CODEC_ID_VP8:
           mimeType = MimeTypes.VIDEO_VP8;
@@ -1948,7 +1960,8 @@ public class MatroskaExtractor implements Extractor {
           nalUnitLengthFieldLength = hevcConfig.nalUnitLengthFieldLength;
           break;
         case CODEC_ID_FOURCC:
-          Pair<String, List<byte[]>> pair = parseFourCcPrivate(new ParsableByteArray(codecPrivate));
+          Pair<String, @NullableType List<byte[]>> pair =
+              parseFourCcPrivate(new ParsableByteArray(codecPrivate));
           mimeType = pair.first;
           initializationData = pair.second;
           break;
@@ -2210,8 +2223,8 @@ public class MatroskaExtractor implements Extractor {
      *     is {@code null}.
      * @throws ParserException If the initialization data could not be built.
      */
-    private static Pair<String, List<byte[]>> parseFourCcPrivate(ParsableByteArray buffer)
-        throws ParserException {
+    private static Pair<String, @NullableType List<byte[]>> parseFourCcPrivate(
+        ParsableByteArray buffer) throws ParserException {
       try {
         buffer.skipBytes(16); // size(4), width(4), height(4), planes(2), bitcount(2).
         long compression = buffer.readLittleEndianUnsignedInt();

@@ -24,6 +24,7 @@ import android.media.MediaCryptoException;
 import android.media.MediaFormat;
 import android.os.Bundle;
 import android.os.SystemClock;
+import androidx.annotation.CallSuper;
 import androidx.annotation.CheckResult;
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
@@ -60,8 +61,46 @@ import java.util.List;
 public abstract class MediaCodecRenderer extends BaseRenderer {
 
   /**
-   * Thrown when a failure occurs instantiating a decoder.
+   * The modes to operate the {@link MediaCodec}.
+   *
+   * <p>Allowed values:
+   *
+   * <ul>
+   *   <li>{@link #OPERATION_MODE_SYNCHRONOUS}
+   *   <li>{@link #OPERATION_MODE_ASYNCHRONOUS_PLAYBACK_THREAD}
+   *   <li>{@link #OPERATION_MODE_ASYNCHRONOUS_DEDICATED_THREAD}
+   *   <li>{@link #OPERATION_MODE_ASYNCHRONOUS_DEDICATED_THREAD_MULTI_LOCK}
+   * </ul>
    */
+  @Documented
+  @Retention(RetentionPolicy.SOURCE)
+  @IntDef({
+    OPERATION_MODE_SYNCHRONOUS,
+    OPERATION_MODE_ASYNCHRONOUS_PLAYBACK_THREAD,
+    OPERATION_MODE_ASYNCHRONOUS_DEDICATED_THREAD,
+    OPERATION_MODE_ASYNCHRONOUS_DEDICATED_THREAD_MULTI_LOCK
+  })
+  public @interface MediaCodecOperationMode {}
+
+  /** Operates the {@link MediaCodec} in synchronous mode. */
+  public static final int OPERATION_MODE_SYNCHRONOUS = 0;
+  /**
+   * Operates the {@link MediaCodec} in asynchronous mode and routes {@link MediaCodec.Callback}
+   * callbacks to the playback Thread.
+   */
+  public static final int OPERATION_MODE_ASYNCHRONOUS_PLAYBACK_THREAD = 1;
+  /**
+   * Operates the {@link MediaCodec} in asynchronous mode and routes {@link MediaCodec.Callback}
+   * callbacks to a dedicated Thread.
+   */
+  public static final int OPERATION_MODE_ASYNCHRONOUS_DEDICATED_THREAD = 2;
+  /**
+   * Operates the {@link MediaCodec} in asynchronous mode and routes {@link MediaCodec.Callback}
+   * callbacks to a dedicated Thread. Uses granular locking for input and output buffers.
+   */
+  public static final int OPERATION_MODE_ASYNCHRONOUS_DEDICATED_THREAD_MULTI_LOCK = 3;
+
+  /** Thrown when a failure occurs instantiating a decoder. */
   public static class DecoderInitializationException extends Exception {
 
     private static final int CUSTOM_ERROR_CODE_BASE = -50000;
@@ -188,24 +227,6 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
       }
       return null;
     }
-  }
-
-  /** The modes to operate the {@link MediaCodec}. */
-  @Documented
-  @Retention(RetentionPolicy.SOURCE)
-  @IntDef({
-    MediaCodecOperationMode.SYNCHRONOUS,
-    MediaCodecOperationMode.ASYNCHRONOUS_PLAYBACK_THREAD
-  })
-  public @interface MediaCodecOperationMode {
-
-    /** Operates the {@link MediaCodec} in synchronous mode. */
-    int SYNCHRONOUS = 0;
-    /**
-     * Operates the {@link MediaCodec} in asynchronous mode and routes {@link MediaCodec.Callback}
-     * callbacks to the playback Thread.
-     */
-    int ASYNCHRONOUS_PLAYBACK_THREAD = 1;
   }
 
   /** Indicates no codec operating rate should be set. */
@@ -393,9 +414,7 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
   private boolean waitingForFirstSyncSample;
   private boolean waitingForFirstSampleInFormat;
   private boolean pendingOutputEndOfStream;
-
-  private @MediaCodecOperationMode int mediaCodecOperationMode;
-
+  @MediaCodecOperationMode private int mediaCodecOperationMode;
   protected DecoderCounters decoderCounters;
 
   /**
@@ -434,13 +453,10 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
     formatQueue = new TimedValueQueue<>();
     decodeOnlyPresentationTimestamps = new ArrayList<>();
     outputBufferInfo = new MediaCodec.BufferInfo();
-    codecReconfigurationState = RECONFIGURATION_STATE_NONE;
-    codecDrainState = DRAIN_STATE_NONE;
-    codecDrainAction = DRAIN_ACTION_NONE;
-    codecOperatingRate = CODEC_OPERATING_RATE_UNSET;
     rendererOperatingRate = 1f;
     renderTimeLimitMs = C.TIME_UNSET;
-    mediaCodecOperationMode = MediaCodecOperationMode.SYNCHRONOUS;
+    mediaCodecOperationMode = OPERATION_MODE_SYNCHRONOUS;
+    resetCodecStateForRelease();
   }
 
   /**
@@ -463,17 +479,26 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
    * <p>This method is experimental, and will be renamed or removed in a future release. It should
    * only be called before the renderer is used.
    *
-   * @param mode the mode of the MediaCodec. The supported modes are:
+   * @param mode The mode of the MediaCodec. The supported modes are:
    *     <ul>
-   *       <li>{@link MediaCodecOperationMode#SYNCHRONOUS}: The {@link MediaCodec} will operate in
-   *           synchronous mode.
-   *       <li>{@link MediaCodecOperationMode#ASYNCHRONOUS_PLAYBACK_THREAD}: The {@link MediaCodec}
-   *           will operate in asynchronous mode and {@link MediaCodec.Callback} callbacks will be
-   *           routed to the Playback Thread. This mode requires API level &ge; 21; if the API level
-   *           is &le; 20, the operation mode will be set to {@link
-   *           MediaCodecOperationMode#SYNCHRONOUS}.
+   *       <li>{@link MediaCodecRenderer#OPERATION_MODE_SYNCHRONOUS}: The {@link MediaCodec} will
+   *           operate in synchronous mode.
+   *       <li>{@link MediaCodecRenderer#OPERATION_MODE_ASYNCHRONOUS_PLAYBACK_THREAD}: The {@link
+   *           MediaCodec} will operate in asynchronous mode and {@link MediaCodec.Callback}
+   *           callbacks will be routed to the Playback Thread. This mode requires API level &ge;
+   *           21; if the API level is &le; 20, the operation mode will be set to {@link
+   *           MediaCodecRenderer#OPERATION_MODE_SYNCHRONOUS}.
+   *       <li>{@link MediaCodecRenderer#OPERATION_MODE_ASYNCHRONOUS_DEDICATED_THREAD}: The {@link
+   *           MediaCodec} will operate in asynchronous mode and {@link MediaCodec.Callback}
+   *           callbacks will be routed to a dedicated Thread. This mode requires API level &ge; 23;
+   *           if the API level is &le; 22, the operation mode will be set to {@link
+   *           MediaCodecRenderer#OPERATION_MODE_SYNCHRONOUS}.
+   *       <li>{@link MediaCodecRenderer#OPERATION_MODE_ASYNCHRONOUS_DEDICATED_THREAD_MULTI_LOCK}:
+   *           Same as {@link MediaCodecRenderer#OPERATION_MODE_ASYNCHRONOUS_DEDICATED_THREAD} but
+   *           it will internally use a finer grained locking mechanism for increased performance.
    *     </ul>
-   *     By default, the operation mode is set to {@link MediaCodecOperationMode#SYNCHRONOUS}.
+   *     By default, the operation mode is set to {@link
+   *     MediaCodecRenderer#OPERATION_MODE_SYNCHRONOUS}.
    */
   public void experimental_setMediaCodecOperationMode(@MediaCodecOperationMode int mode) {
     mediaCodecOperationMode = mode;
@@ -670,36 +695,25 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
   }
 
   protected void releaseCodec() {
-    availableCodecInfos = null;
-    codecInfo = null;
-    codecFormat = null;
-    if (codecAdapter != null) {
-      codecAdapter.shutdown();
-      codecAdapter = null;
-    }
-    resetInputBuffer();
-    resetOutputBuffer();
-    resetCodecBuffers();
-    waitingForKeys = false;
-    codecHotswapDeadlineMs = C.TIME_UNSET;
-    decodeOnlyPresentationTimestamps.clear();
-    largestQueuedPresentationTimeUs = C.TIME_UNSET;
-    lastBufferInStreamPresentationTimeUs = C.TIME_UNSET;
     try {
+      if (codecAdapter != null) {
+        codecAdapter.shutdown();
+      }
       if (codec != null) {
         decoderCounters.decoderReleaseCount++;
         codec.release();
       }
     } finally {
       codec = null;
+      codecAdapter = null;
       try {
         if (mediaCrypto != null) {
           mediaCrypto.release();
         }
       } finally {
         mediaCrypto = null;
-        mediaCryptoRequiresSecureDecoder = false;
         setCodecDrmSession(null);
+        resetCodecStateForRelease();
       }
     }
   }
@@ -788,8 +802,17 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
       releaseCodec();
       return true;
     }
+    try {
+      codecAdapter.flush();
+    } finally {
+      resetCodecStateForFlush();
+    }
+    return false;
+  }
 
-    codecAdapter.flush();
+  /** Resets the renderer internal state after a codec flush. */
+  @CallSuper
+  protected void resetCodecStateForFlush() {
     resetInputBuffer();
     resetOutputBuffer();
     codecHotswapDeadlineMs = C.TIME_UNSET;
@@ -800,7 +823,6 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
     shouldSkipAdaptationWorkaroundOutputBuffer = false;
     isDecodeOnlyOutputBuffer = false;
     isLastOutputBuffer = false;
-
     waitingForKeys = false;
     decodeOnlyPresentationTimestamps.clear();
     largestQueuedPresentationTimeUs = C.TIME_UNSET;
@@ -812,7 +834,34 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
     // guarantee that it's processed.
     codecReconfigurationState =
         codecReconfigured ? RECONFIGURATION_STATE_WRITE_PENDING : RECONFIGURATION_STATE_NONE;
-    return false;
+  }
+
+  /**
+   * Resets the renderer internal state after a codec release.
+   *
+   * <p>Note that this only needs to reset state variables that are changed in addition to those
+   * already changed in {@link #resetCodecStateForFlush()}.
+   */
+  @CallSuper
+  protected void resetCodecStateForRelease() {
+    resetCodecStateForFlush();
+
+    availableCodecInfos = null;
+    codecInfo = null;
+    codecFormat = null;
+    codecOperatingRate = CODEC_OPERATING_RATE_UNSET;
+    codecAdaptationWorkaroundMode = ADAPTATION_WORKAROUND_MODE_NEVER;
+    codecNeedsReconfigureWorkaround = false;
+    codecNeedsDiscardToSpsWorkaround = false;
+    codecNeedsFlushWorkaround = false;
+    codecNeedsEosFlushWorkaround = false;
+    codecNeedsEosOutputExceptionWorkaround = false;
+    codecNeedsMonoChannelCountWorkaround = false;
+    codecNeedsEosPropagation = false;
+    codecReconfigured = false;
+    codecReconfigurationState = RECONFIGURATION_STATE_NONE;
+    resetCodecBuffers();
+    mediaCryptoRequiresSecureDecoder = false;
   }
 
   protected DecoderException createDecoderException(
@@ -940,9 +989,17 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
       codecInitializingTimestamp = SystemClock.elapsedRealtime();
       TraceUtil.beginSection("createCodec:" + codecName);
       codec = MediaCodec.createByCodecName(codecName);
-      if (mediaCodecOperationMode == MediaCodecOperationMode.ASYNCHRONOUS_PLAYBACK_THREAD
+      if (mediaCodecOperationMode == OPERATION_MODE_ASYNCHRONOUS_PLAYBACK_THREAD
           && Util.SDK_INT >= 21) {
         codecAdapter = new AsynchronousMediaCodecAdapter(codec);
+      } else if (mediaCodecOperationMode == OPERATION_MODE_ASYNCHRONOUS_DEDICATED_THREAD
+          && Util.SDK_INT >= 23) {
+        codecAdapter = new DedicatedThreadAsyncMediaCodecAdapter(codec, getTrackType());
+        ((DedicatedThreadAsyncMediaCodecAdapter) codecAdapter).start();
+      } else if (mediaCodecOperationMode == OPERATION_MODE_ASYNCHRONOUS_DEDICATED_THREAD_MULTI_LOCK
+          && Util.SDK_INT >= 23) {
+        codecAdapter = new MultiLockAsynchMediaCodecAdapter(codec, getTrackType());
+        ((MultiLockAsynchMediaCodecAdapter) codecAdapter).start();
       } else {
         codecAdapter = new SynchronousMediaCodecAdapter(codec, getDequeueOutputBufferTimeoutUs());
       }
@@ -982,26 +1039,9 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
         codecNeedsMonoChannelCountWorkaround(codecName, codecFormat);
     codecNeedsEosPropagation =
         codecNeedsEosPropagationWorkaround(codecInfo) || getCodecNeedsEosPropagation();
-
-    resetInputBuffer();
-    resetOutputBuffer();
-    codecHotswapDeadlineMs =
-        getState() == STATE_STARTED
-            ? (SystemClock.elapsedRealtime() + MAX_CODEC_HOTSWAP_TIME_MS)
-            : C.TIME_UNSET;
-    codecReconfigured = false;
-    codecReconfigurationState = RECONFIGURATION_STATE_NONE;
-    codecReceivedEos = false;
-    codecReceivedBuffers = false;
-    largestQueuedPresentationTimeUs = C.TIME_UNSET;
-    lastBufferInStreamPresentationTimeUs = C.TIME_UNSET;
-    codecDrainState = DRAIN_STATE_NONE;
-    codecDrainAction = DRAIN_ACTION_NONE;
-    codecNeedsAdaptationWorkaroundBuffer = false;
-    shouldSkipAdaptationWorkaroundOutputBuffer = false;
-    isDecodeOnlyOutputBuffer = false;
-    isLastOutputBuffer = false;
-    waitingForFirstSyncSample = true;
+    if (getState() == STATE_STARTED) {
+      codecHotswapDeadlineMs = SystemClock.elapsedRealtime() + MAX_CODEC_HOTSWAP_TIME_MS;
+    }
 
     decoderCounters.decoderInitCount++;
     long elapsed = codecInitializedTimestamp - codecInitializingTimestamp;

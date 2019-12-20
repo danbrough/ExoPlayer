@@ -28,6 +28,10 @@
   developers to handle data that's neither UTF-8 nor ISO-8859-1
   ([#6753](https://github.com/google/ExoPlayer/issues/6753)).
 * Add playlist API ([#6161](https://github.com/google/ExoPlayer/issues/6161)).
+* Fix handling of network transitions in `RequirementsWatcher`
+  ([#6733](https://github.com/google/ExoPlayer/issues/6733)). Incorrect handling
+  could previously cause downloads to be paused when they should have been able
+  to proceed.
 
 ### 2.11.1 (2019-12-20) ###
 
@@ -45,6 +49,15 @@
     `SsaStyle$SsaAlignment`
     ([#6771](https://github.com/google/ExoPlayer/issues/6771)).
 * Fix `CacheDataSource` to correctly propagate `DataSpec.httpRequestHeaders`.
+* Fix issue with `DefaultDownloadIndex` that could result in an
+  `IllegalStateException` being thrown from
+  `DefaultDownloadIndex.getDownloadForCurrentRow`
+  ([#6785](https://github.com/google/ExoPlayer/issues/6785)).
+* Fix `IndexOutOfBoundsException` in `SinglePeriodTimeline.getWindow`
+  ([#6776](https://github.com/google/ExoPlayer/issues/6776)).
+* Add missing `@Nullable` to `MediaCodecAudioRenderer.getMediaClock` and
+  `SimpleDecoderAudioRenderer.getMediaClock`
+  ([#6792](https://github.com/google/ExoPlayer/issues/6792)).
 
 ### 2.11.0 (2019-12-11) ###
 

@@ -48,8 +48,10 @@ import com.google.android.exoplayer2.util.TimedValueQueue;
 import com.google.android.exoplayer2.util.TraceUtil;
 import com.google.android.exoplayer2.util.Util;
 import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -74,6 +76,7 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
    */
   @Documented
   @Retention(RetentionPolicy.SOURCE)
+  @Target({ElementType.TYPE_PARAMETER, ElementType.TYPE_USE})
   @IntDef({
     OPERATION_MODE_SYNCHRONOUS,
     OPERATION_MODE_ASYNCHRONOUS_PLAYBACK_THREAD,
@@ -634,7 +637,8 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
    * method if they are taking over responsibility for output format propagation (e.g., when using
    * video tunneling).
    */
-  protected final @Nullable Format updateOutputFormatForTime(long presentationTimeUs) {
+  @Nullable
+  protected final Format updateOutputFormatForTime(long presentationTimeUs) {
     Format format = formatQueue.pollFloor(presentationTimeUs);
     if (format != null) {
       outputFormat = format;
@@ -642,11 +646,13 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
     return format;
   }
 
+  @Nullable
   protected final MediaCodec getCodec() {
     return codec;
   }
 
-  protected final @Nullable MediaCodecInfo getCodecInfo() {
+  @Nullable
+  protected final MediaCodecInfo getCodecInfo() {
     return codecInfo;
   }
 

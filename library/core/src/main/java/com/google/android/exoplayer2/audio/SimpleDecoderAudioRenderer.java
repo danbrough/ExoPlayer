@@ -101,10 +101,14 @@ public abstract class SimpleDecoderAudioRenderer extends BaseRenderer implements
   private Format inputFormat;
   private int encoderDelay;
   private int encoderPadding;
-  private SimpleDecoder<DecoderInputBuffer, ? extends SimpleOutputBuffer,
-        ? extends AudioDecoderException> decoder;
-  private DecoderInputBuffer inputBuffer;
-  private SimpleOutputBuffer outputBuffer;
+
+  @Nullable
+  private SimpleDecoder<
+          DecoderInputBuffer, ? extends SimpleOutputBuffer, ? extends AudioDecoderException>
+      decoder;
+
+  @Nullable private DecoderInputBuffer inputBuffer;
+  @Nullable private SimpleOutputBuffer outputBuffer;
   @Nullable private DrmSession<ExoMediaCrypto> decoderDrmSession;
   @Nullable private DrmSession<ExoMediaCrypto> sourceDrmSession;
 
@@ -351,15 +355,8 @@ public abstract class SimpleDecoderAudioRenderer extends BaseRenderer implements
   /**
    * Returns the format of audio buffers output by the decoder. Will not be called until the first
    * output buffer has been dequeued, so the decoder may use input data to determine the format.
-   * <p>
-   * The default implementation returns a 16-bit PCM format with the same channel count and sample
-   * rate as the input.
    */
-  protected Format getOutputFormat() {
-    return Format.createAudioSampleFormat(null, MimeTypes.AUDIO_RAW, null, Format.NO_VALUE,
-        Format.NO_VALUE, inputFormat.channelCount, inputFormat.sampleRate, C.ENCODING_PCM_16BIT,
-        null, null, 0, null);
-  }
+  protected abstract Format getOutputFormat();
 
   /**
    * Returns whether the existing decoder can be kept for a new format.

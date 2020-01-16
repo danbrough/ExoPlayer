@@ -11,8 +11,14 @@
 * Rename `MediaCodecRenderer.onOutputFormatChanged` to
   `MediaCodecRenderer.onOutputMediaFormatChanged`, further
   clarifying the distinction between `Format` and `MediaFormat`.
-* Downloads: Merge downloads in `SegmentDownloader` to improve overall download
-  speed ([#5978](https://github.com/google/ExoPlayer/issues/5978)).
+* Downloads:
+  * Merge downloads in `SegmentDownloader` to improve overall download
+    speed ([#5978](https://github.com/google/ExoPlayer/issues/5978)).
+  * Fix download resumption when the requirements for them to continue are
+    met ([#6733](https://github.com/google/ExoPlayer/issues/6733),
+    [#6798](https://github.com/google/ExoPlayer/issues/6798)).
+  * Fix `DownloadHelper.createMediaSource` to use `customCacheKey` when creating
+    `ProgressiveMediaSource` instances.
 * In MP4 streams, store the Android capture frame rate only in
   `Format.metadata`. `Format.frameRate` now stores the calculated frame rate.
 * Add `play` and `pause` methods to `Player`.
@@ -28,20 +34,17 @@
   developers to handle data that's neither UTF-8 nor ISO-8859-1
   ([#6753](https://github.com/google/ExoPlayer/issues/6753)).
 * Add playlist API ([#6161](https://github.com/google/ExoPlayer/issues/6161)).
-* Fix handling of network transitions in `RequirementsWatcher`
-  ([#6733](https://github.com/google/ExoPlayer/issues/6733)). Incorrect handling
-  could previously cause downloads to be paused when they should have been able
-  to proceed.
 * Fix handling of E-AC-3 streams that contain AC-3 syncframes
   ([#6602](https://github.com/google/ExoPlayer/issues/6602)).
 * Fix playback of TrueHD streams in Matroska
   ([#6845](https://github.com/google/ExoPlayer/issues/6845)).
 * Support "twos" codec (big endian PCM) in MP4
   ([#5789](https://github.com/google/ExoPlayer/issues/5789)).
-* WAV: Support IMA ADPCM encoded data.
 * Show ad group markers in `DefaultTimeBar` even if they are after the end of
   the current window
   ([#6552](https://github.com/google/ExoPlayer/issues/6552)).
+* HLS: Fix slow seeking into long MP3 segments
+  ([#6155](https://github.com/google/ExoPlayer/issues/6155)).
 * WAV:
   * Support IMA ADPCM encoded data.
   * Improve support for G.711 A-law and mu-law encoded data.
@@ -62,6 +65,14 @@
   Matroska or MP4.
 * Javadocs: Add favicon for easier identification in browser tabs
 * FMP4: Add support for encrypted AC-4 tracks.
+* Startup latency optimizations:
+  * Reduce startup latency for DASH and SmoothStreaming playbacks by allowing
+    codec initialization to occur before the network connection for the first
+    media segment has been established.
+  * Reduce startup latency for on-demand DASH playbacks by allowing codec
+    initialization to occur before the sidx box has been loaded.
+* Select multiple metadata tracks if multiple metadata renderers are available
+  ([#6676](https://github.com/google/ExoPlayer/issues/6676)).
 
 ### 2.11.1 (2019-12-20) ###
 

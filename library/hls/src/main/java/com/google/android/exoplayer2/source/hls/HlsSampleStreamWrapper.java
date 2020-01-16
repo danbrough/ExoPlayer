@@ -132,20 +132,20 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   private int[] sampleQueueTrackIds;
   private Set<Integer> sampleQueueMappingDoneByType;
   private SparseIntArray sampleQueueIndicesByType;
-  @MonotonicNonNull private TrackOutput emsgUnwrappingTrackOutput;
+  private @MonotonicNonNull TrackOutput emsgUnwrappingTrackOutput;
   private int primarySampleQueueType;
   private int primarySampleQueueIndex;
   private boolean sampleQueuesBuilt;
   private boolean prepared;
   private int enabledTrackGroupCount;
-  @MonotonicNonNull private Format upstreamTrackFormat;
+  private @MonotonicNonNull Format upstreamTrackFormat;
   @Nullable private Format downstreamTrackFormat;
   private boolean released;
 
   // Tracks are complicated in HLS. See documentation of buildTracksFromSampleStreams for details.
   // Indexed by track (as exposed by this source).
-  @MonotonicNonNull private TrackGroupArray trackGroups;
-  @MonotonicNonNull private Set<TrackGroup> optionalTrackGroups;
+  private @MonotonicNonNull TrackGroupArray trackGroups;
+  private @MonotonicNonNull Set<TrackGroup> optionalTrackGroups;
   // Indexed by track group.
   private int @MonotonicNonNull [] trackGroupToSampleQueueIndex;
   private int primaryTrackGroupIndex;
@@ -361,13 +361,12 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
           // If there's still a chance of avoiding a seek, try and seek within the sample queue.
           if (!seekRequired) {
             SampleQueue sampleQueue = sampleQueues[trackGroupToSampleQueueIndex[trackGroupIndex]];
-            sampleQueue.rewind();
-            // A seek can be avoided if we're able to advance to the current playback position in
+            // A seek can be avoided if we're able to seek to the current playback position in
             // the sample queue, or if we haven't read anything from the queue since the previous
             // seek (this case is common for sparse tracks such as metadata tracks). In all other
             // cases a seek is required.
             seekRequired =
-                sampleQueue.advanceTo(positionUs, true, true) == SampleQueue.ADVANCE_FAILED
+                !sampleQueue.seekTo(positionUs, /* allowTimeBeyondBuffer= */ true)
                     && sampleQueue.getReadIndex() != 0;
           }
         }
@@ -584,8 +583,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     if (loadingFinished && positionUs > sampleQueue.getLargestQueuedTimestampUs()) {
       return sampleQueue.advanceToEnd();
     } else {
-      int skipCount = sampleQueue.advanceTo(positionUs, true, true);
-      return skipCount == SampleQueue.ADVANCE_FAILED ? 0 : skipCount;
+      return sampleQueue.advanceTo(positionUs);
     }
   }
 
@@ -1170,9 +1168,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     int sampleQueueCount = sampleQueues.length;
     for (int i = 0; i < sampleQueueCount; i++) {
       SampleQueue sampleQueue = sampleQueues[i];
-      sampleQueue.rewind();
-      boolean seekInsideQueue = sampleQueue.advanceTo(positionUs, true, false)
-          != SampleQueue.ADVANCE_FAILED;
+      boolean seekInsideQueue = sampleQueue.seekTo(positionUs, /* allowTimeBeyondBuffer= */ false);
       // If we have AV tracks then an in-queue seek is successful if the seek into every AV queue
       // is successful. We ignore whether seeks within non-AV queues are successful in this case, as
       // they may be sparse or poorly interleaved. If we only have non-AV tracks then a seek is
@@ -1358,7 +1354,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     private final EventMessageDecoder emsgDecoder;
     private final TrackOutput delegate;
     private final Format delegateFormat;
-    @MonotonicNonNull private Format format;
+    private @MonotonicNonNull Format format;
 
     private byte[] buffer;
     private int bufferPosition;

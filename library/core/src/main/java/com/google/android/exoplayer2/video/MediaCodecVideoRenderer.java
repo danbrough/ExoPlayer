@@ -26,6 +26,7 @@ import android.media.MediaCrypto;
 import android.media.MediaFormat;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Message;
 import android.os.SystemClock;
 import android.util.Pair;
 import android.view.Surface;
@@ -158,7 +159,7 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
 
   private boolean tunneling;
   private int tunnelingAudioSessionId;
-  /* package */ OnFrameRenderedListenerV23 tunnelingOnFrameRenderedListener;
+  /* package */ @Nullable OnFrameRenderedListenerV23 tunnelingOnFrameRenderedListener;
 
   private long lastInputTimeUs;
   private long outputStreamOffsetUs;
@@ -563,7 +564,7 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
     clearReportedVideoSize();
     clearRenderedFirstFrame();
     frameReleaseTimeHelper.disable();
-    tunnelingOnFrameRenderedListener = null;
+    releaseOnFrameRenderedListener();
     try {
       super.onDisabled();
     } finally {
@@ -1792,15 +1793,74 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
 
   }
 
-  @TargetApi(23)
-  private final class OnFrameRenderedListenerV23 implements MediaCodec.OnFrameRenderedListener {
+  private void releaseOnFrameRenderedListener() {
+    if (tunnelingOnFrameRenderedListener != null) {
+      tunnelingOnFrameRenderedListener.release();
+    }
+    tunnelingOnFrameRenderedListener = null;
+  }
 
-    private OnFrameRenderedListenerV23(MediaCodec codec) {
-      codec.setOnFrameRenderedListener(/* listener= */ this, Util.createHandler());
+  @TargetApi(23)
+  private final class OnFrameRenderedListenerV23
+      implements MediaCodec.OnFrameRenderedListener, Handler.Callback {
+
+    private static final int HANDLE_FRAME_RENDERED = 0;
+
+    private final Handler handler;
+    private final MediaCodec codec;
+
+    public OnFrameRenderedListenerV23(MediaCodec mediaCodec) {
+      handler = Util.createHandler(/* callback= */ this);
+      codec = mediaCodec;
+      codec.setOnFrameRenderedListener(/* listener= */ this, handler);
+    }
+
+    /**
+     * Stop listening for the codec OnFrameRendered events and invalidate all queued such events.
+     *
+     * <p>Not required when switching one frame render listener for another and may cause overhead
+     * (MediaCodec calls native_enableOnFrameRenderedListener() twice then). The stale event logic
+     * prevents issues for a listener switch.
+     */
+    public void release() {
+      codec.setOnFrameRenderedListener(null, null);
+      handler.removeCallbacksAndMessages(null);
     }
 
     @Override
     public void onFrameRendered(MediaCodec codec, long presentationTimeUs, long nanoTime) {
+      // Workaround bug in MediaCodec that causes deadlock if you call directly back into the
+      // MediaCodec from this listener method.
+      // Deadlock occurs because MediaCodec calls this listener method holding a lock,
+      // which may also be required by calls made back into the MediaCodec.
+      // This was fixed in https://android-review.googlesource.com/1156807.
+      //
+      // The workaround queues the event for subsequent processing, where the lock will not be held.
+      if (Util.SDK_INT < 30) {
+        Message message =
+            Message.obtain(
+                handler,
+                /* what= */ HANDLE_FRAME_RENDERED,
+                /* arg1= */ (int) (presentationTimeUs >> 32),
+                /* arg2= */ (int) presentationTimeUs);
+        handler.sendMessageAtFrontOfQueue(message);
+      } else {
+        handleFrameRendered(presentationTimeUs);
+      }
+    }
+
+    @Override
+    public boolean handleMessage(Message message) {
+      switch (message.what) {
+        case HANDLE_FRAME_RENDERED:
+          handleFrameRendered(Util.toLong(message.arg1, message.arg2));
+          return true;
+        default:
+          return false;
+      }
+    }
+
+    private void handleFrameRendered(long presentationTimeUs) {
       if (this != tunnelingOnFrameRenderedListener) {
         // Stale event.
         return;
@@ -1811,6 +1871,5 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
         onProcessedTunneledBuffer(presentationTimeUs);
       }
     }
-
   }
 }

@@ -6,6 +6,7 @@
   * Add playlist API ([#6161](https://github.com/google/ExoPlayer/issues/6161)).
   * Add `play` and `pause` methods to `Player`.
   * Add `Player.getCurrentLiveOffset` to conveniently return the live offset.
+  * Add `Player.onPlayWhenReadyChanged` with reasons.
   * Make `MediaSourceEventListener.LoadEventInfo` and
     `MediaSourceEventListener.MediaLoadData` top-level classes.
   * Rename `MediaCodecRenderer.onOutputFormatChanged` to
@@ -19,9 +20,20 @@
     later).
   * Parse `text-combine-upright` CSS property (i.e. tate-chu-yoko) in WebVTT
     subtitles (rendering is coming later).
+  * Parse `tts:combineText` property (i.e. tate-chu-yoko) in TTML subtitles
+    (rendering is coming later).
+  * Fix `SubtitlePainter` to render `EDGE_TYPE_OUTLINE` using the correct color
+    ([#6724](https://github.com/google/ExoPlayer/pull/6724)).
 * DRM: Add support for attaching DRM sessions to clear content in the demo app.
+* HLS: Fix playback of DRM protected content that uses key rotation
+  ([#6903](https://github.com/google/ExoPlayer/issues/6903)).
 * Downloads: Merge downloads in `SegmentDownloader` to improve overall download
   speed ([#5978](https://github.com/google/ExoPlayer/issues/5978)).
+* MP3: Add `IndexSeeker` for accurate seeks in VBR streams
+  ([#6787](https://github.com/google/ExoPlayer/issues/6787)).
+  This seeker is enabled by passing `FLAG_ENABLE_INDEX_SEEKING` to the
+  `Mp3Extractor`. It may require to scan a significant portion of the file for
+  seeking, which may be costly on large files.
 * MP4: Store the Android capture frame rate only in `Format.metadata`.
   `Format.frameRate` now stores the calculated frame rate.
 * Testing

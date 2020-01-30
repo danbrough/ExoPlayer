@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import org.checkerframework.checker.nullness.compatqual.NullableType;
 
 /**
  * Fake {@link MediaPeriod} that provides tracks from the given {@link TrackGroupArray}. Selecting
@@ -149,8 +150,12 @@ public class FakeMediaPeriod implements MediaPeriod {
   }
 
   @Override
-  public long selectTracks(TrackSelection[] selections, boolean[] mayRetainStreamFlags,
-      SampleStream[] streams, boolean[] streamResetFlags, long positionUs) {
+  public long selectTracks(
+      @NullableType TrackSelection[] selections,
+      boolean[] mayRetainStreamFlags,
+      @NullableType SampleStream[] streams,
+      boolean[] streamResetFlags,
+      long positionUs) {
     assertThat(prepared).isTrue();
     sampleStreams.clear();
     int rendererCount = selections.length;
@@ -245,8 +250,8 @@ public class FakeMediaPeriod implements MediaPeriod {
     return new FakeSampleStream(
         selection.getSelectedFormat(),
         eventDispatcher,
-        FakeSampleStream.SINGLE_SAMPLE_THEN_END_OF_STREAM,
-        /* timeUsIncrement= */ 0);
+        /* timeUsIncrement= */ 0,
+        FakeSampleStream.SINGLE_SAMPLE_THEN_END_OF_STREAM);
   }
 
   /**
@@ -261,7 +266,7 @@ public class FakeMediaPeriod implements MediaPeriod {
       // When seeking back to 0, queue our single sample at time 0 again.
       ((FakeSampleStream) sampleStream)
           .resetSampleStreamItems(
-              FakeSampleStream.SINGLE_SAMPLE_THEN_END_OF_STREAM, /* timeUs= */ 0);
+              /* timeUs= */ 0, FakeSampleStream.SINGLE_SAMPLE_THEN_END_OF_STREAM);
     }
   }
 

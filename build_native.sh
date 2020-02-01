@@ -5,17 +5,19 @@ cd `dirname $0`
 EXOPLAYER_ROOT="$(pwd)"
 FLAC_EXT_PATH="${EXOPLAYER_ROOT}/extensions/flac/src/main"
 NDK_PATH=/mnt/files/android/android-ndk-r17c
+FLAC_VERSION=1.3.3
 
 cd "${FLAC_EXT_PATH}/jni" 
 if [ ! -d flac ]; then
-	curl https://ftp.osuosl.org/pub/xiph/releases/flac/flac-1.3.2.tar.xz | tar xJ && \
-	mv flac-1.3.2 flac
+	git clone git@github.com:xiph/flac.git flac 
+	#curl https://ftp.osuosl.org/pub/xiph/releases/flac/flac-$FLAC_VERSION.tar.xz | tar xJ && \
+	#mv flac-$FLAC_VERSION flac
 fi
+cd flac && git clean -xdf && git reset --hard && git checkout $FLAC_VERSION && cd ..
 
 rm -rf "$FLAC_EXT_PATH/obj" "$FLAC_EXT_PATH/libs"
 cd "${FLAC_EXT_PATH}"/jni && \
 ${NDK_PATH}/ndk-build APP_ABI=all -j4
-
 
 cd "$EXO_PLAYER_ROOT" 
 OPUS_EXT_PATH="${EXOPLAYER_ROOT}/extensions/opus/src/main"

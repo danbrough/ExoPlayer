@@ -2136,30 +2136,37 @@ public class MatroskaExtractor implements Extractor {
                 drmInitData);
       } else if (MimeTypes.APPLICATION_SUBRIP.equals(mimeType)) {
         type = C.TRACK_TYPE_TEXT;
-        format = Format.createTextSampleFormat(Integer.toString(trackId), mimeType, selectionFlags,
-            language, drmInitData);
+        format =
+            Format.createTextSampleFormat(
+                    Integer.toString(trackId), mimeType, selectionFlags, language)
+                .copyWithDrmInitData(drmInitData);
       } else if (MimeTypes.TEXT_SSA.equals(mimeType)) {
         type = C.TRACK_TYPE_TEXT;
         initializationData = new ArrayList<>(2);
         initializationData.add(SSA_DIALOGUE_FORMAT);
         initializationData.add(codecPrivate);
-        format = Format.createTextSampleFormat(Integer.toString(trackId), mimeType, null,
-            Format.NO_VALUE, selectionFlags, language, Format.NO_VALUE, drmInitData,
-            Format.OFFSET_SAMPLE_RELATIVE, initializationData);
+        format =
+            Format.createTextSampleFormat(
+                    Integer.toString(trackId),
+                    mimeType,
+                    selectionFlags,
+                    language,
+                    /* accessibilityChannel= */ Format.NO_VALUE,
+                    Format.OFFSET_SAMPLE_RELATIVE,
+                    initializationData)
+                .copyWithDrmInitData(drmInitData);
       } else if (MimeTypes.APPLICATION_VOBSUB.equals(mimeType)
           || MimeTypes.APPLICATION_PGS.equals(mimeType)
           || MimeTypes.APPLICATION_DVBSUBS.equals(mimeType)) {
         type = C.TRACK_TYPE_TEXT;
         format =
             Format.createImageSampleFormat(
-                Integer.toString(trackId),
-                mimeType,
-                null,
-                Format.NO_VALUE,
-                selectionFlags,
-                initializationData,
-                language,
-                drmInitData);
+                    Integer.toString(trackId),
+                    mimeType,
+                    selectionFlags,
+                    initializationData,
+                    language)
+                .copyWithDrmInitData(drmInitData);
       } else {
         throw new ParserException("Unexpected MIME type.");
       }

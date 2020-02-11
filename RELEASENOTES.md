@@ -7,6 +7,10 @@
   * Add `play` and `pause` methods to `Player`.
   * Add `Player.getCurrentLiveOffset` to conveniently return the live offset.
   * Add `Player.onPlayWhenReadyChanged` with reasons.
+  * Add `Player.onPlaybackStateChanged` and deprecate
+    `Player.onPlayerStateChanged`.
+  * Deprecate and rename getPlaybackError to getPlayerError for consistency.
+  * Deprecate and rename onLoadingChanged to onIsLoadingChanged for consistency.
   * Make `MediaSourceEventListener.LoadEventInfo` and
     `MediaSourceEventListener.MediaLoadData` top-level classes.
   * Rename `MediaCodecRenderer.onOutputFormatChanged` to
@@ -37,6 +41,13 @@
 * Testing
   * Upgrade Truth dependency from 0.44 to 1.0.
   * Upgrade to JUnit 4.13-rc-2.
+* UI
+  * Move logic of prev, next, fast forward and rewind to ControlDispatcher
+    ([#6926](https://github.com/google/ExoPlayer/issues/6926)).
+* Demo apps: Add
+  [GL demo app](https://github.com/google/ExoPlayer/tree/dev-v2/demos/gl) to
+  show how to render video to a `GLSurfaceView` while applying a GL shader.
+  ([#6920](https://github.com/google/ExoPlayer/issues/6920)).
 
 ### 2.11.2 (TBD) ###
 
@@ -91,6 +102,8 @@
   on earlier releases, but only when embedded in a non-FLAC container such as
   Matroska or MP4.
 * Add support for ID3 genres added in Wimamp 5.6 (2010).
+* DRM: Fix `NullPointerException` when playing DRM-protected content
+  ([#6951](https://github.com/google/ExoPlayer/issues/6951)).
 
 ### 2.11.1 (2019-12-20) ###
 

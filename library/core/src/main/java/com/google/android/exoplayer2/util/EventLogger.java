@@ -91,13 +91,12 @@ public class EventLogger implements AnalyticsListener {
   // AnalyticsListener
 
   @Override
-  public void onLoadingChanged(EventTime eventTime, boolean isLoading) {
+  public void onIsLoadingChanged(EventTime eventTime, boolean isLoading) {
     logd(eventTime, "loading", Boolean.toString(isLoading));
   }
 
   @Override
-  public void onPlayerStateChanged(
-      EventTime eventTime, boolean playWhenReady, @Player.State int state) {
+  public void onPlaybackStateChanged(EventTime eventTime, @Player.State int state) {
     logd(eventTime, "state", getStateString(state));
   }
 

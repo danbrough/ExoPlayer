@@ -1163,11 +1163,19 @@ public class SimpleExoPlayer extends BasePlayer
     return player.getPlaybackSuppressionReason();
   }
 
+  /** @deprecated Use {@link #getPlayerError()} instead. */
+  @Deprecated
   @Override
   @Nullable
   public ExoPlaybackException getPlaybackError() {
+    return getPlayerError();
+  }
+
+  @Override
+  @Nullable
+  public ExoPlaybackException getPlayerError() {
     verifyApplicationThread();
-    return player.getPlaybackError();
+    return player.getPlayerError();
   }
 
   /** @deprecated Use {@link #prepare()} instead. */
@@ -1662,6 +1670,22 @@ public class SimpleExoPlayer extends BasePlayer
     }
   }
 
+  private void updateWakeLock() {
+    @State int playbackState = getPlaybackState();
+    switch (playbackState) {
+      case Player.STATE_READY:
+      case Player.STATE_BUFFERING:
+        wakeLockManager.setStayAwake(getPlayWhenReady());
+        break;
+      case Player.STATE_ENDED:
+      case Player.STATE_IDLE:
+        wakeLockManager.setStayAwake(false);
+        break;
+      default:
+        throw new IllegalStateException();
+    }
+  }
+
   private static int getPlayWhenReadyChangeReason(boolean playWhenReady, int playerCommand) {
     return playWhenReady && playerCommand != AudioFocusManager.PLAYER_COMMAND_PLAY_WHEN_READY
         ? PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS
@@ -1907,7 +1931,7 @@ public class SimpleExoPlayer extends BasePlayer
     // Player.EventListener implementation.
 
     @Override
-    public void onLoadingChanged(boolean isLoading) {
+    public void onIsLoadingChanged(boolean isLoading) {
       if (priorityTaskManager != null) {
         if (isLoading && !isPriorityTaskManagerRegistered) {
           priorityTaskManager.add(C.PRIORITY_PLAYBACK);
@@ -1920,17 +1944,14 @@ public class SimpleExoPlayer extends BasePlayer
     }
 
     @Override
-    public void onPlayerStateChanged(boolean playWhenReady, @State int playbackState) {
-      switch (playbackState) {
-        case Player.STATE_READY:
-        case Player.STATE_BUFFERING:
-          wakeLockManager.setStayAwake(playWhenReady);
-          break;
-        case Player.STATE_ENDED:
-        case Player.STATE_IDLE:
-          wakeLockManager.setStayAwake(false);
-          break;
-      }
+    public void onPlaybackStateChanged(@State int playbackState) {
+      updateWakeLock();
+    }
+
+    @Override
+    public void onPlayWhenReadyChanged(
+        boolean playWhenReady, @PlayWhenReadyChangeReason int reason) {
+      updateWakeLock();
     }
   }
 }

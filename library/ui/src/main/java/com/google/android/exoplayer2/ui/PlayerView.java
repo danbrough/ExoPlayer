@@ -965,31 +965,30 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
   /**
    * Sets the {@link ControlDispatcher}.
    *
-   * @param controlDispatcher The {@link ControlDispatcher}, or null to use {@link
-   *     DefaultControlDispatcher}.
+   * @param controlDispatcher The {@link ControlDispatcher}.
    */
-  public void setControlDispatcher(@Nullable ControlDispatcher controlDispatcher) {
+  public void setControlDispatcher(ControlDispatcher controlDispatcher) {
     Assertions.checkStateNotNull(controller);
     controller.setControlDispatcher(controlDispatcher);
   }
 
   /**
-   * Sets the rewind increment in milliseconds.
-   *
-   * @param rewindMs The rewind increment in milliseconds. A non-positive value will cause the
-   *     rewind button to be disabled.
+   * @deprecated Use {@link #setControlDispatcher(ControlDispatcher)} with {@link
+   *     DefaultControlDispatcher#DefaultControlDispatcher(long, long)}.
    */
+  @SuppressWarnings("deprecation")
+  @Deprecated
   public void setRewindIncrementMs(int rewindMs) {
     Assertions.checkStateNotNull(controller);
     controller.setRewindIncrementMs(rewindMs);
   }
 
   /**
-   * Sets the fast forward increment in milliseconds.
-   *
-   * @param fastForwardMs The fast forward increment in milliseconds. A non-positive value will
-   *     cause the fast forward button to be disabled.
+   * @deprecated Use {@link #setControlDispatcher(ControlDispatcher)} with {@link
+   *     DefaultControlDispatcher#DefaultControlDispatcher(long, long)}.
    */
+  @SuppressWarnings("deprecation")
+  @Deprecated
   public void setFastForwardIncrementMs(int fastForwardMs) {
     Assertions.checkStateNotNull(controller);
     controller.setFastForwardIncrementMs(fastForwardMs);
@@ -1394,7 +1393,7 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
         errorMessageView.setVisibility(View.VISIBLE);
         return;
       }
-      @Nullable ExoPlaybackException error = player != null ? player.getPlaybackError() : null;
+      @Nullable ExoPlaybackException error = player != null ? player.getPlayerError() : null;
       if (error != null && errorMessageProvider != null) {
         CharSequence errorMessage = errorMessageProvider.getErrorMessage(error).second;
         errorMessageView.setText(errorMessage);
@@ -1416,6 +1415,14 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
     } else {
       setContentDescription(
           /* contentDescription= */ getResources().getString(R.string.exo_controls_show));
+    }
+  }
+
+  private void updateControllerVisibility() {
+    if (isPlayingAd() && controllerHideDuringAds) {
+      hideController();
+    } else {
+      maybeShowController(false);
     }
   }
 
@@ -1533,14 +1540,17 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
     // Player.EventListener implementation
 
     @Override
-    public void onPlayerStateChanged(boolean playWhenReady, @Player.State int playbackState) {
+    public void onPlaybackStateChanged(@Player.State int playbackState) {
       updateBuffering();
       updateErrorMessage();
-      if (isPlayingAd() && controllerHideDuringAds) {
-        hideController();
-      } else {
-        maybeShowController(false);
-      }
+      updateControllerVisibility();
+    }
+
+    @Override
+    public void onPlayWhenReadyChanged(
+        boolean playWhenReady, @Player.PlayWhenReadyChangeReason int reason) {
+      updateBuffering();
+      updateControllerVisibility();
     }
 
     @Override

@@ -36,6 +36,15 @@ android {
     sourceSets.test.assets.srcDir '../../testdata/src/test/assets/'
 
     testOptions.unitTests.includeAndroidResources = true
+    task sourcesJar(type: Jar) {
+        from android.sourceSets.main.java.srcDirs
+        classifier = 'sources'
+    }
+
+    artifacts {
+        archives sourcesJar
+    }
+
 }
 
 dependencies {

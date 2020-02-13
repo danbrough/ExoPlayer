@@ -32,6 +32,188 @@ import java.util.Map;
  */
 public final class DataSpec {
 
+  /** Builds {@link DataSpec} instances. */
+  public static final class Builder {
+
+    @Nullable private Uri uri;
+    private long uriPositionOffset;
+    @HttpMethod private int httpMethod;
+    @Nullable private byte[] httpBody;
+    private Map<String, String> httpRequestHeaders;
+    private long position;
+    private long length;
+    @Nullable private String key;
+    @Flags private int flags;
+    @Nullable private Object customData;
+
+    /** Creates a new instance with default values. */
+    public Builder() {
+      httpMethod = HTTP_METHOD_GET;
+      httpRequestHeaders = Collections.emptyMap();
+      length = C.LENGTH_UNSET;
+    }
+
+    /**
+     * Creates a new instance to build upon the provided {@link DataSpec}.
+     *
+     * @param dataSpec The {@link DataSpec} to build upon.
+     */
+    private Builder(DataSpec dataSpec) {
+      uri = dataSpec.uri;
+      uriPositionOffset = dataSpec.uriPositionOffset;
+      httpMethod = dataSpec.httpMethod;
+      httpBody = dataSpec.httpBody;
+      httpRequestHeaders = dataSpec.httpRequestHeaders;
+      position = dataSpec.position;
+      length = dataSpec.length;
+      key = dataSpec.key;
+      flags = dataSpec.flags;
+      customData = dataSpec.customData;
+    }
+
+    /**
+     * Sets {@link DataSpec#uri}.
+     *
+     * @param uriString The {@link DataSpec#uri}.
+     * @return The builder.
+     */
+    public Builder setUri(String uriString) {
+      this.uri = Uri.parse(uriString);
+      return this;
+    }
+
+    /**
+     * Sets {@link DataSpec#uri}.
+     *
+     * @param uri The {@link DataSpec#uri}.
+     * @return The builder.
+     */
+    public Builder setUri(Uri uri) {
+      this.uri = uri;
+      return this;
+    }
+
+    /**
+     * Sets the {@link DataSpec#uriPositionOffset}. The default value is 0.
+     *
+     * @param uriPositionOffset The {@link DataSpec#uriPositionOffset}.
+     * @return The builder.
+     */
+    public Builder setUriPositionOffset(long uriPositionOffset) {
+      this.uriPositionOffset = uriPositionOffset;
+      return this;
+    }
+
+    /**
+     * Sets {@link DataSpec#httpMethod}. The default value is {@link #HTTP_METHOD_GET}.
+     *
+     * @param httpMethod The {@link DataSpec#httpMethod}.
+     * @return The builder.
+     */
+    public Builder setHttpMethod(@HttpMethod int httpMethod) {
+      this.httpMethod = httpMethod;
+      return this;
+    }
+
+    /**
+     * Sets {@link DataSpec#httpBody}. The default value is {@code null}.
+     *
+     * @param httpBody The {@link DataSpec#httpBody}.
+     * @return The builder.
+     */
+    public Builder setHttpBody(@Nullable byte[] httpBody) {
+      this.httpBody = httpBody;
+      return this;
+    }
+
+    /**
+     * Sets the {@link DataSpec#httpRequestHeaders}. The default value is an empty map.
+     *
+     * @param httpRequestHeaders The {@link DataSpec#httpRequestHeaders}.
+     * @return The builder.
+     */
+    public Builder setHttpRequestHeaders(Map<String, String> httpRequestHeaders) {
+      this.httpRequestHeaders = httpRequestHeaders;
+      return this;
+    }
+
+    /**
+     * Sets the {@link DataSpec#position}. The default value is 0.
+     *
+     * @param position The {@link DataSpec#position}.
+     * @return The builder.
+     */
+    public Builder setPosition(long position) {
+      this.position = position;
+      return this;
+    }
+
+    /**
+     * Sets the {@link DataSpec#length}. The default value is {@link C#LENGTH_UNSET}.
+     *
+     * @param length The {@link DataSpec#length}.
+     * @return The builder.
+     */
+    public Builder setLength(long length) {
+      this.length = length;
+      return this;
+    }
+
+    /**
+     * Sets the {@link DataSpec#key}. The default value is {@code null}.
+     *
+     * @param key The {@link DataSpec#key}.
+     * @return The builder.
+     */
+    public Builder setKey(@Nullable String key) {
+      this.key = key;
+      return this;
+    }
+
+    /**
+     * Sets the {@link DataSpec#flags}. The default value is 0.
+     *
+     * @param flags The {@link DataSpec#flags}.
+     * @return The builder.
+     */
+    public Builder setFlags(@Flags int flags) {
+      this.flags = flags;
+      return this;
+    }
+
+    /**
+     * Sets the {@link DataSpec#customData}. The default value is {@code null}.
+     *
+     * @param customData The {@link DataSpec#customData}.
+     * @return The builder.
+     */
+    public Builder setCustomData(@Nullable Object customData) {
+      this.customData = customData;
+      return this;
+    }
+
+    /**
+     * Builds a {@link DataSpec} with the builder's current values.
+     *
+     * @return The build {@link DataSpec}.
+     * @throws IllegalStateException If {@link #setUri} has not been called.
+     */
+    public DataSpec build() {
+      Assertions.checkStateNotNull(uri, "The uri must be set.");
+      return new DataSpec(
+          uri,
+          uriPositionOffset,
+          httpMethod,
+          httpBody,
+          httpRequestHeaders,
+          position,
+          length,
+          key,
+          flags,
+          customData);
+    }
+  }
+
   /**
    * The flags that apply to any request for data. Possible flag values are {@link
    * #FLAG_ALLOW_GZIP}, {@link #FLAG_DONT_CACHE_IF_LENGTH_UNKNOWN}, {@link
@@ -131,7 +313,7 @@ public final class DataSpec {
    * The HTTP method to use when requesting the data. This value will be ignored by non-HTTP {@link
    * DataSource} implementations.
    */
-  public final @HttpMethod int httpMethod;
+  @HttpMethod public final int httpMethod;
 
   /**
    * The HTTP request body, null otherwise. If the body is non-null, then {@code httpBody.length}
@@ -166,7 +348,15 @@ public final class DataSpec {
   @Nullable public final String key;
 
   /** Request {@link Flags flags}. */
-  public final @Flags int flags;
+  @Flags public final int flags;
+
+  /**
+   * Application specific data.
+   *
+   * <p>This field is intended for advanced use cases in which applications require the ability to
+   * attach custom data to {@link DataSpec} instances. The custom data should be immutable.
+   */
+  @Nullable public final Object customData;
 
   /**
    * Constructs an instance.
@@ -174,15 +364,39 @@ public final class DataSpec {
    * @param uri {@link #uri}.
    */
   public DataSpec(Uri uri) {
-    this(uri, /* flags= */ 0);
+    this(uri, /* position= */ 0, /* length= */ C.LENGTH_UNSET);
   }
 
   /**
    * Constructs an instance.
    *
    * @param uri {@link #uri}.
+   * @param position {@link #position}.
+   * @param length {@link #length}.
+   */
+  public DataSpec(Uri uri, long position, long length) {
+    this(
+        uri,
+        /* uriPositionOffset= */ 0,
+        HTTP_METHOD_GET,
+        /* httpBody= */ null,
+        /* httpRequestHeaders= */ Collections.emptyMap(),
+        position,
+        length,
+        /* key= */ null,
+        /* flags= */ 0,
+        /* customData= */ null);
+  }
+
+  /**
+   * Constructs an instance.
+   *
+   * @deprecated Use {@link Builder}.
+   * @param uri {@link #uri}.
    * @param flags {@link #flags}.
    */
+  @SuppressWarnings("deprecation")
+  @Deprecated
   public DataSpec(Uri uri, @Flags int flags) {
     this(uri, /* position= */ 0, C.LENGTH_UNSET, /* key= */ null, flags);
   }
@@ -190,11 +404,14 @@ public final class DataSpec {
   /**
    * Constructs an instance.
    *
+   * @deprecated Use {@link Builder}.
    * @param uri {@link #uri}.
    * @param position {@link #position}.
    * @param length {@link #length}.
    * @param key {@link #key}.
    */
+  @SuppressWarnings("deprecation")
+  @Deprecated
   public DataSpec(Uri uri, long position, long length, @Nullable String key) {
     this(uri, position, position, length, key, /* flags= */ 0);
   }
@@ -202,12 +419,15 @@ public final class DataSpec {
   /**
    * Constructs an instance.
    *
+   * @deprecated Use {@link Builder}.
    * @param uri {@link #uri}.
    * @param position {@link #position}.
    * @param length {@link #length}.
    * @param key {@link #key}.
    * @param flags {@link #flags}.
    */
+  @SuppressWarnings("deprecation")
+  @Deprecated
   public DataSpec(Uri uri, long position, long length, @Nullable String key, @Flags int flags) {
     this(uri, position, position, length, key, flags);
   }
@@ -215,6 +435,7 @@ public final class DataSpec {
   /**
    * Constructs an instance.
    *
+   * @deprecated Use {@link Builder}.
    * @param uri {@link #uri}.
    * @param position {@link #position}, equal to {@link #position}.
    * @param length {@link #length}.
@@ -222,6 +443,8 @@ public final class DataSpec {
    * @param flags {@link #flags}.
    * @param httpRequestHeaders {@link #httpRequestHeaders}
    */
+  @SuppressWarnings("deprecation")
+  @Deprecated
   public DataSpec(
       Uri uri,
       long position,
@@ -244,6 +467,7 @@ public final class DataSpec {
   /**
    * Constructs an instance where {@link #uriPositionOffset} may be non-zero.
    *
+   * @deprecated Use {@link Builder}.
    * @param uri {@link #uri}.
    * @param absoluteStreamPosition The sum of {@link #uriPositionOffset} and {@link #position}.
    * @param position {@link #position}.
@@ -251,6 +475,8 @@ public final class DataSpec {
    * @param key {@link #key}.
    * @param flags {@link #flags}.
    */
+  @SuppressWarnings("deprecation")
+  @Deprecated
   public DataSpec(
       Uri uri,
       long absoluteStreamPosition,
@@ -267,6 +493,7 @@ public final class DataSpec {
    * set to {@link #HTTP_METHOD_POST}. If {@code postBody} is null then {@link #httpMethod} is set
    * to {@link #HTTP_METHOD_GET}.
    *
+   * @deprecated Use {@link Builder}.
    * @param uri {@link #uri}.
    * @param postBody {@link #httpBody} The body of the HTTP request, which is also used to infer the
    *     {@link #httpMethod}.
@@ -276,6 +503,8 @@ public final class DataSpec {
    * @param key {@link #key}.
    * @param flags {@link #flags}.
    */
+  @SuppressWarnings("deprecation")
+  @Deprecated
   public DataSpec(
       Uri uri,
       @Nullable byte[] postBody,
@@ -298,6 +527,7 @@ public final class DataSpec {
   /**
    * Construct a instance where {@link #uriPositionOffset} may be non-zero.
    *
+   * @deprecated Use {@link Builder}.
    * @param uri {@link #uri}.
    * @param httpMethod {@link #httpMethod}.
    * @param httpBody {@link #httpBody}.
@@ -307,6 +537,8 @@ public final class DataSpec {
    * @param key {@link #key}.
    * @param flags {@link #flags}.
    */
+  @SuppressWarnings("deprecation")
+  @Deprecated
   public DataSpec(
       Uri uri,
       @HttpMethod int httpMethod,
@@ -331,6 +563,7 @@ public final class DataSpec {
   /**
    * Construct a instance where {@link #uriPositionOffset} may be non-zero.
    *
+   * @deprecated Use {@link Builder}.
    * @param uri {@link #uri}.
    * @param httpMethod {@link #httpMethod}.
    * @param httpBody {@link #httpBody}.
@@ -341,6 +574,7 @@ public final class DataSpec {
    * @param flags {@link #flags}.
    * @param httpRequestHeaders {@link #httpRequestHeaders}.
    */
+  @Deprecated
   public DataSpec(
       Uri uri,
       @HttpMethod int httpMethod,
@@ -360,7 +594,8 @@ public final class DataSpec {
         position,
         length,
         key,
-        flags);
+        flags,
+        /* customData= */ null);
   }
 
   @SuppressWarnings("deprecation")
@@ -373,7 +608,8 @@ public final class DataSpec {
       long position,
       long length,
       @Nullable String key,
-      @Flags int flags) {
+      @Flags int flags,
+      @Nullable Object customData) {
     // TODO: Replace this assertion with a stricter one checking "uriPositionOffset >= 0", after
     // validating there are no violations in ExoPlayer and 1P apps.
     Assertions.checkArgument(uriPositionOffset + position >= 0);
@@ -389,6 +625,7 @@ public final class DataSpec {
     this.length = length;
     this.key = key;
     this.flags = flags;
+    this.customData = customData;
   }
 
   /**
@@ -406,6 +643,11 @@ public final class DataSpec {
    */
   public final String getHttpMethodString() {
     return getStringForHttpMethod(httpMethod);
+  }
+
+  /** Returns a {@link DataSpec.Builder} initialized with the values of this instance. */
+  public DataSpec.Builder buildUpon() {
+    return new Builder(this);
   }
 
   /**
@@ -439,7 +681,8 @@ public final class DataSpec {
           position + offset,
           length,
           key,
-          flags);
+          flags,
+          customData);
     }
   }
 
@@ -459,7 +702,8 @@ public final class DataSpec {
         position,
         length,
         key,
-        flags);
+        flags,
+        customData);
   }
 
   /**
@@ -479,7 +723,8 @@ public final class DataSpec {
         position,
         length,
         key,
-        flags);
+        flags,
+        customData);
   }
 
   /**
@@ -502,7 +747,8 @@ public final class DataSpec {
         position,
         length,
         key,
-        flags);
+        flags,
+        customData);
   }
 
   @Override

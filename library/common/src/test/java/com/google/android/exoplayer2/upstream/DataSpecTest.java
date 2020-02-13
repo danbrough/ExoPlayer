@@ -20,6 +20,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static junit.framework.TestCase.fail;
 
 import android.net.Uri;
+import androidx.annotation.Nullable;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import com.google.android.exoplayer2.C;
 import java.util.HashMap;
@@ -31,6 +32,7 @@ import org.junit.runner.RunWith;
 @RunWith(AndroidJUnit4.class)
 public class DataSpecTest {
 
+  @SuppressWarnings("deprecation")
   @Test
   public void createDataSpec_withDefaultValues() {
     Uri uri = Uri.parse("www.google.com");
@@ -94,13 +96,19 @@ public class DataSpecTest {
     assertDefaultDataSpec(dataSpec, uri);
   }
 
-  @SuppressWarnings("deprecation")
   @Test
-  public void createDataSpec_setsCustomValues() {
+  public void createDataSpec_withBuilder_withDefaultValues() {
     Uri uri = Uri.parse("www.google.com");
 
-    Map<String, String> httpRequestHeaders = createHttpRequestHeaders(3);
+    DataSpec dataSpec = new DataSpec.Builder().setUri(uri).build();
+    assertDefaultDataSpec(dataSpec, uri);
+  }
 
+  @SuppressWarnings("deprecation")
+  @Test
+  public void createDataSpec_setsValues() {
+    Uri uri = Uri.parse("www.google.com");
+    Map<String, String> httpRequestHeaders = createHttpRequestHeaders(3);
     byte[] httpBody = new byte[] {0, 1, 2, 3};
 
     DataSpec dataSpec =
@@ -129,11 +137,89 @@ public class DataSpecTest {
     assertHttpRequestHeadersReadOnly(dataSpec);
   }
 
+  @SuppressWarnings("deprecation")
+  @Test
+  public void createDataSpec_withBuilder_setsValues() {
+    Uri uri = Uri.parse("www.google.com");
+    Map<String, String> httpRequestHeaders = createHttpRequestHeaders(3);
+    byte[] httpBody = new byte[] {0, 1, 2, 3};
+    Object customData = new Object();
+
+    DataSpec dataSpec =
+        new DataSpec.Builder()
+            .setUri(uri)
+            .setUriPositionOffset(50)
+            .setHttpMethod(DataSpec.HTTP_METHOD_POST)
+            .setHttpBody(httpBody)
+            .setPosition(150)
+            .setLength(5)
+            .setKey("key")
+            .setFlags(DataSpec.FLAG_ALLOW_GZIP)
+            .setHttpRequestHeaders(httpRequestHeaders)
+            .setCustomData(customData)
+            .build();
+
+    assertThat(dataSpec.uri).isEqualTo(uri);
+    assertThat(dataSpec.uriPositionOffset).isEqualTo(50);
+    assertThat(dataSpec.httpMethod).isEqualTo(DataSpec.HTTP_METHOD_POST);
+    assertThat(dataSpec.httpBody).isEqualTo(httpBody);
+    assertThat(dataSpec.httpRequestHeaders).isEqualTo(httpRequestHeaders);
+    // absoluteStreamPosition = uriPositionOffset + position
+    assertThat(dataSpec.absoluteStreamPosition).isEqualTo(200);
+    assertThat(dataSpec.position).isEqualTo(150);
+    assertThat(dataSpec.length).isEqualTo(5);
+    assertThat(dataSpec.key).isEqualTo("key");
+    assertThat(dataSpec.flags).isEqualTo(DataSpec.FLAG_ALLOW_GZIP);
+    assertThat(dataSpec.customData).isEqualTo(customData);
+    assertHttpRequestHeadersReadOnly(dataSpec);
+  }
+
+  @SuppressWarnings("deprecation")
+  @Test
+  public void buildUponDataSpec_setsValues() {
+    Uri uri = Uri.parse("www.google.com");
+    Map<String, String> httpRequestHeaders = createHttpRequestHeaders(3);
+    byte[] httpBody = new byte[] {0, 1, 2, 3};
+    Object customData = new Object();
+
+    DataSpec dataSpec =
+        new DataSpec.Builder()
+            .setUri(uri)
+            .setUriPositionOffset(50)
+            .setHttpMethod(DataSpec.HTTP_METHOD_POST)
+            .setHttpBody(httpBody)
+            .setPosition(150)
+            .setLength(5)
+            .setKey("key")
+            .setFlags(DataSpec.FLAG_ALLOW_GZIP)
+            .setHttpRequestHeaders(httpRequestHeaders)
+            .setCustomData(customData)
+            .build();
+
+    // Build upon the DataSpec.
+    dataSpec = dataSpec.buildUpon().build();
+
+    assertThat(dataSpec.uri).isEqualTo(uri);
+    assertThat(dataSpec.uriPositionOffset).isEqualTo(50);
+    assertThat(dataSpec.httpMethod).isEqualTo(DataSpec.HTTP_METHOD_POST);
+    assertThat(dataSpec.httpBody).isEqualTo(httpBody);
+    assertThat(dataSpec.httpRequestHeaders).isEqualTo(httpRequestHeaders);
+    // absoluteStreamPosition = uriPositionOffset + position
+    assertThat(dataSpec.absoluteStreamPosition).isEqualTo(200);
+    assertThat(dataSpec.position).isEqualTo(150);
+    assertThat(dataSpec.length).isEqualTo(5);
+    assertThat(dataSpec.key).isEqualTo("key");
+    assertThat(dataSpec.flags).isEqualTo(DataSpec.FLAG_ALLOW_GZIP);
+    assertThat(dataSpec.customData).isEqualTo(customData);
+    assertHttpRequestHeadersReadOnly(dataSpec);
+  }
+
+  @SuppressWarnings("deprecation")
   @Test
   public void createDataSpec_setsHttpMethodAndPostBody() {
     Uri uri = Uri.parse("www.google.com");
 
-    byte[] postBody = new byte[] {0, 1, 2, 3};
+    @Nullable byte[] postBody = new byte[] {0, 1, 2, 3};
     DataSpec dataSpec =
         new DataSpec(
             uri,
@@ -176,7 +262,7 @@ public class DataSpecTest {
   @Test
   public void withUri_copiesHttpRequestHeaders() {
     Map<String, String> httpRequestHeaders = createHttpRequestHeaders(5);
-    DataSpec dataSpec = createDataSpecWithHeaders(httpRequestHeaders);
+    DataSpec dataSpec = createDataSpecWithHttpRequestHeaders(httpRequestHeaders);
 
     DataSpec dataSpecCopy = dataSpec.withUri(Uri.parse("www.new-uri.com"));
 
@@ -186,7 +272,7 @@ public class DataSpecTest {
   @Test
   public void subrange_copiesHttpRequestHeaders() {
     Map<String, String> httpRequestHeaders = createHttpRequestHeaders(5);
-    DataSpec dataSpec = createDataSpecWithHeaders(httpRequestHeaders);
+    DataSpec dataSpec = createDataSpecWithHttpRequestHeaders(httpRequestHeaders);
 
     DataSpec dataSpecCopy = dataSpec.subrange(2);
 
@@ -196,7 +282,7 @@ public class DataSpecTest {
   @Test
   public void subrange_withOffsetAndLength_copiesHttpRequestHeaders() {
     Map<String, String> httpRequestHeaders = createHttpRequestHeaders(5);
-    DataSpec dataSpec = createDataSpecWithHeaders(httpRequestHeaders);
+    DataSpec dataSpec = createDataSpecWithHttpRequestHeaders(httpRequestHeaders);
 
     DataSpec dataSpecCopy = dataSpec.subrange(2, 2);
 
@@ -206,7 +292,7 @@ public class DataSpecTest {
   @Test
   public void withRequestHeaders_setsCorrectHeaders() {
     Map<String, String> httpRequestHeaders = createHttpRequestHeaders(5);
-    DataSpec dataSpec = createDataSpecWithHeaders(httpRequestHeaders);
+    DataSpec dataSpec = createDataSpecWithHttpRequestHeaders(httpRequestHeaders);
 
     Map<String, String> newRequestHeaders = createHttpRequestHeaders(5, 10);
     DataSpec dataSpecCopy = dataSpec.withRequestHeaders(newRequestHeaders);
@@ -217,7 +303,7 @@ public class DataSpecTest {
   @Test
   public void withAdditionalHeaders_setsCorrectHeaders() {
     Map<String, String> httpRequestHeaders = createHttpRequestHeaders(5);
-    DataSpec dataSpec = createDataSpecWithHeaders(httpRequestHeaders);
+    DataSpec dataSpec = createDataSpecWithHttpRequestHeaders(httpRequestHeaders);
     Map<String, String> additionalHeaders = createHttpRequestHeaders(5, 10);
     // additionalHeaders may overwrite a header key
     String existingKey = httpRequestHeaders.keySet().iterator().next();
@@ -245,17 +331,12 @@ public class DataSpecTest {
     return httpRequestParameters;
   }
 
-  private static DataSpec createDataSpecWithHeaders(Map<String, String> httpRequestHeaders) {
-    return new DataSpec(
-        Uri.parse("www.google.com"),
-        /* httpMethod= */ 0,
-        /* httpBody= */ new byte[] {0, 0, 0, 0},
-        /* absoluteStreamPosition= */ 0,
-        /* position= */ 0,
-        /* length= */ 1,
-        /* key= */ "key",
-        /* flags= */ 0,
-        httpRequestHeaders);
+  private static DataSpec createDataSpecWithHttpRequestHeaders(
+      Map<String, String> httpRequestHeaders) {
+    return new DataSpec.Builder()
+        .setUri("www.google.com")
+        .setHttpRequestHeaders(httpRequestHeaders)
+        .build();
   }
 
   @SuppressWarnings("deprecation")
@@ -270,6 +351,7 @@ public class DataSpecTest {
     assertThat(dataSpec.length).isEqualTo(C.LENGTH_UNSET);
     assertThat(dataSpec.key).isNull();
     assertThat(dataSpec.flags).isEqualTo(0);
+    assertThat(dataSpec.customData).isNull();
     assertHttpRequestHeadersReadOnly(dataSpec);
   }
 

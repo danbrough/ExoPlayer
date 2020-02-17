@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,25 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.google.android.exoplayer2;
+@NonNullApi
+package com.google.android.exoplayer2.source;
 
-import androidx.annotation.Nullable;
-import com.google.android.exoplayer2.drm.DrmSession;
-
-/**
- * Holds a {@link Format}.
- */
-public final class FormatHolder {
-
-  /** An accompanying context for decrypting samples in the format. */
-  @Nullable public DrmSession<?> drmSession;
-
-  /** The held {@link Format}. */
-  @Nullable public Format format;
-
-  /** Clears the holder. */
-  public void clear() {
-    drmSession = null;
-    format = null;
-  }
-}
+import com.google.android.exoplayer2.util.NonNullApi;

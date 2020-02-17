@@ -107,6 +107,7 @@ public final class AnalyticsCollectorTest {
   private static final int EVENT_DRM_KEYS_REMOVED = 36;
   private static final int EVENT_DRM_SESSION_ACQUIRED = 37;
   private static final int EVENT_DRM_SESSION_RELEASED = 38;
+  private static final int EVENT_VIDEO_FRAME_PROCESSING_OFFSET = 39;
 
   private static final int TIMEOUT_MS = 10000;
   private static final Timeline SINGLE_PERIOD_TIMELINE = new FakeTimeline(/* windowCount= */ 1);
@@ -181,6 +182,7 @@ public final class AnalyticsCollectorTest {
     assertThat(listener.getEvents(EVENT_DROPPED_VIDEO_FRAMES)).containsExactly(period0);
     assertThat(listener.getEvents(EVENT_VIDEO_SIZE_CHANGED)).containsExactly(period0);
     assertThat(listener.getEvents(EVENT_RENDERED_FIRST_FRAME)).containsExactly(period0);
+    assertThat(listener.getEvents(EVENT_VIDEO_FRAME_PROCESSING_OFFSET)).containsExactly(period0);
     listener.assertNoMoreEvents();
   }
 
@@ -241,6 +243,7 @@ public final class AnalyticsCollectorTest {
     assertThat(listener.getEvents(EVENT_DROPPED_VIDEO_FRAMES)).containsExactly(period1);
     assertThat(listener.getEvents(EVENT_VIDEO_SIZE_CHANGED)).containsExactly(period0);
     assertThat(listener.getEvents(EVENT_RENDERED_FIRST_FRAME)).containsExactly(period0);
+    assertThat(listener.getEvents(EVENT_VIDEO_FRAME_PROCESSING_OFFSET)).containsExactly(period1);
     listener.assertNoMoreEvents();
   }
 
@@ -295,6 +298,7 @@ public final class AnalyticsCollectorTest {
     assertThat(listener.getEvents(EVENT_DROPPED_VIDEO_FRAMES)).containsExactly(period0);
     assertThat(listener.getEvents(EVENT_VIDEO_SIZE_CHANGED)).containsExactly(period0);
     assertThat(listener.getEvents(EVENT_RENDERED_FIRST_FRAME)).containsExactly(period0);
+    assertThat(listener.getEvents(EVENT_VIDEO_FRAME_PROCESSING_OFFSET)).containsExactly(period0);
     listener.assertNoMoreEvents();
   }
 
@@ -442,6 +446,8 @@ public final class AnalyticsCollectorTest {
         .containsExactly(period0, period1Seq2, period1Seq2);
     assertThat(listener.getEvents(EVENT_VIDEO_SIZE_CHANGED)).containsExactly(period0, period0);
     assertThat(listener.getEvents(EVENT_RENDERED_FIRST_FRAME)).containsExactly(period0, period0);
+    assertThat(listener.getEvents(EVENT_VIDEO_FRAME_PROCESSING_OFFSET))
+        .containsExactly(period0, period1Seq2, period1Seq2);
     listener.assertNoMoreEvents();
   }
 
@@ -518,6 +524,8 @@ public final class AnalyticsCollectorTest {
         .containsExactly(period0Seq0, period0Seq1);
     assertThat(listener.getEvents(EVENT_RENDERED_FIRST_FRAME))
         .containsExactly(period0Seq0, period0Seq1);
+    assertThat(listener.getEvents(EVENT_VIDEO_FRAME_PROCESSING_OFFSET))
+        .containsExactly(period0Seq1);
     listener.assertNoMoreEvents();
   }
 
@@ -587,6 +595,8 @@ public final class AnalyticsCollectorTest {
         .containsExactly(period0Seq0, period0Seq0);
     assertThat(listener.getEvents(EVENT_RENDERED_FIRST_FRAME))
         .containsExactly(period0Seq0, period0Seq0);
+    assertThat(listener.getEvents(EVENT_VIDEO_FRAME_PROCESSING_OFFSET))
+        .containsExactly(period0Seq0);
     listener.assertNoMoreEvents();
   }
 
@@ -665,6 +675,8 @@ public final class AnalyticsCollectorTest {
         .containsExactly(window0Period1Seq0, period1Seq0);
     assertThat(listener.getEvents(EVENT_RENDERED_FIRST_FRAME))
         .containsExactly(window0Period1Seq0, period1Seq0);
+    assertThat(listener.getEvents(EVENT_VIDEO_FRAME_PROCESSING_OFFSET))
+        .containsExactly(window0Period1Seq0);
     listener.assertNoMoreEvents();
   }
 
@@ -735,6 +747,8 @@ public final class AnalyticsCollectorTest {
         .containsExactly(period0Seq0, period0Seq1);
     assertThat(listener.getEvents(EVENT_RENDERED_FIRST_FRAME))
         .containsExactly(period0Seq0, period0Seq1);
+    assertThat(listener.getEvents(EVENT_VIDEO_FRAME_PROCESSING_OFFSET))
+        .containsExactly(period0Seq1);
     listener.assertNoMoreEvents();
   }
 
@@ -952,6 +966,8 @@ public final class AnalyticsCollectorTest {
         .containsExactly(contentAfterPreroll, contentAfterMidroll, contentAfterPostroll);
     assertThat(listener.getEvents(EVENT_VIDEO_SIZE_CHANGED)).containsExactly(prerollAd);
     assertThat(listener.getEvents(EVENT_RENDERED_FIRST_FRAME)).containsExactly(prerollAd);
+    assertThat(listener.getEvents(EVENT_VIDEO_FRAME_PROCESSING_OFFSET))
+        .containsExactly(contentAfterPreroll, contentAfterMidroll, contentAfterPostroll);
     listener.assertNoMoreEvents();
   }
 
@@ -1069,6 +1085,8 @@ public final class AnalyticsCollectorTest {
         .containsExactly(contentBeforeMidroll, midrollAd);
     assertThat(listener.getEvents(EVENT_RENDERED_FIRST_FRAME))
         .containsExactly(contentBeforeMidroll, midrollAd);
+    assertThat(listener.getEvents(EVENT_VIDEO_FRAME_PROCESSING_OFFSET))
+        .containsExactly(contentAfterMidroll);
     listener.assertNoMoreEvents();
   }
 
@@ -1149,8 +1167,7 @@ public final class AnalyticsCollectorTest {
             videoRendererEventListener,
             audioRendererEventListener,
             textRendererOutput,
-            metadataRendererOutput,
-            drmSessionManager) ->
+            metadataRendererOutput) ->
             new Renderer[] {
               new FakeVideoRenderer(eventHandler, videoRendererEventListener),
               new FakeAudioRenderer(eventHandler, audioRendererEventListener)
@@ -1196,6 +1213,8 @@ public final class AnalyticsCollectorTest {
     protected void onStopped() throws ExoPlaybackException {
       super.onStopped();
       eventDispatcher.droppedFrames(/* droppedFrameCount= */ 0, /* elapsedMs= */ 0);
+      eventDispatcher.reportVideoFrameProcessingOffset(
+          /* totalProcessingOffsetUs= */ 400000, /* frameCount= */ 10, this.format);
     }
 
     @Override
@@ -1221,13 +1240,15 @@ public final class AnalyticsCollectorTest {
     }
 
     @Override
-    protected void onBufferRead() {
-      if (!renderedFirstFrame) {
+    protected boolean shouldProcessBuffer(long bufferTimeUs, long playbackPositionUs) {
+      boolean shouldProcess = super.shouldProcessBuffer(bufferTimeUs, playbackPositionUs);
+      if (shouldProcess && !renderedFirstFrame) {
         eventDispatcher.videoSizeChanged(
             format.width, format.height, format.rotationDegrees, format.pixelWidthHeightRatio);
         eventDispatcher.renderedFirstFrame(/* surface= */ null);
         renderedFirstFrame = true;
       }
+      return shouldProcess;
     }
   }
 
@@ -1271,11 +1292,13 @@ public final class AnalyticsCollectorTest {
     }
 
     @Override
-    protected void onBufferRead() {
-      if (!notifiedAudioSessionId) {
+    protected boolean shouldProcessBuffer(long bufferTimeUs, long playbackPositionUs) {
+      boolean shouldProcess = super.shouldProcessBuffer(bufferTimeUs, playbackPositionUs);
+      if (shouldProcess && !notifiedAudioSessionId) {
         eventDispatcher.audioSessionId(/* audioSessionId= */ 1);
         notifiedAudioSessionId = true;
       }
+      return shouldProcess;
     }
   }
 
@@ -1559,6 +1582,12 @@ public final class AnalyticsCollectorTest {
     @Override
     public void onDrmSessionReleased(EventTime eventTime) {
       reportedEvents.add(new ReportedEvent(EVENT_DRM_SESSION_RELEASED, eventTime));
+    }
+
+    @Override
+    public void onVideoFrameProcessingOffset(
+        EventTime eventTime, long totalProcessingOffsetUs, int frameCount, Format format) {
+      reportedEvents.add(new ReportedEvent(EVENT_VIDEO_FRAME_PROCESSING_OFFSET, eventTime));
     }
 
     private static final class ReportedEvent {

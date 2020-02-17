@@ -3,6 +3,8 @@
 ### dev-v2 (not yet released) ###
 
 * Core library:
+  * Add API in `AnalyticsListener` to report video frame processing offset.
+    `MediaCodecVideoRenderer` reports the event.
   * Add fields `videoFrameProcessingOffsetUsSum` and
     `videoFrameProcessingOffsetUsCount` in `DecoderCounters` to compute
     the average video frame processing offset.
@@ -39,7 +41,16 @@
     (rendering is coming later).
   * Fix `SubtitlePainter` to render `EDGE_TYPE_OUTLINE` using the correct color
     ([#6724](https://github.com/google/ExoPlayer/pull/6724)).
-* DRM: Add support for attaching DRM sessions to clear content in the demo app.
+  * Add support for WebVTT default
+    [text](https://www.w3.org/TR/webvtt1/#default-text-color) and
+    [background](https://www.w3.org/TR/webvtt1/#default-text-background) colors
+    ([PR #4178](https://github.com/google/ExoPlayer/pull/4178),
+    [issue #6581](https://github.com/google/ExoPlayer/issues/6581)).
+* DRM:
+  * Add support for attaching DRM sessions to clear content in the demo app.
+  * Remove `DrmSessionManager` references from all renderers.
+    `DrmSessionManager` must be injected into the MediaSources using the
+    MediaSources factories.
 * Downloads: Merge downloads in `SegmentDownloader` to improve overall download
   speed ([#5978](https://github.com/google/ExoPlayer/issues/5978)).
 * MP3: Add `IndexSeeker` for accurate seeks in VBR streams
@@ -60,7 +71,15 @@
   show how to render video to a `GLSurfaceView` while applying a GL shader.
   ([#6920](https://github.com/google/ExoPlayer/issues/6920)).
 
-### 2.11.2 (TBD) ###
+### 2.11.3 (2020-02-19) ###
+
+* SmoothStreaming: Fix regression that broke playback in 2.11.2
+  ([#6981](https://github.com/google/ExoPlayer/issues/6981)).
+* DRM: Fix issue switching from protected content that uses a 16-byte
+  initialization vector to one that uses an 8-byte initialization vector
+  ([#6982](https://github.com/google/ExoPlayer/issues/6982)).
+
+### 2.11.2 (2020-02-13) ###
 
 * Add Java FLAC extractor
   ([#6406](https://github.com/google/ExoPlayer/issues/6406)).
@@ -76,6 +95,8 @@
     [#6798](https://github.com/google/ExoPlayer/issues/6798)).
   * Fix `DownloadHelper.createMediaSource` to use `customCacheKey` when creating
     `ProgressiveMediaSource` instances.
+* DRM: Fix `NullPointerException` when playing DRM-protected content
+  ([#6951](https://github.com/google/ExoPlayer/issues/6951)).
 * Metadata:
   * Update `IcyDecoder` to try ISO-8859-1 decoding if UTF-8 decoding fails.
     Also change `IcyInfo.rawMetadata` from `String` to `byte[]` to allow
@@ -83,6 +104,7 @@
     ([#6753](https://github.com/google/ExoPlayer/issues/6753)).
   * Select multiple metadata tracks if multiple metadata renderers are available
     ([#6676](https://github.com/google/ExoPlayer/issues/6676)).
+  * Add support for ID3 genres added in Wimamp 5.6 (2010).
 * UI:
   * Show ad group markers in `DefaultTimeBar` even if they are after the end
     of the current window
@@ -112,9 +134,10 @@
   This issue caused FLAC streams with other bit depths to sound like white noise
   on earlier releases, but only when embedded in a non-FLAC container such as
   Matroska or MP4.
-* Add support for ID3 genres added in Wimamp 5.6 (2010).
-* DRM: Fix `NullPointerException` when playing DRM-protected content
-  ([#6951](https://github.com/google/ExoPlayer/issues/6951)).
+* Demo apps: Add
+  [GL demo app](https://github.com/google/ExoPlayer/tree/dev-v2/demos/gl) to
+  show how to render video to a `GLSurfaceView` while applying a GL shader.
+  ([#6920](https://github.com/google/ExoPlayer/issues/6920)).
 
 ### 2.11.1 (2019-12-20) ###
 

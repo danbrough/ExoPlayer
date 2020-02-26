@@ -25,16 +25,13 @@ import com.google.android.exoplayer2.ParserException;
 import com.google.android.exoplayer2.SeekParameters;
 import com.google.android.exoplayer2.decoder.DecoderInputBuffer;
 import com.google.android.exoplayer2.drm.DrmSessionManager;
-import com.google.android.exoplayer2.extractor.DefaultExtractorInput;
 import com.google.android.exoplayer2.extractor.Extractor;
-import com.google.android.exoplayer2.extractor.ExtractorInput;
 import com.google.android.exoplayer2.extractor.ExtractorOutput;
 import com.google.android.exoplayer2.extractor.PositionHolder;
 import com.google.android.exoplayer2.extractor.SeekMap;
 import com.google.android.exoplayer2.extractor.SeekMap.SeekPoints;
 import com.google.android.exoplayer2.extractor.SeekMap.Unseekable;
 import com.google.android.exoplayer2.extractor.TrackOutput;
-import com.google.android.exoplayer2.extractor.mp3.Mp3Extractor;
 import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.metadata.icy.IcyHeaders;
 import com.google.android.exoplayer2.source.MediaSourceEventListener.EventDispatcher;
@@ -53,7 +50,6 @@ import com.google.android.exoplayer2.util.ConditionVariable;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.ParsableByteArray;
 import com.google.android.exoplayer2.util.Util;
-import java.io.EOFException;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -735,10 +731,13 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
                       ? new Metadata(icyHeaders)
                       : metadata.copyWithAppendedEntries(icyHeaders));
         }
+        // Update the track format with the bitrate from the ICY header only if it declares neither
+        // an average or peak bitrate of its own.
         if (isAudio
-            && trackFormat.bitrate == Format.NO_VALUE
+            && trackFormat.averageBitrate == Format.NO_VALUE
+            && trackFormat.peakBitrate == Format.NO_VALUE
             && icyHeaders.bitrate != Format.NO_VALUE) {
-          trackFormat = trackFormat.copyWithBitrate(icyHeaders.bitrate);
+          trackFormat = trackFormat.buildUpon().setAverageBitrate(icyHeaders.bitrate).build();
         }
       }
       trackArray[i] = new TrackGroup(trackFormat);
@@ -953,7 +952,6 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     public void load() throws IOException, InterruptedException {
       int result = Extractor.RESULT_CONTINUE;
       while (result == Extractor.RESULT_CONTINUE && !loadCanceled) {
-        ExtractorInput input = null;
         try {
           long position = positionHolder.position;
           dataSpec = buildDataSpec(position);
@@ -961,7 +959,6 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
           if (length != C.LENGTH_UNSET) {
             length += position;
           }
-          Uri uri = Assertions.checkNotNull(dataSource.getUri());
           icyHeaders = IcyHeaders.parse(dataSource.getResponseHeaders());
           DataSource extractorDataSource = dataSource;
           if (icyHeaders != null && icyHeaders.metadataInterval != C.LENGTH_UNSET) {
@@ -969,23 +966,22 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
             icyTrackOutput = icyTrack();
             icyTrackOutput.format(ICY_FORMAT);
           }
-          input = new DefaultExtractorInput(extractorDataSource, position, length);
-          Extractor extractor = extractorHolder.selectExtractor(input, extractorOutput, uri);
+          extractorHolder.init(extractorDataSource, position, length, extractorOutput);
 
-          // MP3 live streams commonly have seekable metadata, despite being unseekable.
-          if (icyHeaders != null && extractor instanceof Mp3Extractor) {
-            ((Mp3Extractor) extractor).disableSeeking();
+          if (icyHeaders != null) {
+            extractorHolder.disableSeekingOnMp3Streams();
           }
 
           if (pendingExtractorSeek) {
-            extractor.seek(position, seekTimeUs);
+            extractorHolder.seek(position, seekTimeUs);
             pendingExtractorSeek = false;
           }
           while (result == Extractor.RESULT_CONTINUE && !loadCanceled) {
             loadCondition.block();
-            result = extractor.read(input, positionHolder);
-            if (input.getPosition() > position + continueLoadingCheckIntervalBytes) {
-              position = input.getPosition();
+            result = extractorHolder.read(positionHolder);
+            long currentInputPosition = extractorHolder.getCurrentInputPosition();
+            if (currentInputPosition > position + continueLoadingCheckIntervalBytes) {
+              position = currentInputPosition;
               loadCondition.close();
               handler.post(onContinueLoadingRequestedRunnable);
             }
@@ -993,8 +989,8 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
         } finally {
           if (result == Extractor.RESULT_SEEK) {
             result = Extractor.RESULT_CONTINUE;
-          } else if (input != null) {
-            positionHolder.position = input.getPosition();
+          } else if (extractorHolder.getCurrentInputPosition() != C.POSITION_UNSET) {
+            positionHolder.position = extractorHolder.getCurrentInputPosition();
           }
           Util.closeQuietly(dataSource);
         }
@@ -1037,75 +1033,6 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
       seekTimeUs = timeUs;
       pendingExtractorSeek = true;
       seenIcyMetadata = false;
-    }
-  }
-
-  /** Stores a list of extractors and a selected extractor when the format has been detected. */
-  private static final class ExtractorHolder {
-
-    private final Extractor[] extractors;
-
-    @Nullable private Extractor extractor;
-
-    /**
-     * Creates a holder that will select an extractor and initialize it using the specified output.
-     *
-     * @param extractors One or more extractors to choose from.
-     */
-    public ExtractorHolder(Extractor[] extractors) {
-      this.extractors = extractors;
-    }
-
-    /**
-     * Returns an initialized extractor for reading {@code input}, and returns the same extractor on
-     * later calls.
-     *
-     * @param input The {@link ExtractorInput} from which data should be read.
-     * @param output The {@link ExtractorOutput} that will be used to initialize the selected
-     *     extractor.
-     * @param uri The {@link Uri} of the data.
-     * @return An initialized extractor for reading {@code input}.
-     * @throws UnrecognizedInputFormatException Thrown if the input format could not be detected.
-     * @throws IOException Thrown if the input could not be read.
-     * @throws InterruptedException Thrown if the thread was interrupted.
-     */
-    public Extractor selectExtractor(ExtractorInput input, ExtractorOutput output, Uri uri)
-        throws IOException, InterruptedException {
-      if (extractor != null) {
-        return extractor;
-      }
-      if (extractors.length == 1) {
-        this.extractor = extractors[0];
-      } else {
-        for (Extractor extractor : extractors) {
-          try {
-            if (extractor.sniff(input)) {
-              this.extractor = extractor;
-              break;
-            }
-          } catch (EOFException e) {
-            // Do nothing.
-          } finally {
-            input.resetPeekPosition();
-          }
-        }
-        if (extractor == null) {
-          throw new UnrecognizedInputFormatException(
-              "None of the available extractors ("
-                  + Util.getCommaDelimitedSimpleClassNames(extractors)
-                  + ") could read the stream.",
-              uri);
-        }
-      }
-      extractor.init(output);
-      return extractor;
-    }
-
-    public void release() {
-      if (extractor != null) {
-        extractor.release();
-        extractor = null;
-      }
     }
   }
 

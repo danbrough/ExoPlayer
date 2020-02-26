@@ -21,13 +21,15 @@ import android.media.MediaFormat;
 import android.os.Handler;
 import android.os.HandlerThread;
 import androidx.annotation.IntDef;
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.annotation.VisibleForTesting;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.decoder.CryptoInfo;
 import com.google.android.exoplayer2.util.Util;
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
 /**
@@ -41,6 +43,8 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 /* package */ final class DedicatedThreadAsyncMediaCodecAdapter extends MediaCodec.Callback
     implements MediaCodecAdapter {
 
+  @Documented
+  @Retention(RetentionPolicy.SOURCE)
   @IntDef({STATE_CREATED, STATE_STARTED, STATE_SHUT_DOWN})
   private @interface State {}
 
@@ -179,25 +183,23 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   }
 
   @Override
-  public synchronized void onInputBufferAvailable(@NonNull MediaCodec codec, int index) {
+  public synchronized void onInputBufferAvailable(MediaCodec codec, int index) {
     mediaCodecAsyncCallback.onInputBufferAvailable(codec, index);
   }
 
   @Override
   public synchronized void onOutputBufferAvailable(
-      @NonNull MediaCodec codec, int index, @NonNull MediaCodec.BufferInfo info) {
+      MediaCodec codec, int index, MediaCodec.BufferInfo info) {
     mediaCodecAsyncCallback.onOutputBufferAvailable(codec, index, info);
   }
 
   @Override
-  public synchronized void onError(
-      @NonNull MediaCodec codec, @NonNull MediaCodec.CodecException e) {
+  public synchronized void onError(MediaCodec codec, MediaCodec.CodecException e) {
     mediaCodecAsyncCallback.onError(codec, e);
   }
 
   @Override
-  public synchronized void onOutputFormatChanged(
-      @NonNull MediaCodec codec, @NonNull MediaFormat format) {
+  public synchronized void onOutputFormatChanged(MediaCodec codec, MediaFormat format) {
     mediaCodecAsyncCallback.onOutputFormatChanged(codec, format);
   }
 

@@ -59,7 +59,7 @@ public final class FakeExtractorOutput implements ExtractorOutput, Dumper.Dumpab
    */
   private static final int WRITE_TO_LOCAL = 1;
   /** Write output to folder {@code /storage/emulated/0/Android/data} of device. */
-  private static final int WRITE_TO_DEVICE = 2;
+  private static final int WRITE_TO_DEVICE = 1 << 1;
 
   @DumpFilesAction private static final int DUMP_FILE_ACTION = COMPARE_WITH_EXISTING;
 
@@ -129,7 +129,14 @@ public final class FakeExtractorOutput implements ExtractorOutput, Dumper.Dumpab
 
     if (DUMP_FILE_ACTION == COMPARE_WITH_EXISTING) {
       String expected = TestUtil.getString(context, dumpFile);
-      assertWithMessage(dumpFile).that(actual).isEqualTo(expected);
+      assertWithMessage(
+              "Extractor output doesn't match golden file: %s\n"
+                  + "To update the golden, change FakeExtractorOutput#DUMP_FILE_ACTION to"
+                  + " WRITE_TO_LOCAL (for Robolectric tests) or WRITE_TO_DEVICE (for"
+                  + " instrumentation tests) and re-run the test.",
+              dumpFile)
+          .that(actual)
+          .isEqualTo(expected);
     } else {
       File file =
           DUMP_FILE_ACTION == WRITE_TO_LOCAL

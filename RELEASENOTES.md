@@ -32,6 +32,10 @@
   * Add a sample count parameter to `MediaCodecRenderer.processOutputBuffer`
     and `AudioSink.handleBuffer` to allow batching multiple encoded frames
     in one buffer.
+  * Add a `Format.Builder` and deprecate all `Format.create*` methods and most
+    `Format.copyWith*` methods.
+  * Split `Format.bitrate` into `Format.averageBitrate` and `Format.peakBitrate`
+    ([#2863](https://github.com/google/ExoPlayer/issues/2863)).
 * Text:
   * Parse `<ruby>` and `<rt>` tags in WebVTT subtitles (rendering is coming
     later).
@@ -46,6 +50,11 @@
     [background](https://www.w3.org/TR/webvtt1/#default-text-background) colors
     ([PR #4178](https://github.com/google/ExoPlayer/pull/4178),
     [issue #6581](https://github.com/google/ExoPlayer/issues/6581)).
+  * Catch-and-log all fatal exceptions in `TextRenderer` instead of re-throwing,
+    allowing playback to continue even if subtitles fail
+    ([#6885](https://github.com/google/ExoPlayer/issues/6885)).
+  * Parse `tts:ruby` and `tts:rubyPosition` properties in TTML subtitles
+    (rendering is coming later).
 * DRM:
   * Add support for attaching DRM sessions to clear content in the demo app.
   * Remove `DrmSessionManager` references from all renderers.

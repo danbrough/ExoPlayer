@@ -22,7 +22,6 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import androidx.annotation.GuardedBy;
 import androidx.annotation.IntDef;
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.annotation.VisibleForTesting;
@@ -30,6 +29,9 @@ import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.decoder.CryptoInfo;
 import com.google.android.exoplayer2.util.IntArrayQueue;
 import com.google.android.exoplayer2.util.Util;
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayDeque;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
@@ -52,6 +54,8 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 /* package */ final class MultiLockAsyncMediaCodecAdapter extends MediaCodec.Callback
     implements MediaCodecAdapter {
 
+  @Documented
+  @Retention(RetentionPolicy.SOURCE)
   @IntDef({STATE_CREATED, STATE_STARTED, STATE_SHUT_DOWN})
   private @interface State {}
 
@@ -290,15 +294,14 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   // Called by the internal thread.
 
   @Override
-  public void onInputBufferAvailable(@NonNull MediaCodec codec, int index) {
+  public void onInputBufferAvailable(MediaCodec codec, int index) {
     synchronized (inputBufferLock) {
       availableInputBuffers.add(index);
     }
   }
 
   @Override
-  public void onOutputBufferAvailable(
-      @NonNull MediaCodec codec, int index, @NonNull MediaCodec.BufferInfo info) {
+  public void onOutputBufferAvailable(MediaCodec codec, int index, MediaCodec.BufferInfo info) {
     synchronized (outputBufferLock) {
       availableOutputBuffers.add(index);
       bufferInfos.add(info);
@@ -306,12 +309,12 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   }
 
   @Override
-  public void onError(@NonNull MediaCodec codec, @NonNull MediaCodec.CodecException e) {
+  public void onError(MediaCodec codec, MediaCodec.CodecException e) {
     onMediaCodecError(e);
   }
 
   @Override
-  public void onOutputFormatChanged(@NonNull MediaCodec codec, @NonNull MediaFormat format) {
+  public void onOutputFormatChanged(MediaCodec codec, MediaFormat format) {
     synchronized (outputBufferLock) {
       availableOutputBuffers.add(MediaCodec.INFO_OUTPUT_FORMAT_CHANGED);
       formats.add(format);

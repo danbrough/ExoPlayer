@@ -78,28 +78,29 @@ public class SimpleDecoderAudioRendererTest {
 
   @Config(sdk = 19)
   @Test
-  public void testSupportsFormatAtApi19() {
+  public void supportsFormatAtApi19() {
     assertThat(audioRenderer.supportsFormat(FORMAT))
         .isEqualTo(ADAPTIVE_NOT_SEAMLESS | TUNNELING_NOT_SUPPORTED | FORMAT_HANDLED);
   }
 
   @Config(sdk = 21)
   @Test
-  public void testSupportsFormatAtApi21() {
+  public void supportsFormatAtApi21() {
     // From API 21, tunneling is supported.
     assertThat(audioRenderer.supportsFormat(FORMAT))
         .isEqualTo(ADAPTIVE_NOT_SEAMLESS | TUNNELING_SUPPORTED | FORMAT_HANDLED);
   }
 
   @Test
-  public void testImmediatelyReadEndOfStreamPlaysAudioSinkToEndOfStream() throws Exception {
+  public void immediatelyReadEndOfStreamPlaysAudioSinkToEndOfStream() throws Exception {
     audioRenderer.enable(
         RendererConfiguration.DEFAULT,
         new Format[] {FORMAT},
         new FakeSampleStream(FORMAT, /* eventDispatcher= */ null, /* shouldOutputSample= */ false),
-        0,
-        false,
-        0);
+        /* positionUs= */ 0,
+        /* joining= */ false,
+        /* mayRenderStartOfStream= */ true,
+        /* offsetUs= */ 0);
     audioRenderer.setCurrentStreamFinal();
     when(mockAudioSink.isEnded()).thenReturn(true);
     while (!audioRenderer.isEnded()) {

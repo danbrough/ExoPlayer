@@ -49,6 +49,11 @@ public final class TsExtractorTest {
   }
 
   @Test
+  public void testSampleScte35() throws Exception {
+    ExtractorAsserts.assertBehavior(TsExtractor::new, "ts/sample_scte35.ts");
+  }
+
+  @Test
   public void testStreamWithJunkData() throws Exception {
     ExtractorAsserts.assertBehavior(
         TsExtractor::new, "ts/sample_with_junk", ApplicationProvider.getApplicationContext());
@@ -138,8 +143,8 @@ public final class TsExtractorTest {
       }
     }
 
-    @Nullable
     @Override
+    @Nullable
     public TsPayloadReader createPayloadReader(int streamType, EsInfo esInfo) {
       if (provideCustomEsReader && streamType == 3) {
         esReader = new CustomEsReader(esInfo.language);

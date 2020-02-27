@@ -23,10 +23,45 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * Provides static utility methods for manipulating various types of codec specific data.
- */
+/** Provides utilities for handling various types of codec-specific data. */
 public final class CodecSpecificDataUtil {
+
+  private static final String TAG = "CodecSpecificDataUtil";
+
+  /** Holds sample format information for AAC audio. */
+  public static final class AacConfig {
+
+    /** The sample rate in Hertz. */
+    public final int sampleRateHz;
+    /** The number of channels. */
+    public final int channelCount;
+    /** The RFC 6381 codecs string. */
+    public final String codecs;
+
+    private AacConfig(int sampleRateHz, int channelCount, String codecs) {
+      this.sampleRateHz = sampleRateHz;
+      this.channelCount = channelCount;
+      this.codecs = codecs;
+    }
+  }
+
+  // AAC audio sample count constants assume the frameLengthFlag in the access unit is 0.
+  /**
+   * Number of raw audio samples that are produced per channel when decoding an AAC LC access unit.
+   */
+  public static final int AAC_LC_AUDIO_SAMPLE_COUNT = 1024;
+  /**
+   * Number of raw audio samples that are produced per channel when decoding an AAC XHE access unit.
+   */
+  public static final int AAC_XHE_AUDIO_SAMPLE_COUNT = AAC_LC_AUDIO_SAMPLE_COUNT;
+  /**
+   * Number of raw audio samples that are produced per channel when decoding an AAC HE access unit.
+   */
+  public static final int AAC_HE_AUDIO_SAMPLE_COUNT = 2048;
+  /**
+   * Number of raw audio samples that are produced per channel when decoding an AAC LD access unit.
+   */
+  public static final int AAC_LD_AUDIO_SAMPLE_COUNT = 512;
 
   private static final byte[] NAL_START_CODE = new byte[] {0, 0, 0, 1};
 
@@ -70,16 +105,26 @@ public final class CodecSpecificDataUtil {
         AUDIO_SPECIFIC_CONFIG_CHANNEL_CONFIGURATION_INVALID
       };
 
+  /**
+   * Prefix for the RFC 6381 codecs string for AAC formats. To form a full codecs string, suffix the
+   * decimal AudioObjectType.
+   */
+  private static final String AAC_CODECS_STRING_PREFIX = "mp4a.40.";
+
   // Advanced Audio Coding Low-Complexity profile.
   private static final int AUDIO_OBJECT_TYPE_AAC_LC = 2;
   // Spectral Band Replication.
-  private static final int AUDIO_OBJECT_TYPE_SBR = 5;
+  private static final int AUDIO_OBJECT_TYPE_AAC_SBR = 5;
   // Error Resilient Bit-Sliced Arithmetic Coding.
-  private static final int AUDIO_OBJECT_TYPE_ER_BSAC = 22;
+  private static final int AUDIO_OBJECT_TYPE_AAC_ER_BSAC = 22;
+  // Enhanced low delay.
+  private static final int AUDIO_OBJECT_TYPE_AAC_ELD = 23;
   // Parametric Stereo.
-  private static final int AUDIO_OBJECT_TYPE_PS = 29;
+  private static final int AUDIO_OBJECT_TYPE_AAC_PS = 29;
   // Escape code for extended audio object types.
   private static final int AUDIO_OBJECT_TYPE_ESCAPE = 31;
+  // Extended high efficiency.
+  private static final int AUDIO_OBJECT_TYPE_AAC_XHE = 42;
 
   private CodecSpecificDataUtil() {}
 
@@ -87,12 +132,13 @@ public final class CodecSpecificDataUtil {
    * Parses an AAC AudioSpecificConfig, as defined in ISO 14496-3 1.6.2.1
    *
    * @param audioSpecificConfig A byte array containing the AudioSpecificConfig to parse.
-   * @return A pair consisting of the sample rate in Hz and the channel count.
+   * @return The parsed configuration.
    * @throws ParserException If the AudioSpecificConfig cannot be parsed as it's not supported.
    */
-  public static Pair<Integer, Integer> parseAacAudioSpecificConfig(byte[] audioSpecificConfig)
+  public static AacConfig parseAacAudioSpecificConfig(byte[] audioSpecificConfig)
       throws ParserException {
-    return parseAacAudioSpecificConfig(new ParsableBitArray(audioSpecificConfig), false);
+    return parseAacAudioSpecificConfig(
+        new ParsableBitArray(audioSpecificConfig), /* forceReadToEnd= */ false);
   }
 
   /**
@@ -102,23 +148,25 @@ public final class CodecSpecificDataUtil {
    *     position is advanced to the end of the AudioSpecificConfig.
    * @param forceReadToEnd Whether the entire AudioSpecificConfig should be read. Required for
    *     knowing the length of the configuration payload.
-   * @return A pair consisting of the sample rate in Hz and the channel count.
+   * @return The parsed configuration.
    * @throws ParserException If the AudioSpecificConfig cannot be parsed as it's not supported.
    */
-  public static Pair<Integer, Integer> parseAacAudioSpecificConfig(
+  public static AacConfig parseAacAudioSpecificConfig(
       ParsableBitArray bitArray, boolean forceReadToEnd) throws ParserException {
     int audioObjectType = getAacAudioObjectType(bitArray);
-    int sampleRate = getAacSamplingFrequency(bitArray);
+    int sampleRateHz = getAacSamplingFrequency(bitArray);
     int channelConfiguration = bitArray.readBits(4);
-    if (audioObjectType == AUDIO_OBJECT_TYPE_SBR || audioObjectType == AUDIO_OBJECT_TYPE_PS) {
+    String codecs = AAC_CODECS_STRING_PREFIX + audioObjectType;
+    if (audioObjectType == AUDIO_OBJECT_TYPE_AAC_SBR
+        || audioObjectType == AUDIO_OBJECT_TYPE_AAC_PS) {
       // For an AAC bitstream using spectral band replication (SBR) or parametric stereo (PS) with
       // explicit signaling, we return the extension sampling frequency as the sample rate of the
       // content; this is identical to the sample rate of the decoded output but may differ from
       // the sample rate set above.
       // Use the extensionSamplingFrequencyIndex.
-      sampleRate = getAacSamplingFrequency(bitArray);
+      sampleRateHz = getAacSamplingFrequency(bitArray);
       audioObjectType = getAacAudioObjectType(bitArray);
-      if (audioObjectType == AUDIO_OBJECT_TYPE_ER_BSAC) {
+      if (audioObjectType == AUDIO_OBJECT_TYPE_AAC_ER_BSAC) {
         // Use the extensionChannelConfiguration.
         channelConfiguration = bitArray.readBits(4);
       }
@@ -160,7 +208,7 @@ public final class CodecSpecificDataUtil {
     // For supported containers, bits_to_decode() is always 0.
     int channelCount = AUDIO_SPECIFIC_CONFIG_CHANNEL_COUNT_TABLE[channelConfiguration];
     Assertions.checkArgument(channelCount != AUDIO_SPECIFIC_CONFIG_CHANNEL_CONFIGURATION_INVALID);
-    return Pair.create(sampleRate, channelCount);
+    return new AacConfig(sampleRateHz, channelCount, codecs);
   }
 
   /**
@@ -204,6 +252,25 @@ public final class CodecSpecificDataUtil {
     specificConfig[0] = (byte) (((audioObjectType << 3) & 0xF8) | ((sampleRateIndex >> 1) & 0x07));
     specificConfig[1] = (byte) (((sampleRateIndex << 7) & 0x80) | ((channelConfig << 3) & 0x78));
     return specificConfig;
+  }
+
+  /** Returns the encoding for a given AAC audio object type. */
+  @C.Encoding
+  public static int getEncodingForAacAudioObjectType(int audioObjectType) {
+    switch (audioObjectType) {
+      case AUDIO_OBJECT_TYPE_AAC_LC:
+        return C.ENCODING_AAC_LC;
+      case AUDIO_OBJECT_TYPE_AAC_SBR:
+        return C.ENCODING_AAC_HE_V1;
+      case AUDIO_OBJECT_TYPE_AAC_PS:
+        return C.ENCODING_AAC_HE_V2;
+      case AUDIO_OBJECT_TYPE_AAC_XHE:
+        return C.ENCODING_AAC_XHE;
+      case AUDIO_OBJECT_TYPE_AAC_ELD:
+        return C.ENCODING_AAC_ELD;
+      default:
+        return C.ENCODING_INVALID;
+    }
   }
 
   /**
@@ -382,7 +449,10 @@ public final class CodecSpecificDataUtil {
 
   private static void parseGaSpecificConfig(ParsableBitArray bitArray, int audioObjectType,
       int channelConfiguration) {
-    bitArray.skipBits(1); // frameLengthFlag.
+    boolean frameLengthFlag = bitArray.readBit();
+    if (frameLengthFlag) {
+      Log.w(TAG, "Unexpected AAC frameLengthFlag = 1");
+    }
     boolean dependsOnCoreDecoder = bitArray.readBit();
     if (dependsOnCoreDecoder) {
       bitArray.skipBits(14); // coreCoderDelay.

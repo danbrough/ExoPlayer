@@ -3,6 +3,9 @@
 ### dev-v2 (not yet released) ###
 
 * Core library:
+  * The `DefaultLoadControl` default minimum buffer is set to 50 seconds,
+    equal to the default maximum buffer. `DefaultLoadControl` applies the
+    same behavior for audio and video.
   * Add API in `AnalyticsListener` to report video frame processing offset.
     `MediaCodecVideoRenderer` reports the event.
   * Add fields `videoFrameProcessingOffsetUsSum` and
@@ -36,6 +39,8 @@
     `Format.copyWith*` methods.
   * Split `Format.bitrate` into `Format.averageBitrate` and `Format.peakBitrate`
     ([#2863](https://github.com/google/ExoPlayer/issues/2863)).
+  * Add optional automatic `WifiLock` handling to `SimpleExoPlayer`
+    ([#6914](https://github.com/google/ExoPlayer/issues/6914)).
 * Text:
   * Parse `<ruby>` and `<rt>` tags in WebVTT subtitles (rendering is coming
     later).
@@ -79,6 +84,8 @@
   [GL demo app](https://github.com/google/ExoPlayer/tree/dev-v2/demos/gl) to
   show how to render video to a `GLSurfaceView` while applying a GL shader.
   ([#6920](https://github.com/google/ExoPlayer/issues/6920)).
+* Metadata: Add minimal DVB Application Information Table (AIT) support
+    ([#6922](https://github.com/google/ExoPlayer/pull/6922)).
 
 ### 2.11.3 (2020-02-19) ###
 

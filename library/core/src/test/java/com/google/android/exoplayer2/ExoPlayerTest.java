@@ -459,7 +459,9 @@ public final class ExoPlayerTest {
   public void adGroupWithLoadErrorIsSkipped() throws Exception {
     AdPlaybackState initialAdPlaybackState =
         FakeTimeline.createAdPlaybackState(
-            /* adsPerAdGroup= */ 1, /* adGroupTimesUs=... */ 5 * C.MICROS_PER_SECOND);
+            /* adsPerAdGroup= */ 1, /* adGroupTimesUs=... */
+            TimelineWindowDefinition.DEFAULT_WINDOW_OFFSET_IN_FIRST_PERIOD_US
+                + 5 * C.MICROS_PER_SECOND);
     Timeline fakeTimeline =
         new FakeTimeline(
             new TimelineWindowDefinition(
@@ -702,7 +704,8 @@ public final class ExoPlayerTest {
               EventDispatcher eventDispatcher,
               @Nullable TransferListener transferListener) {
             FakeMediaPeriod mediaPeriod = new FakeMediaPeriod(trackGroupArray, eventDispatcher);
-            mediaPeriod.setDiscontinuityPositionUs(0);
+            mediaPeriod.setDiscontinuityPositionUs(
+                TimelineWindowDefinition.DEFAULT_WINDOW_OFFSET_IN_FIRST_PERIOD_US);
             return mediaPeriod;
           }
         };
@@ -3064,6 +3067,7 @@ public final class ExoPlayerTest {
                 /* isPlaceholder= */ false,
                 /* durationUs= */ 10_000_000,
                 /* defaultPositionUs= */ 5_000_000,
+                TimelineWindowDefinition.DEFAULT_WINDOW_OFFSET_IN_FIRST_PERIOD_US,
                 adPlaybackState));
     FakeMediaSource fakeMediaSource = new FakeMediaSource(/* timeline= */ null);
     AtomicReference<Player> playerReference = new AtomicReference<>();
@@ -5722,6 +5726,43 @@ public final class ExoPlayerTest {
     assertThat(trackGroupsAfterError.get().get(0).getFormat(0)).isEqualTo(Builder.AUDIO_FORMAT);
     assertThat(trackSelectionsAfterError.get().get(0)).isNull(); // Video renderer.
     assertThat(trackSelectionsAfterError.get().get(1)).isNotNull(); // Audio renderer.
+  }
+
+  @Test
+  public void seekToCurrentPosition_inEndedState_switchesToBufferingStateAndContinuesPlayback()
+      throws Exception {
+    MediaSource mediaSource = new FakeMediaSource(new FakeTimeline(/* windowCount = */ 1));
+    AtomicInteger windowIndexAfterFinalEndedState = new AtomicInteger();
+    ActionSchedule actionSchedule =
+        new ActionSchedule.Builder("seekToCurrentPosition_inEndedState")
+            .waitForPlaybackState(Player.STATE_ENDED)
+            .addMediaSources(mediaSource)
+            .executeRunnable(
+                new PlayerRunnable() {
+                  @Override
+                  public void run(SimpleExoPlayer player) {
+                    player.seekTo(player.getCurrentPosition());
+                  }
+                })
+            .waitForPlaybackState(Player.STATE_READY)
+            .waitForPlaybackState(Player.STATE_ENDED)
+            .executeRunnable(
+                new PlayerRunnable() {
+                  @Override
+                  public void run(SimpleExoPlayer player) {
+                    windowIndexAfterFinalEndedState.set(player.getCurrentWindowIndex());
+                  }
+                })
+            .build();
+    new Builder()
+        .setMediaSources(mediaSource)
+        .setActionSchedule(actionSchedule)
+        .build(context)
+        .start()
+        .blockUntilActionScheduleFinished(TIMEOUT_MS)
+        .blockUntilEnded(TIMEOUT_MS);
+
+    assertThat(windowIndexAfterFinalEndedState.get()).isEqualTo(1);
   }
 
   // Internal methods.

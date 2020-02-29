@@ -22,6 +22,7 @@ import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.ParserException;
+import com.google.android.exoplayer2.audio.AacUtil;
 import com.google.android.exoplayer2.audio.Ac3Util;
 import com.google.android.exoplayer2.audio.Ac4Util;
 import com.google.android.exoplayer2.drm.DrmInitData;
@@ -29,7 +30,6 @@ import com.google.android.exoplayer2.extractor.GaplessInfoHolder;
 import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.CodecSpecificDataUtil;
-import com.google.android.exoplayer2.util.CodecSpecificDataUtil.AacConfig;
 import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.ParsableByteArray;
@@ -815,8 +815,10 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
             language, out);
       } else if (childAtomType == Atom.TYPE_camm) {
         out.format =
-            Format.createSampleFormat(
-                Integer.toString(trackId), MimeTypes.APPLICATION_CAMERA_MOTION);
+            new Format.Builder()
+                .setId(trackId)
+                .setSampleMimeType(MimeTypes.APPLICATION_CAMERA_MOTION)
+                .build();
       }
       stsd.setPosition(childStartPosition + childAtomSize);
     }
@@ -861,14 +863,13 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
     }
 
     out.format =
-        Format.createTextSampleFormat(
-            Integer.toString(trackId),
-            mimeType,
-            /* selectionFlags= */ 0,
-            language,
-            /* accessibilityChannel= */ Format.NO_VALUE,
-            subsampleOffsetUs,
-            initializationData);
+        new Format.Builder()
+            .setId(trackId)
+            .setSampleMimeType(mimeType)
+            .setLanguage(language)
+            .setSubsampleOffsetUs(subsampleOffsetUs)
+            .setInitializationData(initializationData)
+            .build();
   }
 
   private static void parseVideoSampleEntry(
@@ -1003,22 +1004,19 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
     }
 
     out.format =
-        Format.createVideoSampleFormat(
-            Integer.toString(trackId),
-            mimeType,
-            codecs,
-            /* bitrate= */ Format.NO_VALUE,
-            /* maxInputSize= */ Format.NO_VALUE,
-            width,
-            height,
-            /* frameRate= */ Format.NO_VALUE,
-            initializationData,
-            rotationDegrees,
-            pixelWidthHeightRatio,
-            projectionData,
-            stereoMode,
-            /* colorInfo= */ null,
-            drmInitData);
+        new Format.Builder()
+            .setId(trackId)
+            .setSampleMimeType(mimeType)
+            .setCodecs(codecs)
+            .setWidth(width)
+            .setHeight(height)
+            .setPixelWidthHeightRatio(pixelWidthHeightRatio)
+            .setRotationDegrees(rotationDegrees)
+            .setProjectionData(projectionData)
+            .setStereoMode(stereoMode)
+            .setInitializationData(initializationData)
+            .setDrmInitData(drmInitData)
+            .build();
   }
 
   /**
@@ -1184,8 +1182,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
           if (MimeTypes.AUDIO_AAC.equals(mimeType) && initializationData != null) {
             // Update sampleRate and channelCount from the AudioSpecificConfig initialization data,
             // which is more reliable. See [Internal: b/10903778].
-            AacConfig aacConfig =
-                CodecSpecificDataUtil.parseAacAudioSpecificConfig(initializationData);
+            AacUtil.Config aacConfig = AacUtil.parseAudioSpecificConfig(initializationData);
             sampleRate = aacConfig.sampleRateHz;
             channelCount = aacConfig.channelCount;
             codecs = aacConfig.codecs;
@@ -1204,9 +1201,15 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
         out.format =
             Ac4Util.parseAc4AnnexEFormat(parent, Integer.toString(trackId), language, drmInitData);
       } else if (childAtomType == Atom.TYPE_ddts) {
-        out.format = Format.createAudioSampleFormat(Integer.toString(trackId), mimeType, null,
-            Format.NO_VALUE, Format.NO_VALUE, channelCount, sampleRate, null, drmInitData, 0,
-            language);
+        out.format =
+            new Format.Builder()
+                .setId(trackId)
+                .setSampleMimeType(mimeType)
+                .setChannelCount(channelCount)
+                .setSampleRate(sampleRate)
+                .setDrmInitData(drmInitData)
+                .setLanguage(language)
+                .build();
       } else if (childAtomType == Atom.TYPE_dOps) {
         // Build an Opus Identification Header (defined in RFC-7845) by concatenating the Opus Magic
         // Signature and the body of the dOps atom.
@@ -1242,7 +1245,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
     if (out.format == null && mimeType != null) {
       out.format =
           new Format.Builder()
-              .setId(Integer.toString(trackId))
+              .setId(trackId)
               .setSampleMimeType(mimeType)
               .setCodecs(codecs)
               .setChannelCount(channelCount)

@@ -790,6 +790,8 @@ public class AnalyticsCollector
       }
       if (!mediaPeriodInfoQueue.isEmpty()) {
         playingMediaPeriod = mediaPeriodInfoQueue.get(0);
+      } else if (playingMediaPeriod != null) {
+        playingMediaPeriod = updateMediaPeriodInfoToNewTimeline(playingMediaPeriod, timeline);
       }
       this.timeline = timeline;
       currentPlayerMediaPeriod = findMatchingMediaPeriodInQueue(player);
@@ -852,7 +854,8 @@ public class AnalyticsCollector
               ? C.INDEX_UNSET
               : playerTimeline
                   .getPeriod(playerPeriodIndex, period)
-                  .getAdGroupIndexAfterPositionUs(C.msToUs(player.getCurrentPosition()));
+                  .getAdGroupIndexAfterPositionUs(
+                      C.msToUs(player.getCurrentPosition()) - period.getPositionInWindowUs());
       for (int i = 0; i < mediaPeriodInfoQueue.size(); i++) {
         MediaPeriodInfo mediaPeriodInfo = mediaPeriodInfoQueue.get(i);
         if (isMatchingMediaPeriod(
@@ -897,7 +900,8 @@ public class AnalyticsCollector
               ? C.INDEX_UNSET
               : playerTimeline
                   .getPeriod(playerPeriodIndex, period)
-                  .getAdGroupIndexAfterPositionUs(C.msToUs(player.getCurrentPosition()));
+                  .getAdGroupIndexAfterPositionUs(
+                      C.msToUs(player.getCurrentPosition()) - period.getPositionInWindowUs());
       return isMatchingMediaPeriod(
           playingMediaPeriod,
           playerTimeline,

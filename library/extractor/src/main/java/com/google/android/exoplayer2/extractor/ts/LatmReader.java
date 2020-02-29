@@ -19,12 +19,11 @@ import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.ParserException;
+import com.google.android.exoplayer2.audio.AacUtil;
 import com.google.android.exoplayer2.extractor.ExtractorOutput;
 import com.google.android.exoplayer2.extractor.TrackOutput;
 import com.google.android.exoplayer2.extractor.ts.TsPayloadReader.TrackIdGenerator;
 import com.google.android.exoplayer2.util.Assertions;
-import com.google.android.exoplayer2.util.CodecSpecificDataUtil;
-import com.google.android.exoplayer2.util.CodecSpecificDataUtil.AacConfig;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.ParsableBitArray;
 import com.google.android.exoplayer2.util.ParsableByteArray;
@@ -72,6 +71,7 @@ public final class LatmReader implements ElementaryStreamReader {
   private int sampleRateHz;
   private long sampleDurationUs;
   private int channelCount;
+  @Nullable private String codecs;
 
   /**
    * @param language Track language.
@@ -203,18 +203,15 @@ public final class LatmReader implements ElementaryStreamReader {
         byte[] initData = new byte[(readBits + 7) / 8];
         data.readBits(initData, 0, readBits);
         Format format =
-            Format.createAudioSampleFormat(
-                formatId,
-                MimeTypes.AUDIO_AAC,
-                /* codecs= */ null,
-                Format.NO_VALUE,
-                Format.NO_VALUE,
-                channelCount,
-                sampleRateHz,
-                Collections.singletonList(initData),
-                /* drmInitData= */ null,
-                /* selectionFlags= */ 0,
-                language);
+            new Format.Builder()
+                .setId(formatId)
+                .setSampleMimeType(MimeTypes.AUDIO_AAC)
+                .setCodecs(codecs)
+                .setChannelCount(channelCount)
+                .setSampleRate(sampleRateHz)
+                .setInitializationData(Collections.singletonList(initData))
+                .setLanguage(language)
+                .build();
         if (!format.equals(this.format)) {
           this.format = format;
           sampleDurationUs = (C.MICROS_PER_SECOND * 1024) / format.sampleRate;
@@ -273,8 +270,8 @@ public final class LatmReader implements ElementaryStreamReader {
 
   private int parseAudioSpecificConfig(ParsableBitArray data) throws ParserException {
     int bitsLeft = data.bitsLeft();
-    AacConfig config =
-        CodecSpecificDataUtil.parseAacAudioSpecificConfig(data, /* forceReadToEnd= */ true);
+    AacUtil.Config config = AacUtil.parseAudioSpecificConfig(data, /* forceReadToEnd= */ true);
+    codecs = config.codecs;
     sampleRateHz = config.sampleRateHz;
     channelCount = config.channelCount;
     return bitsLeft - data.bitsLeft();

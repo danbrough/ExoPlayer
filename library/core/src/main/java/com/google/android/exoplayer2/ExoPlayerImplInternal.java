@@ -902,12 +902,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
     }
 
     try {
-      if (playbackInfo.timeline.isEmpty() || !playlist.isPrepared()) {
+      if (playbackInfo.timeline.isEmpty()) {
         // Save seek position for later, as we are still waiting for a prepared source.
         pendingInitialSeekPosition = seekPosition;
       } else if (resolvedSeekPosition == null) {
         // End playback, as we didn't manage to find a valid seek position.
-        setState(Player.STATE_ENDED);
+        if (playbackInfo.playbackState != Player.STATE_IDLE) {
+          setState(Player.STATE_ENDED);
+        }
         resetInternal(
             /* resetRenderers= */ false,
             /* resetPosition= */ true,
@@ -926,7 +928,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
                 playingPeriodHolder.mediaPeriod.getAdjustedSeekPositionUs(
                     newPeriodPositionUs, seekParameters);
           }
-          if (C.usToMs(newPeriodPositionUs) == C.usToMs(playbackInfo.positionUs)) {
+          if (C.usToMs(newPeriodPositionUs) == C.usToMs(playbackInfo.positionUs)
+              && (playbackInfo.playbackState == Player.STATE_BUFFERING
+                  || playbackInfo.playbackState == Player.STATE_READY)) {
             // Seek will be performed to the current position. Do nothing.
             periodPositionUs = playbackInfo.positionUs;
             return;
@@ -971,11 +975,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
       setState(Player.STATE_BUFFERING);
     }
 
-    // Find the requested period if it's already prepared.
+    // Find the requested period if it already exists.
     @Nullable MediaPeriodHolder oldPlayingPeriodHolder = queue.getPlayingPeriod();
     @Nullable MediaPeriodHolder newPlayingPeriodHolder = oldPlayingPeriodHolder;
     while (newPlayingPeriodHolder != null) {
-      if (periodId.equals(newPlayingPeriodHolder.info.id) && newPlayingPeriodHolder.prepared) {
+      if (periodId.equals(newPlayingPeriodHolder.info.id)) {
         break;
       }
       newPlayingPeriodHolder = newPlayingPeriodHolder.getNext();
@@ -1004,7 +1008,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
     // Do the actual seeking.
     if (newPlayingPeriodHolder != null) {
       queue.removeAfter(newPlayingPeriodHolder);
-      if (newPlayingPeriodHolder.hasEnabledTracks) {
+      if (!newPlayingPeriodHolder.prepared) {
+        newPlayingPeriodHolder.info =
+            newPlayingPeriodHolder.info.copyWithStartPositionUs(periodPositionUs);
+      } else if (newPlayingPeriodHolder.hasEnabledTracks) {
         periodPositionUs = newPlayingPeriodHolder.mediaPeriod.seekToUs(periodPositionUs);
         newPlayingPeriodHolder.mediaPeriod.discardBuffer(
             periodPositionUs - backBufferDurationUs, retainBackBufferFromKeyframe);
@@ -1549,14 +1556,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
       } else if (!timeline.isEmpty()) {
         // Something changed. Seek to new start position.
         @Nullable MediaPeriodHolder periodHolder = queue.getPlayingPeriod();
-        if (periodHolder != null) {
+        while (periodHolder != null) {
           // Update the new playing media period info if it already exists.
-          while (periodHolder.getNext() != null) {
-            periodHolder = periodHolder.getNext();
-            if (periodHolder.info.id.equals(newPeriodId)) {
-              periodHolder.info = queue.getUpdatedMediaPeriodInfo(timeline, periodHolder.info);
-            }
+          if (periodHolder.info.id.equals(newPeriodId)) {
+            periodHolder.info = queue.getUpdatedMediaPeriodInfo(timeline, periodHolder.info);
           }
+          periodHolder = periodHolder.getNext();
         }
         newPositionUs = seekToPeriodPosition(newPeriodId, newPositionUs, forceBufferingState);
       }
@@ -1896,7 +1901,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
   private PlaybackInfo copyWithNewPosition(
       MediaPeriodId mediaPeriodId, long positionUs, long contentPositionUs) {
     deliverPendingMessageAtStartPositionRequired =
-        positionUs != playbackInfo.positionUs || !mediaPeriodId.equals(playbackInfo.periodId);
+        deliverPendingMessageAtStartPositionRequired
+            || positionUs != playbackInfo.positionUs
+            || !mediaPeriodId.equals(playbackInfo.periodId);
     TrackGroupArray trackGroupArray = playbackInfo.trackGroups;
     TrackSelectorResult trackSelectorResult = playbackInfo.trackSelectorResult;
     if (playlist.isPrepared()) {

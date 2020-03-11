@@ -31,6 +31,7 @@ import com.google.android.exoplayer2.upstream.LoadErrorHandlingPolicy;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.EventDispatcher;
 import com.google.android.exoplayer2.util.Log;
+import com.google.android.exoplayer2.util.MediaSourceEventDispatcher;
 import com.google.android.exoplayer2.util.Util;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
@@ -238,7 +239,7 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto> implements DrmSe
   private final ExoMediaDrm.Provider<T> exoMediaDrmProvider;
   private final MediaDrmCallback callback;
   private final HashMap<String, String> keyRequestParameters;
-  private final EventDispatcher<DefaultDrmSessionEventListener> eventDispatcher;
+  private final EventDispatcher<DrmSessionEventListener> eventDispatcher;
   private final boolean multiSession;
   private final int[] useDrmSessionsForClearContentTrackTypes;
   private final boolean playClearSamplesWithoutKeys;
@@ -366,28 +367,28 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto> implements DrmSe
   }
 
   /**
-   * Adds a {@link DefaultDrmSessionEventListener} to listen to drm session events.
+   * Adds a {@link DrmSessionEventListener} to listen to drm session events.
    *
    * @param handler A handler to use when delivering events to {@code eventListener}.
    * @param eventListener A listener of events.
    */
-  public final void addListener(Handler handler, DefaultDrmSessionEventListener eventListener) {
+  public final void addListener(Handler handler, DrmSessionEventListener eventListener) {
     eventDispatcher.addListener(handler, eventListener);
   }
 
   /**
-   * Removes a {@link DefaultDrmSessionEventListener} from the list of drm session event listeners.
+   * Removes a {@link DrmSessionEventListener} from the list of drm session event listeners.
    *
    * @param eventListener The listener to remove.
    */
-  public final void removeListener(DefaultDrmSessionEventListener eventListener) {
+  public final void removeListener(DrmSessionEventListener eventListener) {
     eventDispatcher.removeListener(eventListener);
   }
 
   /**
    * Sets the mode, which determines the role of sessions acquired from the instance. This must be
-   * called before {@link #acquireSession(Looper, DrmInitData)} or {@link
-   * #acquirePlaceholderSession} is called.
+   * called before {@link #acquireSession(Looper, MediaSourceEventDispatcher, DrmInitData)} or
+   * {@link #acquirePlaceholderSession} is called.
    *
    * <p>By default, the mode is {@link #MODE_PLAYBACK} and a streaming license is requested when
    * required.
@@ -490,12 +491,15 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto> implements DrmSe
       sessions.add(placeholderDrmSession);
       this.placeholderDrmSession = placeholderDrmSession;
     }
-    placeholderDrmSession.acquire();
+    placeholderDrmSession.acquire(/* eventDispatcher= */ null);
     return placeholderDrmSession;
   }
 
   @Override
-  public DrmSession<T> acquireSession(Looper playbackLooper, DrmInitData drmInitData) {
+  public DrmSession<T> acquireSession(
+      Looper playbackLooper,
+      @Nullable MediaSourceEventDispatcher eventDispatcher,
+      DrmInitData drmInitData) {
     assertExpectedPlaybackLooper(playbackLooper);
     maybeCreateMediaDrmHandler(playbackLooper);
 
@@ -504,7 +508,7 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto> implements DrmSe
       schemeDatas = getSchemeDatas(drmInitData, uuid, false);
       if (schemeDatas.isEmpty()) {
         final MissingSchemeDataException error = new MissingSchemeDataException(uuid);
-        eventDispatcher.dispatch(listener -> listener.onDrmSessionManagerError(error));
+        this.eventDispatcher.dispatch(listener -> listener.onDrmSessionManagerError(error));
         return new ErrorStateDrmSession<>(new DrmSessionException(error));
       }
     }
@@ -531,7 +535,7 @@ public class DefaultDrmSessionManager<T extends ExoMediaCrypto> implements DrmSe
       }
       sessions.add(session);
     }
-    session.acquire();
+    session.acquire(eventDispatcher);
     return session;
   }
 

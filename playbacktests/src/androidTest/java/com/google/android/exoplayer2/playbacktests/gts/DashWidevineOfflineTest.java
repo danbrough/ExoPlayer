@@ -35,6 +35,7 @@ import com.google.android.exoplayer2.testutil.ActionSchedule;
 import com.google.android.exoplayer2.testutil.HostActivity;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory;
+import com.google.android.exoplayer2.util.MediaSourceEventDispatcher;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.Util;
 import java.io.IOException;
@@ -75,8 +76,9 @@ public final class DashWidevineOfflineTest {
     String widevineLicenseUrl = DashTestData.getWidevineLicenseUrl(true, useL1Widevine);
     httpDataSourceFactory = new DefaultHttpDataSourceFactory(USER_AGENT);
     if (Util.SDK_INT >= 18) {
-      offlineLicenseHelper = OfflineLicenseHelper.newWidevineInstance(widevineLicenseUrl,
-          httpDataSourceFactory);
+      offlineLicenseHelper =
+          OfflineLicenseHelper.newWidevineInstance(
+              widevineLicenseUrl, httpDataSourceFactory, new MediaSourceEventDispatcher());
     }
   }
 
@@ -188,7 +190,7 @@ public final class DashWidevineOfflineTest {
     testRunner.setActionSchedule(schedule).run();
   }
 
-  private void downloadLicense() throws InterruptedException, DrmSessionException, IOException {
+  private void downloadLicense() throws IOException {
     DataSource dataSource = httpDataSourceFactory.createDataSource();
     DashManifest dashManifest = DashUtil.loadManifest(dataSource,
         Uri.parse(DashTestData.WIDEVINE_H264_MANIFEST));

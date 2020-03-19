@@ -28,7 +28,6 @@ import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.FormatHolder;
-import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.PlayerMessage.Target;
 import com.google.android.exoplayer2.RendererCapabilities;
 import com.google.android.exoplayer2.audio.AudioRendererEventListener.EventDispatcher;
@@ -63,6 +62,11 @@ import java.util.List;
  *   <li>Message with type {@link #MSG_SET_AUX_EFFECT_INFO} to set the auxiliary effect. The message
  *       payload should be an {@link AuxEffectInfo} instance that will configure the underlying
  *       audio track.
+ *   <li>Message with type {@link #MSG_SET_SKIP_SILENCE_ENABLED} to enable or disable skipping
+ *       silences. The message payload should be a {@link Boolean}.
+ *   <li>Message with type {@link #MSG_SET_AUDIO_SESSION_ID} to set the audio session ID. The
+ *       message payload should be a session ID {@link Integer} that will be attached to the
+ *       underlying audio track.
  * </ul>
  */
 public class MediaCodecAudioRenderer extends MediaCodecRenderer implements MediaClock {
@@ -567,13 +571,13 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
   }
 
   @Override
-  public void setPlaybackParameters(PlaybackParameters playbackParameters) {
-    audioSink.setPlaybackParameters(playbackParameters);
+  public void setPlaybackSpeed(float playbackSpeed) {
+    audioSink.setPlaybackSpeed(playbackSpeed);
   }
 
   @Override
-  public PlaybackParameters getPlaybackParameters() {
-    return audioSink.getPlaybackParameters();
+  public float getPlaybackSpeed() {
+    return audioSink.getPlaybackSpeed();
   }
 
   @Override

@@ -38,7 +38,9 @@ import com.google.android.exoplayer2.audio.AuxEffectInfo;
 import com.google.android.exoplayer2.decoder.DecoderCounters;
 import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.metadata.MetadataOutput;
+import com.google.android.exoplayer2.source.DefaultMediaSourceFactory;
 import com.google.android.exoplayer2.source.MediaSource;
+import com.google.android.exoplayer2.source.MediaSourceFactory;
 import com.google.android.exoplayer2.source.ShuffleOrder;
 import com.google.android.exoplayer2.source.TrackGroupArray;
 import com.google.android.exoplayer2.text.Cue;
@@ -89,6 +91,7 @@ public class SimpleExoPlayer extends BasePlayer
 
     private Clock clock;
     private TrackSelector trackSelector;
+    private MediaSourceFactory mediaSourceFactory;
     private LoadControl loadControl;
     private BandwidthMeter bandwidthMeter;
     private AnalyticsCollector analyticsCollector;
@@ -108,6 +111,7 @@ public class SimpleExoPlayer extends BasePlayer
      * <ul>
      *   <li>{@link RenderersFactory}: {@link DefaultRenderersFactory}
      *   <li>{@link TrackSelector}: {@link DefaultTrackSelector}
+     *   <li>{@link MediaSourceFactory}: {@link DefaultMediaSourceFactory}
      *   <li>{@link LoadControl}: {@link DefaultLoadControl}
      *   <li>{@link BandwidthMeter}: {@link DefaultBandwidthMeter#getSingletonInstance(Context)}
      *   <li>{@link Looper}: The {@link Looper} associated with the current thread, or the {@link
@@ -138,6 +142,7 @@ public class SimpleExoPlayer extends BasePlayer
           context,
           renderersFactory,
           new DefaultTrackSelector(context),
+          DefaultMediaSourceFactory.newInstance(context),
           new DefaultLoadControl(),
           DefaultBandwidthMeter.getSingletonInstance(context),
           Util.getLooper(),
@@ -157,6 +162,7 @@ public class SimpleExoPlayer extends BasePlayer
      * @param renderersFactory A factory for creating {@link Renderer Renderers} to be used by the
      *     player.
      * @param trackSelector A {@link TrackSelector}.
+     * @param mediaSourceFactory A {@link MediaSourceFactory}.
      * @param loadControl A {@link LoadControl}.
      * @param bandwidthMeter A {@link BandwidthMeter}.
      * @param looper A {@link Looper} that must be used for all calls to the player.
@@ -170,6 +176,7 @@ public class SimpleExoPlayer extends BasePlayer
         Context context,
         RenderersFactory renderersFactory,
         TrackSelector trackSelector,
+        MediaSourceFactory mediaSourceFactory,
         LoadControl loadControl,
         BandwidthMeter bandwidthMeter,
         Looper looper,
@@ -179,6 +186,7 @@ public class SimpleExoPlayer extends BasePlayer
       this.context = context;
       this.renderersFactory = renderersFactory;
       this.trackSelector = trackSelector;
+      this.mediaSourceFactory = mediaSourceFactory;
       this.loadControl = loadControl;
       this.bandwidthMeter = bandwidthMeter;
       this.looper = looper;
@@ -197,6 +205,19 @@ public class SimpleExoPlayer extends BasePlayer
     public Builder setTrackSelector(TrackSelector trackSelector) {
       Assertions.checkState(!buildCalled);
       this.trackSelector = trackSelector;
+      return this;
+    }
+
+    /**
+     * Sets the {@link MediaSourceFactory} that will be used by the player.
+     *
+     * @param mediaSourceFactory A {@link MediaSourceFactory}.
+     * @return This builder.
+     * @throws IllegalStateException If {@link #build()} has already been called.
+     */
+    public Builder setMediaSourceFactory(MediaSourceFactory mediaSourceFactory) {
+      Assertions.checkState(!buildCalled);
+      this.mediaSourceFactory = mediaSourceFactory;
       return this;
     }
 
@@ -350,6 +371,7 @@ public class SimpleExoPlayer extends BasePlayer
         builder.context,
         builder.renderersFactory,
         builder.trackSelector,
+        builder.mediaSourceFactory,
         builder.loadControl,
         builder.bandwidthMeter,
         builder.analyticsCollector,
@@ -378,6 +400,7 @@ public class SimpleExoPlayer extends BasePlayer
       Context context,
       RenderersFactory renderersFactory,
       TrackSelector trackSelector,
+      MediaSourceFactory mediaSourceFactory,
       LoadControl loadControl,
       BandwidthMeter bandwidthMeter,
       AnalyticsCollector analyticsCollector,
@@ -414,6 +437,7 @@ public class SimpleExoPlayer extends BasePlayer
         new ExoPlayerImpl(
             renderers,
             trackSelector,
+            mediaSourceFactory,
             loadControl,
             bandwidthMeter,
             analyticsCollector,
@@ -674,6 +698,9 @@ public class SimpleExoPlayer extends BasePlayer
   @Override
   public void setAudioSessionId(int audioSessionId) {
     verifyApplicationThread();
+    if (this.audioSessionId == audioSessionId) {
+      return;
+    }
     this.audioSessionId = audioSessionId;
     for (Renderer renderer : renderers) {
       if (renderer.getTrackType() == C.TRACK_TYPE_AUDIO) {
@@ -683,6 +710,9 @@ public class SimpleExoPlayer extends BasePlayer
             .setPayload(audioSessionId)
             .send();
       }
+    }
+    if (audioSessionId != C.AUDIO_SESSION_ID_UNSET) {
+      notifyAudioSessionIdSet();
     }
   }
 
@@ -853,23 +883,19 @@ public class SimpleExoPlayer extends BasePlayer
     this.priorityTaskManager = priorityTaskManager;
   }
 
-  /**
-   * Sets the {@link PlaybackParams} governing audio playback.
-   *
-   * @deprecated Use {@link #setPlaybackParameters(PlaybackParameters)}.
-   * @param params The {@link PlaybackParams}, or null to clear any previously set parameters.
-   */
+  /** @deprecated Use {@link #setPlaybackSpeed(float)} instead. */
+  @SuppressWarnings("deprecation")
   @Deprecated
   @RequiresApi(23)
   public void setPlaybackParams(@Nullable PlaybackParams params) {
-    PlaybackParameters playbackParameters;
+    float playbackSpeed;
     if (params != null) {
       params.allowDefaults();
-      playbackParameters = new PlaybackParameters(params.getSpeed());
+      playbackSpeed = params.getSpeed();
     } else {
-      playbackParameters = null;
+      playbackSpeed = 1.0f;
     }
-    setPlaybackParameters(playbackParameters);
+    setPlaybackSpeed(playbackSpeed);
   }
 
   /** Returns the video format currently being played, or null if no video is being played. */
@@ -1236,6 +1262,49 @@ public class SimpleExoPlayer extends BasePlayer
   }
 
   @Override
+  public void setMediaItems(List<MediaItem> mediaItems) {
+    verifyApplicationThread();
+    analyticsCollector.resetForNewPlaylist();
+    player.setMediaItems(mediaItems);
+  }
+
+  @Override
+  public void setMediaItems(List<MediaItem> mediaItems, boolean resetPosition) {
+    verifyApplicationThread();
+    analyticsCollector.resetForNewPlaylist();
+    player.setMediaItems(mediaItems, resetPosition);
+  }
+
+  @Override
+  public void setMediaItems(
+      List<MediaItem> mediaItems, int startWindowIndex, long startPositionMs) {
+    verifyApplicationThread();
+    analyticsCollector.resetForNewPlaylist();
+    player.setMediaItems(mediaItems, startWindowIndex, startPositionMs);
+  }
+
+  @Override
+  public void setMediaItem(MediaItem mediaItem) {
+    verifyApplicationThread();
+    analyticsCollector.resetForNewPlaylist();
+    player.setMediaItem(mediaItem);
+  }
+
+  @Override
+  public void setMediaItem(MediaItem mediaItem, boolean resetPosition) {
+    verifyApplicationThread();
+    analyticsCollector.resetForNewPlaylist();
+    player.setMediaItem(mediaItem, resetPosition);
+  }
+
+  @Override
+  public void setMediaItem(MediaItem mediaItem, long startPositionMs) {
+    verifyApplicationThread();
+    analyticsCollector.resetForNewPlaylist();
+    player.setMediaItem(mediaItem, startPositionMs);
+  }
+
+  @Override
   public void setMediaSources(List<MediaSource> mediaSources) {
     verifyApplicationThread();
     analyticsCollector.resetForNewPlaylist();
@@ -1276,6 +1345,30 @@ public class SimpleExoPlayer extends BasePlayer
     verifyApplicationThread();
     analyticsCollector.resetForNewPlaylist();
     player.setMediaSource(mediaSource, startPositionMs);
+  }
+
+  @Override
+  public void addMediaItems(List<MediaItem> mediaItems) {
+    verifyApplicationThread();
+    player.addMediaItems(mediaItems);
+  }
+
+  @Override
+  public void addMediaItems(int index, List<MediaItem> mediaItems) {
+    verifyApplicationThread();
+    player.addMediaItems(index, mediaItems);
+  }
+
+  @Override
+  public void addMediaItem(MediaItem mediaItem) {
+    verifyApplicationThread();
+    player.addMediaItem(mediaItem);
+  }
+
+  @Override
+  public void addMediaItem(int index, MediaItem mediaItem) {
+    verifyApplicationThread();
+    player.addMediaItem(index, mediaItem);
   }
 
   @Override
@@ -1354,6 +1447,18 @@ public class SimpleExoPlayer extends BasePlayer
   }
 
   @Override
+  public void setPauseAtEndOfMediaItems(boolean pauseAtEndOfMediaItems) {
+    verifyApplicationThread();
+    player.setPauseAtEndOfMediaItems(pauseAtEndOfMediaItems);
+  }
+
+  @Override
+  public boolean getPauseAtEndOfMediaItems() {
+    verifyApplicationThread();
+    return player.getPauseAtEndOfMediaItems();
+  }
+
+  @Override
   public @RepeatMode int getRepeatMode() {
     verifyApplicationThread();
     return player.getRepeatMode();
@@ -1390,24 +1495,37 @@ public class SimpleExoPlayer extends BasePlayer
     player.seekTo(windowIndex, positionMs);
   }
 
+  /**
+   * @deprecated Use {@link #setPlaybackSpeed(float)} and {@link #setSkipSilenceEnabled(boolean)}
+   *     instead.
+   */
+  @SuppressWarnings("deprecation")
+  @Deprecated
   @Override
   public void setPlaybackParameters(@Nullable PlaybackParameters playbackParameters) {
     verifyApplicationThread();
-    boolean newSkipSilenceEnabled =
-        playbackParameters != null
-            ? playbackParameters.skipSilence
-            : PlaybackParameters.DEFAULT.skipSilence;
-    if (skipSilenceEnabled != newSkipSilenceEnabled) {
-      skipSilenceEnabled = newSkipSilenceEnabled;
-      notifySkipSilenceEnabledChanged();
-    }
     player.setPlaybackParameters(playbackParameters);
   }
 
+  /** @deprecated Use {@link #getPlaybackSpeed()} and {@link #getSkipSilenceEnabled()} instead. */
+  @SuppressWarnings("deprecation")
+  @Deprecated
   @Override
   public PlaybackParameters getPlaybackParameters() {
     verifyApplicationThread();
     return player.getPlaybackParameters();
+  }
+
+  @Override
+  public void setPlaybackSpeed(float playbackSpeed) {
+    verifyApplicationThread();
+    player.setPlaybackSpeed(playbackSpeed);
+  }
+
+  @Override
+  public float getPlaybackSpeed() {
+    verifyApplicationThread();
+    return player.getPlaybackSpeed();
   }
 
   @Override
@@ -1704,6 +1822,19 @@ public class SimpleExoPlayer extends BasePlayer
     }
   }
 
+  private void notifyAudioSessionIdSet() {
+    for (AudioListener audioListener : audioListeners) {
+      // Prevent duplicate notification if a listener is both a AudioRendererEventListener and
+      // a AudioListener, as they have the same method signature.
+      if (!audioDebugListeners.contains(audioListener)) {
+        audioListener.onAudioSessionId(audioSessionId);
+      }
+    }
+    for (AudioRendererEventListener audioDebugListener : audioDebugListeners) {
+      audioDebugListener.onAudioSessionId(audioSessionId);
+    }
+  }
+
   @SuppressWarnings("SuspiciousMethodCalls")
   private void notifySkipSilenceEnabledChanged() {
     for (AudioListener listener : audioListeners) {
@@ -1874,16 +2005,7 @@ public class SimpleExoPlayer extends BasePlayer
         return;
       }
       audioSessionId = sessionId;
-      for (AudioListener audioListener : audioListeners) {
-        // Prevent duplicate notification if a listener is both a AudioRendererEventListener and
-        // a AudioListener, as they have the same method signature.
-        if (!audioDebugListeners.contains(audioListener)) {
-          audioListener.onAudioSessionId(sessionId);
-        }
-      }
-      for (AudioRendererEventListener audioDebugListener : audioDebugListeners) {
-        audioDebugListener.onAudioSessionId(sessionId);
-      }
+      notifyAudioSessionIdSet();
     }
 
     @Override

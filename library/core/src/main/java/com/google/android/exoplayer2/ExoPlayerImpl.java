@@ -25,6 +25,7 @@ import com.google.android.exoplayer2.PlayerMessage.Target;
 import com.google.android.exoplayer2.analytics.AnalyticsCollector;
 import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.source.MediaSource.MediaPeriodId;
+import com.google.android.exoplayer2.source.MediaSourceFactory;
 import com.google.android.exoplayer2.source.ShuffleOrder;
 import com.google.android.exoplayer2.source.TrackGroupArray;
 import com.google.android.exoplayer2.trackselection.TrackSelection;
@@ -69,6 +70,7 @@ import java.util.concurrent.TimeoutException;
   private final ArrayDeque<Runnable> pendingListenerNotifications;
   private final List<Playlist.MediaSourceHolder> mediaSourceHolders;
   private final boolean useLazyPreparation;
+  private final MediaSourceFactory mediaSourceFactory;
 
   @RepeatMode private int repeatMode;
   private boolean shuffleModeEnabled;
@@ -78,10 +80,11 @@ import java.util.concurrent.TimeoutException;
   @DiscontinuityReason private int pendingDiscontinuityReason;
   @PlayWhenReadyChangeReason private int pendingPlayWhenReadyChangeReason;
   private boolean foregroundMode;
-  private int pendingSetPlaybackParametersAcks;
-  private PlaybackParameters playbackParameters;
+  private int pendingSetPlaybackSpeedAcks;
+  private float playbackSpeed;
   private SeekParameters seekParameters;
   private ShuffleOrder shuffleOrder;
+  private boolean pauseAtEndOfMediaItems;
 
   // Playback information when there is no pending seek/set source operation.
   private PlaybackInfo playbackInfo;
@@ -94,15 +97,16 @@ import java.util.concurrent.TimeoutException;
   /**
    * Constructs an instance. Must be called from a thread that has an associated {@link Looper}.
    *
-   * @param renderers The {@link Renderer}s that will be used by the instance.
-   * @param trackSelector The {@link TrackSelector} that will be used by the instance.
-   * @param loadControl The {@link LoadControl} that will be used by the instance.
-   * @param bandwidthMeter The {@link BandwidthMeter} that will be used by the instance.
-   * @param analyticsCollector The {@link AnalyticsCollector} that will be used by the instance.
+   * @param renderers The {@link Renderer}s.
+   * @param trackSelector The {@link TrackSelector}.
+   * @param mediaSourceFactory The {@link MediaSourceFactory}.
+   * @param loadControl The {@link LoadControl}.
+   * @param bandwidthMeter The {@link BandwidthMeter}.
+   * @param analyticsCollector The {@link AnalyticsCollector}.
    * @param useLazyPreparation Whether playlist items are prepared lazily. If false, all manifest
    *     loads and other initial preparation steps happen immediately. If true, these initial
    *     preparations are triggered only when the player starts buffering the media.
-   * @param clock The {@link Clock} that will be used by the instance.
+   * @param clock The {@link Clock}.
    * @param looper The {@link Looper} which must be used for all calls to the player and which is
    *     used to call listeners on.
    */
@@ -110,6 +114,7 @@ import java.util.concurrent.TimeoutException;
   public ExoPlayerImpl(
       Renderer[] renderers,
       TrackSelector trackSelector,
+      MediaSourceFactory mediaSourceFactory,
       LoadControl loadControl,
       BandwidthMeter bandwidthMeter,
       @Nullable AnalyticsCollector analyticsCollector,
@@ -121,6 +126,7 @@ import java.util.concurrent.TimeoutException;
     Assertions.checkState(renderers.length > 0);
     this.renderers = Assertions.checkNotNull(renderers);
     this.trackSelector = Assertions.checkNotNull(trackSelector);
+    this.mediaSourceFactory = mediaSourceFactory;
     this.useLazyPreparation = useLazyPreparation;
     repeatMode = Player.REPEAT_MODE_OFF;
     listeners = new CopyOnWriteArrayList<>();
@@ -132,7 +138,7 @@ import java.util.concurrent.TimeoutException;
             new TrackSelection[renderers.length],
             null);
     period = new Timeline.Period();
-    playbackParameters = PlaybackParameters.DEFAULT;
+    playbackSpeed = Player.DEFAULT_PLAYBACK_SPEED;
     seekParameters = SeekParameters.DEFAULT;
     maskingWindowIndex = C.INDEX_UNSET;
     eventHandler =
@@ -174,6 +180,16 @@ import java.util.concurrent.TimeoutException;
    */
   public void experimental_setReleaseTimeoutMs(long timeoutMs) {
     internalPlayer.experimental_setReleaseTimeoutMs(timeoutMs);
+  }
+
+  /**
+   * Configures the player to throw when it detects it's stuck buffering.
+   *
+   * <p>This method is experimental, and will be renamed or removed in a future release. It should
+   * only be called before the player is used.
+   */
+  public void experimental_throwWhenStuckBuffering() {
+    internalPlayer.experimental_throwWhenStuckBuffering();
   }
 
   @Override
@@ -306,6 +322,37 @@ import java.util.concurrent.TimeoutException;
   }
 
   @Override
+  public void setMediaItem(MediaItem mediaItem) {
+    setMediaItems(Collections.singletonList(mediaItem));
+  }
+
+  @Override
+  public void setMediaItem(MediaItem mediaItem, long startPositionMs) {
+    setMediaItems(Collections.singletonList(mediaItem), /* startWindowIndex= */ 0, startPositionMs);
+  }
+
+  @Override
+  public void setMediaItem(MediaItem mediaItem, boolean resetPosition) {
+    setMediaItems(Collections.singletonList(mediaItem), resetPosition);
+  }
+
+  @Override
+  public void setMediaItems(List<MediaItem> mediaItems) {
+    setMediaItems(mediaItems, /* resetPosition= */ true);
+  }
+
+  @Override
+  public void setMediaItems(List<MediaItem> mediaItems, boolean resetPosition) {
+    setMediaSources(createMediaSources(mediaItems), resetPosition);
+  }
+
+  @Override
+  public void setMediaItems(
+      List<MediaItem> mediaItems, int startWindowIndex, long startPositionMs) {
+    setMediaSources(createMediaSources(mediaItems), startWindowIndex, startPositionMs);
+  }
+
+  @Override
   public void setMediaSource(MediaSource mediaSource) {
     setMediaSources(Collections.singletonList(mediaSource));
   }
@@ -328,7 +375,7 @@ import java.util.concurrent.TimeoutException;
 
   @Override
   public void setMediaSources(List<MediaSource> mediaSources, boolean resetPosition) {
-    setMediaItemsInternal(
+    setMediaSourcesInternal(
         mediaSources,
         /* startWindowIndex= */ C.INDEX_UNSET,
         /* startPositionMs= */ C.TIME_UNSET,
@@ -338,8 +385,28 @@ import java.util.concurrent.TimeoutException;
   @Override
   public void setMediaSources(
       List<MediaSource> mediaSources, int startWindowIndex, long startPositionMs) {
-    setMediaItemsInternal(
+    setMediaSourcesInternal(
         mediaSources, startWindowIndex, startPositionMs, /* resetToDefaultPosition= */ false);
+  }
+
+  @Override
+  public void addMediaItem(int index, MediaItem mediaItem) {
+    addMediaItems(index, Collections.singletonList(mediaItem));
+  }
+
+  @Override
+  public void addMediaItem(MediaItem mediaItem) {
+    addMediaItems(Collections.singletonList(mediaItem));
+  }
+
+  @Override
+  public void addMediaItems(List<MediaItem> mediaItems) {
+    addMediaItems(/* index= */ mediaSourceHolders.size(), mediaItems);
+  }
+
+  @Override
+  public void addMediaItems(int index, List<MediaItem> mediaItems) {
+    addMediaSources(index, createMediaSources(mediaItems));
   }
 
   @Override
@@ -434,6 +501,20 @@ import java.util.concurrent.TimeoutException;
         playWhenReady,
         PLAYBACK_SUPPRESSION_REASON_NONE,
         PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST);
+  }
+
+  @Override
+  public void setPauseAtEndOfMediaItems(boolean pauseAtEndOfMediaItems) {
+    if (this.pauseAtEndOfMediaItems == pauseAtEndOfMediaItems) {
+      return;
+    }
+    this.pauseAtEndOfMediaItems = pauseAtEndOfMediaItems;
+    internalPlayer.setPauseAtEndOfWindow(pauseAtEndOfMediaItems);
+  }
+
+  @Override
+  public boolean getPauseAtEndOfMediaItems() {
+    return pauseAtEndOfMediaItems;
   }
 
   @SuppressWarnings("deprecation")
@@ -535,24 +616,44 @@ import java.util.concurrent.TimeoutException;
     notifyListeners(listener -> listener.onPositionDiscontinuity(DISCONTINUITY_REASON_SEEK));
   }
 
+  /** @deprecated Use {@link #setPlaybackSpeed(float)} instead. */
+  @SuppressWarnings("deprecation")
+  @Deprecated
   @Override
   public void setPlaybackParameters(@Nullable PlaybackParameters playbackParameters) {
-    if (playbackParameters == null) {
-      playbackParameters = PlaybackParameters.DEFAULT;
-    }
-    if (this.playbackParameters.equals(playbackParameters)) {
+    setPlaybackSpeed(
+        playbackParameters != null ? playbackParameters.speed : Player.DEFAULT_PLAYBACK_SPEED);
+  }
+
+  /** @deprecated Use {@link #getPlaybackSpeed()} instead. */
+  @SuppressWarnings("deprecation")
+  @Deprecated
+  @Override
+  public PlaybackParameters getPlaybackParameters() {
+    return new PlaybackParameters(playbackSpeed);
+  }
+
+  @SuppressWarnings("deprecation")
+  @Override
+  public void setPlaybackSpeed(float playbackSpeed) {
+    Assertions.checkState(playbackSpeed > 0);
+    if (this.playbackSpeed == playbackSpeed) {
       return;
     }
-    pendingSetPlaybackParametersAcks++;
-    this.playbackParameters = playbackParameters;
-    internalPlayer.setPlaybackParameters(playbackParameters);
-    PlaybackParameters playbackParametersToNotify = playbackParameters;
-    notifyListeners(listener -> listener.onPlaybackParametersChanged(playbackParametersToNotify));
+    pendingSetPlaybackSpeedAcks++;
+    this.playbackSpeed = playbackSpeed;
+    PlaybackParameters playbackParameters = new PlaybackParameters(playbackSpeed);
+    internalPlayer.setPlaybackSpeed(playbackSpeed);
+    notifyListeners(
+        listener -> {
+          listener.onPlaybackParametersChanged(playbackParameters);
+          listener.onPlaybackSpeedChanged(playbackSpeed);
+        });
   }
 
   @Override
-  public PlaybackParameters getPlaybackParameters() {
-    return playbackParameters;
+  public float getPlaybackSpeed() {
+    return playbackSpeed;
   }
 
   @Override
@@ -764,8 +865,8 @@ import java.util.concurrent.TimeoutException;
       case ExoPlayerImplInternal.MSG_PLAYBACK_INFO_CHANGED:
         handlePlaybackInfo((ExoPlayerImplInternal.PlaybackInfoUpdate) msg.obj);
         break;
-      case ExoPlayerImplInternal.MSG_PLAYBACK_PARAMETERS_CHANGED:
-        handlePlaybackParameters((PlaybackParameters) msg.obj, /* operationAck= */ msg.arg1 != 0);
+      case ExoPlayerImplInternal.MSG_PLAYBACK_SPEED_CHANGED:
+        handlePlaybackSpeed((Float) msg.obj, /* operationAck= */ msg.arg1 != 0);
         break;
       default:
         throw new IllegalStateException();
@@ -781,15 +882,27 @@ import java.util.concurrent.TimeoutException;
     }
   }
 
-  private void handlePlaybackParameters(
-      PlaybackParameters playbackParameters, boolean operationAck) {
-    if (operationAck) {
-      pendingSetPlaybackParametersAcks--;
+  private List<MediaSource> createMediaSources(List<MediaItem> mediaItems) {
+    List<MediaSource> mediaSources = new ArrayList<>();
+    for (int i = 0; i < mediaItems.size(); i++) {
+      mediaSources.add(mediaSourceFactory.createMediaSource(mediaItems.get(i)));
     }
-    if (pendingSetPlaybackParametersAcks == 0) {
-      if (!this.playbackParameters.equals(playbackParameters)) {
-        this.playbackParameters = playbackParameters;
-        notifyListeners(listener -> listener.onPlaybackParametersChanged(playbackParameters));
+    return mediaSources;
+  }
+
+  @SuppressWarnings("deprecation")
+  private void handlePlaybackSpeed(float playbackSpeed, boolean operationAck) {
+    if (operationAck) {
+      pendingSetPlaybackSpeedAcks--;
+    }
+    if (pendingSetPlaybackSpeedAcks == 0) {
+      if (this.playbackSpeed != playbackSpeed) {
+        this.playbackSpeed = playbackSpeed;
+        notifyListeners(
+            listener -> {
+              listener.onPlaybackParametersChanged(new PlaybackParameters(playbackSpeed));
+              listener.onPlaybackSpeedChanged(playbackSpeed);
+            });
       }
     }
   }
@@ -884,7 +997,7 @@ import java.util.concurrent.TimeoutException;
   }
 
   @SuppressWarnings("deprecation")
-  private void setMediaItemsInternal(
+  private void setMediaSourcesInternal(
       List<MediaSource> mediaItems,
       int startWindowIndex,
       long startPositionMs,

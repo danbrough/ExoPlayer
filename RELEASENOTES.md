@@ -25,6 +25,9 @@
         consistency.
     *   Deprecate and rename `onLoadingChanged` to `onIsLoadingChanged` for
         consistency.
+    *   Add `ExoPlayer.setPauseAtEndOfMediaItems` to let the player pause at the
+        end of each media item
+        ([#5660](https://github.com/google/ExoPlayer/issues/5660)).
     *   Make `MediaSourceEventListener.LoadEventInfo` and
         `MediaSourceEventListener.MediaLoadData` top-level classes.
     *   Rename `MediaCodecRenderer.onOutputFormatChanged` to
@@ -50,6 +53,9 @@
     *   Add option to `MergingMediaSource` to adjust the time offsets between
         the merged sources
         ([#6103](https://github.com/google/ExoPlayer/issues/6103)).
+    *   `SimpleDecoderVideoRenderer` and `SimpleDecoderAudioRenderer` renamed to
+        `DecoderVideoRenderer` and `DecoderAudioRenderer` respectively, and
+        generalized to work with `Decoder` rather than `SimpleDecoder`.
 *   Text:
     *   Parse `<ruby>` and `<rt>` tags in WebVTT subtitles (rendering is coming
         later).
@@ -74,6 +80,9 @@
     *   Remove `DrmSessionManager` references from all renderers.
         `DrmSessionManager` must be injected into the MediaSources using the
         MediaSources factories.
+    *   Add option to inject a custom `DefaultDrmSessionManager` into
+        `OfflineLicenseHelper`
+        ([#7078](https://github.com/google/ExoPlayer/issues/7078)).
 *   Downloads: Merge downloads in `SegmentDownloader` to improve overall
     download speed ([#5978](https://github.com/google/ExoPlayer/issues/5978)).
 *   DASH:
@@ -94,6 +103,9 @@
     *   Add `showScrubber` and `hideScrubber` methods to DefaultTimeBar.
     *   Move logic of prev, next, fast forward and rewind to ControlDispatcher
         ([#6926](https://github.com/google/ExoPlayer/issues/6926)).
+    *   Add an option to set whether to use the orientation sensor for rotation
+        in spherical playbacks
+        ([#6761](https://github.com/google/ExoPlayer/issues/6761)).
 *   Demo apps: Add
     [GL demo app](https://github.com/google/ExoPlayer/tree/dev-v2/demos/gl) to
     show how to render video to a `GLSurfaceView` while applying a GL shader.
@@ -259,6 +271,9 @@
     ([#5749](https://github.com/google/ExoPlayer/issues/5749)).
   * Add option to set preferred text role flags using
     `DefaultTrackSelector.ParametersBuilder.setPreferredTextRoleFlags`.
+* LoadControl:
+  * Default `prioritizeTimeOverSizeThresholds` to false to prevent OOM errors
+    ([#6647](https://github.com/google/ExoPlayer/issues/6647)).
 * Android 10:
   * Set `compileSdkVersion` to 29 to enable use of Android 10 APIs.
   * Expose new `isHardwareAccelerated`, `isSoftwareOnly` and `isVendor` flags

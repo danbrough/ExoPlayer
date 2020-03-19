@@ -149,9 +149,12 @@ public class EventLogger implements AnalyticsListener {
     logd(
         eventTime,
         "playbackParameters",
-        Util.formatInvariant(
-            "speed=%.2f, skipSilence=%s",
-            playbackParameters.speed, playbackParameters.skipSilence));
+        Util.formatInvariant("speed=%.2f", playbackParameters.speed));
+  }
+
+  @Override
+  public void onPlaybackSpeedChanged(EventTime eventTime, float playbackSpeed) {
+    logd(eventTime, "playbackSpeed", Float.toString(playbackSpeed));
   }
 
   @Override
@@ -662,6 +665,8 @@ public class EventLogger implements AnalyticsListener {
         return "REMOTE";
       case Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST:
         return "USER_REQUEST";
+      case Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM:
+        return "END_OF_MEDIA_ITEM";
       default:
         return "?";
     }

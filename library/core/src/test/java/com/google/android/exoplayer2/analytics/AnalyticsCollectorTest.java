@@ -26,7 +26,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.Format;
-import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.Renderer;
 import com.google.android.exoplayer2.RenderersFactory;
@@ -76,7 +75,7 @@ public final class AnalyticsCollectorTest {
   private static final int EVENT_POSITION_DISCONTINUITY = 2;
   private static final int EVENT_SEEK_STARTED = 3;
   private static final int EVENT_SEEK_PROCESSED = 4;
-  private static final int EVENT_PLAYBACK_PARAMETERS_CHANGED = 5;
+  private static final int EVENT_PLAYBACK_SPEED_CHANGED = 5;
   private static final int EVENT_REPEAT_MODE_CHANGED = 6;
   private static final int EVENT_SHUFFLE_MODE_CHANGED = 7;
   private static final int EVENT_LOADING_CHANGED = 8;
@@ -263,8 +262,6 @@ public final class AnalyticsCollectorTest {
             WINDOW_0 /* setPlayWhenReady */,
             WINDOW_0 /* BUFFERING */,
             period0 /* READY */,
-            period1 /* BUFFERING */,
-            period1 /* READY */,
             period1 /* ENDED */);
     assertThat(listener.getEvents(EVENT_TIMELINE_CHANGED))
         .containsExactly(WINDOW_0 /* PLAYLIST_CHANGED */, period0 /* SOURCE_UPDATE */);
@@ -308,12 +305,19 @@ public final class AnalyticsCollectorTest {
   public void seekToOtherPeriod() throws Exception {
     MediaSource mediaSource =
         new ConcatenatingMediaSource(
-            new FakeMediaSource(SINGLE_PERIOD_TIMELINE, ExoPlayerTestRunner.Builder.VIDEO_FORMAT),
+            new FakeMediaSource(
+                SINGLE_PERIOD_TIMELINE,
+                ExoPlayerTestRunner.Builder.VIDEO_FORMAT,
+                ExoPlayerTestRunner.Builder.AUDIO_FORMAT),
             new FakeMediaSource(SINGLE_PERIOD_TIMELINE, ExoPlayerTestRunner.Builder.AUDIO_FORMAT));
     ActionSchedule actionSchedule =
         new ActionSchedule.Builder(TAG)
             .pause()
-            .waitForPlaybackState(Player.STATE_READY)
+            // Wait until second period has fully loaded to assert loading events without flakiness.
+            .waitForIsLoading(true)
+            .waitForIsLoading(false)
+            .waitForIsLoading(true)
+            .waitForIsLoading(false)
             .seek(/* windowIndex= */ 1, /* positionMs= */ 0)
             .waitForSeekProcessed()
             .play()
@@ -353,18 +357,19 @@ public final class AnalyticsCollectorTest {
             WINDOW_1 /* manifest */,
             period1 /* media */);
     assertThat(listener.getEvents(EVENT_DOWNSTREAM_FORMAT_CHANGED))
-        .containsExactly(period0 /* video */, period1 /* audio */);
+        .containsExactly(period0 /* video */, period0 /* audio */, period1 /* audio */);
     assertThat(listener.getEvents(EVENT_MEDIA_PERIOD_CREATED)).containsExactly(period0, period1);
     assertThat(listener.getEvents(EVENT_MEDIA_PERIOD_RELEASED)).containsExactly(period0);
     assertThat(listener.getEvents(EVENT_READING_STARTED)).containsExactly(period0, period1);
     assertThat(listener.getEvents(EVENT_DECODER_ENABLED))
-        .containsExactly(period0 /* video */, period1 /* audio */);
+        .containsExactly(period0 /* video */, period0 /* audio */, period1 /* audio */);
     assertThat(listener.getEvents(EVENT_DECODER_INIT))
-        .containsExactly(period0 /* video */, period1 /* audio */);
+        .containsExactly(period0 /* video */, period0 /* audio */, period1 /* audio */);
     assertThat(listener.getEvents(EVENT_DECODER_FORMAT_CHANGED))
-        .containsExactly(period0 /* video */, period1 /* audio */);
-    assertThat(listener.getEvents(EVENT_DECODER_DISABLED)).containsExactly(period0);
-    assertThat(listener.getEvents(EVENT_AUDIO_SESSION_ID)).containsExactly(period1);
+        .containsExactly(period0 /* video */, period0 /* audio */, period1 /* audio */);
+    assertThat(listener.getEvents(EVENT_DECODER_DISABLED))
+        .containsExactly(period0 /* video */, period0 /* audio */);
+    assertThat(listener.getEvents(EVENT_AUDIO_SESSION_ID)).containsExactly(period0, period1);
     assertThat(listener.getEvents(EVENT_VIDEO_SIZE_CHANGED)).containsExactly(period0);
     assertThat(listener.getEvents(EVENT_RENDERED_FIRST_FRAME)).containsExactly(period0);
     listener.assertNoMoreEvents();
@@ -403,8 +408,6 @@ public final class AnalyticsCollectorTest {
             period0 /* BUFFERING */,
             period0 /* READY */,
             period0 /* setPlayWhenReady=true */,
-            period1Seq2 /* BUFFERING */,
-            period1Seq2 /* READY */,
             period1Seq2 /* ENDED */);
     assertThat(listener.getEvents(EVENT_TIMELINE_CHANGED))
         .containsExactly(WINDOW_0 /* PLAYLIST_CHANGED */, period0 /* SOURCE_UPDATE */);
@@ -430,7 +433,7 @@ public final class AnalyticsCollectorTest {
             period1Seq1 /* media */,
             period1Seq2 /* media */);
     assertThat(listener.getEvents(EVENT_DOWNSTREAM_FORMAT_CHANGED))
-        .containsExactly(period0, period1Seq1, period1Seq2, period1Seq2);
+        .containsExactly(period0, period1Seq1, period1Seq1, period1Seq2, period1Seq2);
     assertThat(listener.getEvents(EVENT_MEDIA_PERIOD_CREATED))
         .containsExactly(period0, period1Seq1, period1Seq2);
     assertThat(listener.getEvents(EVENT_MEDIA_PERIOD_RELEASED))
@@ -438,21 +441,22 @@ public final class AnalyticsCollectorTest {
     assertThat(listener.getEvents(EVENT_READING_STARTED))
         .containsExactly(period0, period1Seq1, period1Seq2);
     assertThat(listener.getEvents(EVENT_DECODER_ENABLED))
-        .containsExactly(period0, period0, period1Seq2);
+        .containsExactly(period0, period1, period0, period1Seq2);
     assertThat(listener.getEvents(EVENT_DECODER_INIT))
-        .containsExactly(period0, period1Seq1, period1Seq2, period1Seq2);
+        .containsExactly(period0, period1Seq1, period1Seq1, period1Seq2, period1Seq2);
     assertThat(listener.getEvents(EVENT_DECODER_FORMAT_CHANGED))
-        .containsExactly(period0, period1Seq1, period1Seq2, period1Seq2);
-    assertThat(listener.getEvents(EVENT_DECODER_DISABLED)).containsExactly(period0);
-    assertThat(listener.getEvents(EVENT_AUDIO_SESSION_ID)).containsExactly(period1Seq2);
+        .containsExactly(period0, period1Seq1, period1Seq1, period1Seq2, period1Seq2);
+    assertThat(listener.getEvents(EVENT_DECODER_DISABLED)).containsExactly(period0, period0);
+    assertThat(listener.getEvents(EVENT_AUDIO_SESSION_ID))
+        .containsExactly(period1Seq1, period1Seq2);
     assertThat(listener.getEvents(EVENT_DROPPED_VIDEO_FRAMES))
-        .containsExactly(period0, period1Seq2, period1Seq2);
+        .containsExactly(period0, period1Seq2);
     assertThat(listener.getEvents(EVENT_VIDEO_SIZE_CHANGED))
         .containsExactly(period0, period1Seq1, period0, period1Seq2);
     assertThat(listener.getEvents(EVENT_RENDERED_FIRST_FRAME))
         .containsExactly(period0, period1Seq1, period0, period1Seq2);
     assertThat(listener.getEvents(EVENT_VIDEO_FRAME_PROCESSING_OFFSET))
-        .containsExactly(period0, period1Seq2, period1Seq2);
+        .containsExactly(period0, period1Seq2);
     listener.assertNoMoreEvents();
   }
 
@@ -750,11 +754,13 @@ public final class AnalyticsCollectorTest {
         .containsExactly(period0Seq0, period1Seq1);
     assertThat(listener.getEvents(EVENT_MEDIA_PERIOD_RELEASED)).containsExactly(period0Seq0);
     assertThat(listener.getEvents(EVENT_READING_STARTED)).containsExactly(period0Seq0, period0Seq1);
-    assertThat(listener.getEvents(EVENT_DECODER_ENABLED)).containsExactly(period0Seq0, period0Seq1);
+    assertThat(listener.getEvents(EVENT_DECODER_ENABLED))
+        .containsExactly(period0Seq0, period0Seq1, period0Seq1);
     assertThat(listener.getEvents(EVENT_DECODER_INIT)).containsExactly(period0Seq0, period0Seq1);
     assertThat(listener.getEvents(EVENT_DECODER_FORMAT_CHANGED))
         .containsExactly(period0Seq0, period0Seq1);
-    assertThat(listener.getEvents(EVENT_DECODER_DISABLED)).containsExactly(period0Seq0);
+    assertThat(listener.getEvents(EVENT_DECODER_DISABLED))
+        .containsExactly(period0Seq0, period0Seq0);
     assertThat(listener.getEvents(EVENT_DROPPED_VIDEO_FRAMES)).containsExactly(period0Seq1);
     assertThat(listener.getEvents(EVENT_VIDEO_SIZE_CHANGED))
         .containsExactly(period0Seq0, period0Seq1);
@@ -1244,7 +1250,7 @@ public final class AnalyticsCollectorTest {
     private boolean renderedFirstFrameAfterEnable;
 
     public FakeVideoRenderer(Handler handler, VideoRendererEventListener eventListener) {
-      super(ExoPlayerTestRunner.Builder.VIDEO_FORMAT);
+      super(C.TRACK_TYPE_VIDEO);
       eventDispatcher = new VideoRendererEventListener.EventDispatcher(handler, eventListener);
       decoderCounters = new DecoderCounters();
     }
@@ -1323,7 +1329,7 @@ public final class AnalyticsCollectorTest {
     private boolean notifiedAudioSessionId;
 
     public FakeAudioRenderer(Handler handler, AudioRendererEventListener eventListener) {
-      super(ExoPlayerTestRunner.Builder.AUDIO_FORMAT);
+      super(C.TRACK_TYPE_AUDIO);
       eventDispatcher = new AudioRendererEventListener.EventDispatcher(handler, eventListener);
       decoderCounters = new DecoderCounters();
     }
@@ -1464,10 +1470,10 @@ public final class AnalyticsCollectorTest {
       reportedEvents.add(new ReportedEvent(EVENT_SEEK_PROCESSED, eventTime));
     }
 
+    @SuppressWarnings("deprecation")
     @Override
-    public void onPlaybackParametersChanged(
-        EventTime eventTime, PlaybackParameters playbackParameters) {
-      reportedEvents.add(new ReportedEvent(EVENT_PLAYBACK_PARAMETERS_CHANGED, eventTime));
+    public void onPlaybackSpeedChanged(EventTime eventTime, float playbackSpeed) {
+      reportedEvents.add(new ReportedEvent(EVENT_PLAYBACK_SPEED_CHANGED, eventTime));
     }
 
     @Override
@@ -1664,6 +1670,16 @@ public final class AnalyticsCollectorTest {
         this.eventType = eventType;
         this.eventWindowAndPeriodId =
             new EventWindowAndPeriodId(eventTime.windowIndex, eventTime.mediaPeriodId);
+      }
+
+      @Override
+      public String toString() {
+        return "ReportedEvent{"
+            + "type="
+            + eventType
+            + ", windowAndPeriodId="
+            + eventWindowAndPeriodId
+            + '}';
       }
     }
   }

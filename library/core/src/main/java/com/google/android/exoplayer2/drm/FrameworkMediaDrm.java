@@ -47,7 +47,7 @@ import java.util.UUID;
 /** An {@link ExoMediaDrm} implementation that wraps the framework {@link MediaDrm}. */
 @TargetApi(23)
 @RequiresApi(18)
-public final class FrameworkMediaDrm implements ExoMediaDrm<FrameworkMediaCrypto> {
+public final class FrameworkMediaDrm implements ExoMediaDrm {
 
   private static final String TAG = "FrameworkMediaDrm";
 
@@ -56,13 +56,13 @@ public final class FrameworkMediaDrm implements ExoMediaDrm<FrameworkMediaCrypto
    * UUID. Returns a {@link DummyExoMediaDrm} if the protection scheme identified by the given UUID
    * is not supported by the device.
    */
-  public static final Provider<FrameworkMediaCrypto> DEFAULT_PROVIDER =
+  public static final Provider DEFAULT_PROVIDER =
       uuid -> {
         try {
           return newInstance(uuid);
         } catch (UnsupportedDrmException e) {
           Log.e(TAG, "Failed to instantiate a FrameworkMediaDrm for uuid: " + uuid + ".");
-          return new DummyExoMediaDrm<>();
+          return new DummyExoMediaDrm();
         }
       };
 
@@ -106,8 +106,7 @@ public final class FrameworkMediaDrm implements ExoMediaDrm<FrameworkMediaCrypto
   }
 
   @Override
-  public void setOnEventListener(
-      ExoMediaDrm.OnEventListener<? super FrameworkMediaCrypto> listener) {
+  public void setOnEventListener(@Nullable ExoMediaDrm.OnEventListener listener) {
     mediaDrm.setOnEventListener(
         listener == null
             ? null
@@ -117,7 +116,7 @@ public final class FrameworkMediaDrm implements ExoMediaDrm<FrameworkMediaCrypto
 
   @Override
   public void setOnKeyStatusChangeListener(
-      ExoMediaDrm.OnKeyStatusChangeListener<? super FrameworkMediaCrypto> listener) {
+      @Nullable ExoMediaDrm.OnKeyStatusChangeListener listener) {
     if (Util.SDK_INT < 23) {
       throw new UnsupportedOperationException();
     }
@@ -137,8 +136,7 @@ public final class FrameworkMediaDrm implements ExoMediaDrm<FrameworkMediaCrypto
   }
 
   @Override
-  public void setOnExpirationUpdateListener(
-      OnExpirationUpdateListener<? super FrameworkMediaCrypto> listener) {
+  public void setOnExpirationUpdateListener(@Nullable OnExpirationUpdateListener listener) {
     if (Util.SDK_INT < 23) {
       throw new UnsupportedOperationException();
     }

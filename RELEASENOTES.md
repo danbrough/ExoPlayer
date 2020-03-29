@@ -66,6 +66,9 @@
         floating point audio without adjustment, pass `enableFloatOutput=true`
         to the `DefaultAudioSink` constructor
         ([#7134](https://github.com/google/ExoPlayer/issues/7134)).
+    *   Add media item based playlist API to Player.
+    *   Workaround issue that could cause slower than realtime playback of AAC
+        on Android 10 ([#6671](https://github.com/google/ExoPlayer/issues/6671).
 *   Text:
     *   Parse `<ruby>` and `<rt>` tags in WebVTT subtitles (rendering is coming
         later).
@@ -85,7 +88,7 @@
         ([#6885](https://github.com/google/ExoPlayer/issues/6885)).
     *   Parse `tts:ruby` and `tts:rubyPosition` properties in TTML subtitles
         (rendering is coming later).
-    *   Allow missing hours in SubRip (.srt) timecodes
+    *   Allow missing hours & milliseconds in SubRip (.srt) timecodes
         ([#7122](https://github.com/google/ExoPlayer/issues/7122)).
 *   DRM:
     *   Add support for attaching DRM sessions to clear content in the demo app.
@@ -129,6 +132,10 @@
     ([#6922](https://github.com/google/ExoPlayer/pull/6922)).
 *   The demo app startup selected item is the last played one.
 *   Add support for x86_64 for the ffmpeg extension.
+*   Cast extension: Implement playlist API and deprecate the old queue
+    manipulation API.
+*   Opus extension: Fix parsing of negative gain values
+    ([#7046](https://github.com/google/ExoPlayer/issues/7046)).
 
 ### 2.11.3 (2020-02-19) ###
 

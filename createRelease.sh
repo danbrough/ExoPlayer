@@ -9,7 +9,7 @@ VERSION=$(( $VERSION + 1 ))
 echo VERSION $VERSION
 echo $VERSION > .version
 
-VERSION_NAME=`printf '2.11.3-dan%02d'  $VERSION`
+VERSION_NAME=`printf '2.11.4-dan%02d'  $VERSION`
 echo VERSION_NAME $VERSION_NAME
 
 git commit -am "$VERSION_NAME"

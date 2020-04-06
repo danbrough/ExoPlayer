@@ -3,6 +3,7 @@
 ### dev-v2 (not yet released) ###
 
 *   Core library:
+    *   Add playbackPositionUs parameter to 'LoadControl.shouldContinueLoading'.
     *   The `DefaultLoadControl` default minimum buffer is set to 50 seconds,
         equal to the default maximum buffer. `DefaultLoadControl` applies the
         same behavior for audio and video.
@@ -63,6 +64,7 @@
     *   Add media item based playlist API to Player.
     *   Update `CachedContentIndex` to use `SecureRandom` for generating the
         initialization vector used to encrypt the cache contents.
+    *   Remove deprecated members in `DefaultTrackSelector`.
 *   Text:
     *   Parse `<ruby>` and `<rt>` tags in WebVTT subtitles (rendering is coming
         later).

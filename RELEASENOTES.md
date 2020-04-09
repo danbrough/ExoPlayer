@@ -63,6 +63,8 @@
     *   Update `CachedContentIndex` to use `SecureRandom` for generating the
         initialization vector used to encrypt the cache contents.
     *   Remove deprecated members in `DefaultTrackSelector`.
+    *   Add `Player.DeviceComponent` and implement it for `SimpleExoPlayer` so
+        that the device volume can be controlled by player.
 *   Text:
     *   Parse `<ruby>` and `<rt>` tags in WebVTT subtitles (rendering is coming
         later).
@@ -98,6 +100,8 @@
 *   MP4: Store the Android capture frame rate only in `Format.metadata`.
     `Format.frameRate` now stores the calculated frame rate.
 *   Testing
+    *   Add `TestExoPlayer`, a utility class with APIs to create
+        `SimpleExoPlayer` instances with fake components for testing.
     *   Upgrade Truth dependency from 0.44 to 1.0.
     *   Upgrade to JUnit 4.13-rc-2.
 *   UI
@@ -109,6 +113,9 @@
 *   Cast extension: Implement playlist API and deprecate the old queue
     manipulation API.
 *   Demo app: Retain previous position in list of samples.
+*   Change the order of extractors for sniffing to reduce start-up latency in
+    `DefaultExtractorsFactory` and `DefaultHlsExtractorsFactory`
+    ([#6410](https://github.com/google/ExoPlayer/issues/6410)).
 
 ### 2.11.4 (2020-04-08)
 
@@ -161,6 +168,10 @@
 *   FFmpeg extension: Add support for `x86_64` architecture.
 *   Opus extension: Fix parsing of negative gain values
     ([#7046](https://github.com/google/ExoPlayer/issues/7046)).
+*   Cast extension: Upgrade `play-services-cast-framework` dependency to 18.1.0.
+    This fixes an issue where `RemoteServiceException` was thrown due to
+    `Context.startForegroundService()` not calling `Service.startForeground()`
+    ([#7191](https://github.com/google/ExoPlayer/issues/7191)).
 
 ### 2.11.3 (2020-02-19)
 

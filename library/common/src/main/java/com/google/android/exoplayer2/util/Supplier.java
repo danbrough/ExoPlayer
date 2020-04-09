@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 The Android Open Source Project
+ * Copyright (C) 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,16 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.google.android.exoplayer2.device;
 
-import com.google.android.exoplayer2.Player;
+package com.google.android.exoplayer2.util;
 
-/** A listener for changes of {@link Player.DeviceComponent}. */
-public interface DeviceListener {
+/**
+ * A functional interface representing a supplier of results.
+ *
+ * @param <T> The type of results supplied by this supplier.
+ */
+public interface Supplier<T> {
 
-  /** Called when the device information changes. */
-  default void onDeviceInfoChanged(DeviceInfo deviceInfo) {}
-
-  /** Called when the device volume or mute state changes. */
-  default void onDeviceVolumeChanged(int volume, boolean muted) {}
+  /** Gets a result. */
+  T get();
 }

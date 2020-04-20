@@ -109,7 +109,6 @@ public final class CacheUtil {
    *
    * @param dataSpec Defines the data to be cached.
    * @param cache A {@link Cache} to store the data.
-   * @param cacheKeyFactory An optional factory for cache keys.
    * @param upstream A {@link DataSource} for reading data not in the cache.
    * @param progressListener A listener to receive progress updates, or {@code null}.
    * @param isCanceled An optional flag that will interrupt caching if set to true.
@@ -120,15 +119,12 @@ public final class CacheUtil {
   public static void cache(
       DataSpec dataSpec,
       Cache cache,
-      @Nullable CacheKeyFactory cacheKeyFactory,
       DataSource upstream,
       @Nullable ProgressListener progressListener,
       @Nullable AtomicBoolean isCanceled)
       throws IOException, InterruptedException {
     cache(
         dataSpec,
-        cache,
-        cacheKeyFactory,
         new CacheDataSource(cache, upstream),
         new byte[DEFAULT_BUFFER_SIZE_BYTES],
         /* priorityTaskManager= */ null,
@@ -139,21 +135,19 @@ public final class CacheUtil {
   }
 
   /**
-   * Caches the data defined by {@code dataSpec} while skipping already cached data. Caching stops
-   * early if end of input is reached and {@code enableEOFException} is false.
+   * Caches the data defined by {@code dataSpec}, skipping already cached data. Caching stops early
+   * if end of input is reached and {@code enableEOFException} is false.
    *
-   * <p>If a {@link PriorityTaskManager} is given, it's used to pause and resume caching depending
-   * on {@code priority} and the priority of other tasks registered to the PriorityTaskManager.
-   * Please note that it's the responsibility of the calling code to call {@link
-   * PriorityTaskManager#add} to register with the manager before calling this method, and to call
-   * {@link PriorityTaskManager#remove} afterwards to unregister.
+   * <p>If a {@link PriorityTaskManager} is provided, it's used to pause and resume caching
+   * depending on {@code priority} and the priority of other tasks registered to the
+   * PriorityTaskManager. Please note that it's the responsibility of the calling code to call
+   * {@link PriorityTaskManager#add} to register with the manager before calling this method, and to
+   * call {@link PriorityTaskManager#remove} afterwards to unregister.
    *
    * <p>This method may be slow and shouldn't normally be called on the main thread.
    *
    * @param dataSpec Defines the data to be cached.
-   * @param cache A {@link Cache} to store the data.
-   * @param cacheKeyFactory An optional factory for cache keys.
-   * @param dataSource A {@link CacheDataSource} that works on the {@code cache}.
+   * @param dataSource A {@link CacheDataSource} to be used for caching the data.
    * @param buffer The buffer to be used while caching.
    * @param priorityTaskManager If not null it's used to check whether it is allowed to proceed with
    *     caching.
@@ -168,8 +162,6 @@ public final class CacheUtil {
   @WorkerThread
   public static void cache(
       DataSpec dataSpec,
-      Cache cache,
-      @Nullable CacheKeyFactory cacheKeyFactory,
       CacheDataSource dataSource,
       byte[] buffer,
       @Nullable PriorityTaskManager priorityTaskManager,
@@ -181,6 +173,8 @@ public final class CacheUtil {
     Assertions.checkNotNull(dataSource);
     Assertions.checkNotNull(buffer);
 
+    Cache cache = dataSource.getCache();
+    CacheKeyFactory cacheKeyFactory = dataSource.getCacheKeyFactory();
     String key = buildCacheKey(dataSpec, cacheKeyFactory);
     long bytesLeft;
     @Nullable ProgressNotifier progressNotifier = null;

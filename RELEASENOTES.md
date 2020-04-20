@@ -70,6 +70,9 @@
         ([#7207](https://github.com/google/ExoPlayer/issues/7207)).
     *   Add `SilenceMediaSource.Factory` to support tags
         ([PR #7245](https://github.com/google/ExoPlayer/pull/7245)).
+    *   Fix `AdsMediaSource` child `MediaSource`s not being released.
+    *   Parse track titles from Matroska files
+        ([#7247](https://github.com/google/ExoPlayer/pull/7247)).
 *   Text:
     *   Parse `<ruby>` and `<rt>` tags in WebVTT subtitles (rendering is coming
         later).
@@ -86,6 +89,12 @@
         [issue #6581](https://github.com/google/ExoPlayer/issues/6581)).
     *   Parse `tts:ruby` and `tts:rubyPosition` properties in TTML subtitles
         (rendering is coming later).
+    *   Update WebVTT position alignment parsing to recognise `line-left`,
+        `center` and `line-right` as per the
+        [released spec](https://www.w3.org/TR/webvtt1/#webvtt-position-cue-setting)
+        (a
+        [previous draft](https://www.w3.org/TR/2014/WD-webvtt1-20141111/#dfn-webvtt-text-position-cue-setting)
+        used `start`, `middle` and `end`).
 *   DRM:
     *   Add support for attaching DRM sessions to clear content in the demo app.
     *   Remove `DrmSessionManager` references from all renderers.
@@ -97,6 +106,11 @@
     *   Remove generics from DRM components.
 *   Downloads: Merge downloads in `SegmentDownloader` to improve overall
     download speed ([#5978](https://github.com/google/ExoPlayer/issues/5978)).
+*   DASH:
+    *   Merge trick play adaptation sets (i.e., adaptation sets marked with
+        `http://dashif.org/guidelines/trickmode`) into the same `TrackGroup` as
+        the main adaptation sets to which they refer. Trick play tracks are
+        marked with the `C.ROLE_FLAG_TRICK_PLAY` flag.
 *   MP3: Add `IndexSeeker` for accurate seeks in VBR streams
     ([#6787](https://github.com/google/ExoPlayer/issues/6787)). This seeker is
     enabled by passing `FLAG_ENABLE_INDEX_SEEKING` to the `Mp3Extractor`. It may
@@ -104,6 +118,8 @@
     costly on large files.
 *   MP4: Store the Android capture frame rate only in `Format.metadata`.
     `Format.frameRate` now stores the calculated frame rate.
+*   MPEG-TS: Fix issue where SEI NAL units were incorrectly dropped from H.265
+    samples ([#7113](https://github.com/google/ExoPlayer/issues/7113)).
 *   Testing
     *   Add `TestExoPlayer`, a utility class with APIs to create
         `SimpleExoPlayer` instances with fake components for testing.

@@ -17,6 +17,7 @@ package com.google.android.exoplayer2.source.hls;
 
 import android.net.Uri;
 import android.os.Handler;
+import android.os.Looper;
 import android.util.SparseIntArray;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
@@ -36,6 +37,7 @@ import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.metadata.emsg.EventMessage;
 import com.google.android.exoplayer2.metadata.emsg.EventMessageDecoder;
 import com.google.android.exoplayer2.metadata.id3.PrivFrame;
+import com.google.android.exoplayer2.source.LoadEventInfo;
 import com.google.android.exoplayer2.source.MediaSourceEventListener.EventDispatcher;
 import com.google.android.exoplayer2.source.SampleQueue;
 import com.google.android.exoplayer2.source.SampleQueue.UpstreamFormatChangedListener;
@@ -674,15 +676,14 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
         loader.startLoading(
             loadable, this, loadErrorHandlingPolicy.getMinimumLoadableRetryCount(loadable.type));
     eventDispatcher.loadStarted(
-        loadable.dataSpec,
+        new LoadEventInfo(loadable.dataSpec, elapsedRealtimeMs),
         loadable.type,
         trackType,
         loadable.trackFormat,
         loadable.trackSelectionReason,
         loadable.trackSelectionData,
         loadable.startTimeUs,
-        loadable.endTimeUs,
-        elapsedRealtimeMs);
+        loadable.endTimeUs);
     return true;
   }
 
@@ -702,19 +703,20 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   public void onLoadCompleted(Chunk loadable, long elapsedRealtimeMs, long loadDurationMs) {
     chunkSource.onChunkLoadCompleted(loadable);
     eventDispatcher.loadCompleted(
-        loadable.dataSpec,
-        loadable.getUri(),
-        loadable.getResponseHeaders(),
+        new LoadEventInfo(
+            loadable.dataSpec,
+            loadable.getUri(),
+            loadable.getResponseHeaders(),
+            elapsedRealtimeMs,
+            loadDurationMs,
+            loadable.bytesLoaded()),
         loadable.type,
         trackType,
         loadable.trackFormat,
         loadable.trackSelectionReason,
         loadable.trackSelectionData,
         loadable.startTimeUs,
-        loadable.endTimeUs,
-        elapsedRealtimeMs,
-        loadDurationMs,
-        loadable.bytesLoaded());
+        loadable.endTimeUs);
     if (!prepared) {
       continueLoading(lastSeekPositionUs);
     } else {
@@ -726,19 +728,20 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   public void onLoadCanceled(
       Chunk loadable, long elapsedRealtimeMs, long loadDurationMs, boolean released) {
     eventDispatcher.loadCanceled(
-        loadable.dataSpec,
-        loadable.getUri(),
-        loadable.getResponseHeaders(),
+        new LoadEventInfo(
+            loadable.dataSpec,
+            loadable.getUri(),
+            loadable.getResponseHeaders(),
+            elapsedRealtimeMs,
+            loadDurationMs,
+            loadable.bytesLoaded()),
         loadable.type,
         trackType,
         loadable.trackFormat,
         loadable.trackSelectionReason,
         loadable.trackSelectionData,
         loadable.startTimeUs,
-        loadable.endTimeUs,
-        elapsedRealtimeMs,
-        loadDurationMs,
-        loadable.bytesLoaded());
+        loadable.endTimeUs);
     if (!released) {
       resetSampleQueues();
       if (enabledTrackGroupCount > 0) {
@@ -786,9 +789,13 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     }
 
     eventDispatcher.loadError(
-        loadable.dataSpec,
-        loadable.getUri(),
-        loadable.getResponseHeaders(),
+        new LoadEventInfo(
+            loadable.dataSpec,
+            loadable.getUri(),
+            loadable.getResponseHeaders(),
+            elapsedRealtimeMs,
+            loadDurationMs,
+            bytesLoaded),
         loadable.type,
         trackType,
         loadable.trackFormat,
@@ -796,9 +803,6 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
         loadable.trackSelectionData,
         loadable.startTimeUs,
         loadable.endTimeUs,
-        elapsedRealtimeMs,
-        loadDurationMs,
-        bytesLoaded,
         error,
         /* wasCanceled= */ !loadErrorAction.isRetry());
 
@@ -907,7 +911,12 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
     boolean isAudioVideo = type == C.TRACK_TYPE_AUDIO || type == C.TRACK_TYPE_VIDEO;
     HlsSampleQueue sampleQueue =
-        new HlsSampleQueue(allocator, drmSessionManager, eventDispatcher, overridingDrmInitData);
+        new HlsSampleQueue(
+            allocator,
+            /* playbackLooper= */ handler.getLooper(),
+            drmSessionManager,
+            eventDispatcher,
+            overridingDrmInitData);
     if (isAudioVideo) {
       sampleQueue.setDrmInitData(drmInitData);
     }
@@ -1377,10 +1386,11 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
     private HlsSampleQueue(
         Allocator allocator,
+        Looper playbackLooper,
         DrmSessionManager drmSessionManager,
         MediaSourceEventDispatcher eventDispatcher,
         Map<String, DrmInitData> overridingDrmInitData) {
-      super(allocator, drmSessionManager, eventDispatcher);
+      super(allocator, playbackLooper, drmSessionManager, eventDispatcher);
       this.overridingDrmInitData = overridingDrmInitData;
     }
 
@@ -1521,7 +1531,8 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     }
 
     @Override
-    public int sampleData(DataReader input, int length, boolean allowEndOfInput)
+    public int sampleData(
+        DataReader input, int length, boolean allowEndOfInput, @SampleDataPart int sampleDataPart)
         throws IOException {
       ensureBufferCapacity(bufferPosition + length);
       int numBytesRead = input.read(buffer, bufferPosition, length);
@@ -1537,7 +1548,8 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     }
 
     @Override
-    public void sampleData(ParsableByteArray buffer, int length) {
+    public void sampleData(
+        ParsableByteArray buffer, int length, @SampleDataPart int sampleDataPart) {
       ensureBufferCapacity(bufferPosition + length);
       buffer.readBytes(this.buffer, bufferPosition, length);
       bufferPosition += length;

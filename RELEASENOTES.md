@@ -26,6 +26,8 @@
         consistency.
     *   Deprecate and rename `onLoadingChanged` to `onIsLoadingChanged` for
         consistency.
+    *   Deprecate `onSeekProcessed` because all seek changes happen instantly
+        now and listening to `onPositionDiscontinuity` is sufficient.
     *   Add `ExoPlayer.setPauseAtEndOfMediaItems` to let the player pause at the
         end of each media item
         ([#5660](https://github.com/google/ExoPlayer/issues/5660)).
@@ -38,6 +40,8 @@
     *   Rename `MediaCodecRenderer.onOutputFormatChanged` to
         `MediaCodecRenderer.onOutputMediaFormatChanged`, further clarifying the
         distinction between `Format` and `MediaFormat`.
+    *   Improve `Format` propagation within the media codec renderer
+        ([#6646](https://github.com/google/ExoPlayer/issues/6646)).
     *   Move player message-related constants from `C` to `Renderer`, to avoid
         having the constants class depend on player/renderer classes.
     *   Split out `common` and `extractor` submodules.
@@ -60,8 +64,6 @@
         `DecoderVideoRenderer` and `DecoderAudioRenderer` respectively, and
         generalized to work with `Decoder` rather than `SimpleDecoder`.
     *   Add media item based playlist API to Player.
-    *   Update `CachedContentIndex` to use `SecureRandom` for generating the
-        initialization vector used to encrypt the cache contents.
     *   Remove deprecated members in `DefaultTrackSelector`.
     *   Add `Player.DeviceComponent` and implement it for `SimpleExoPlayer` so
         that the device volume can be controlled by player.
@@ -73,6 +75,8 @@
     *   Fix `AdsMediaSource` child `MediaSource`s not being released.
     *   Parse track titles from Matroska files
         ([#7247](https://github.com/google/ExoPlayer/pull/7247)).
+    *   Replace `CacheDataSinkFactory` and `CacheDataSourceFactory` with
+        `CacheDataSink.Factory` and `CacheDataSource.Factory` respectively.
 *   Text:
     *   Parse `<ruby>` and `<rt>` tags in WebVTT subtitles (rendering is coming
         later).
@@ -95,6 +99,11 @@
         (a
         [previous draft](https://www.w3.org/TR/2014/WD-webvtt1-20141111/#dfn-webvtt-text-position-cue-setting)
         used `start`, `middle` and `end`).
+    *   Use anti-aliasing and bitmap filtering when displaying bitmap subtitles
+        ([#6950](https://github.com/google/ExoPlayer/pull/6950)).
+    *   Implement timing-out of stuck CEA-608 captions (as permitted by
+        ANSI/CTA-608-E R-2014 Annex C.9) and set the default timeout to 16
+        seconds ([#7181](https://github.com/google/ExoPlayer/issues/7181)).
 *   DRM:
     *   Add support for attaching DRM sessions to clear content in the demo app.
     *   Remove `DrmSessionManager` references from all renderers.
@@ -104,13 +113,22 @@
         `OfflineLicenseHelper`
         ([#7078](https://github.com/google/ExoPlayer/issues/7078)).
     *   Remove generics from DRM components.
-*   Downloads: Merge downloads in `SegmentDownloader` to improve overall
-    download speed ([#5978](https://github.com/google/ExoPlayer/issues/5978)).
+*   Downloads and caching:
+    *   Merge downloads in `SegmentDownloader` to improve overall download speed
+        ([#5978](https://github.com/google/ExoPlayer/issues/5978)).
+    *   Replace `CacheDataSinkFactory` and `CacheDataSourceFactory` with
+        `CacheDataSink.Factory` and `CacheDataSource.Factory` respectively.
+    *   Remove `DownloadConstructorHelper` and use `CacheDataSource.Factory`
+        directly instead.
+    *   Update `CachedContentIndex` to use `SecureRandom` for generating the
+        initialization vector used to encrypt the cache contents.
 *   DASH:
     *   Merge trick play adaptation sets (i.e., adaptation sets marked with
         `http://dashif.org/guidelines/trickmode`) into the same `TrackGroup` as
         the main adaptation sets to which they refer. Trick play tracks are
         marked with the `C.ROLE_FLAG_TRICK_PLAY` flag.
+    *   Fix assertion failure in `SampleQueue` when playing DASH streams with
+        EMSG tracks ([#7273](https://github.com/google/ExoPlayer/issues/7273)).
 *   MP3: Add `IndexSeeker` for accurate seeks in VBR streams
     ([#6787](https://github.com/google/ExoPlayer/issues/6787)). This seeker is
     enabled by passing `FLAG_ENABLE_INDEX_SEEKING` to the `Mp3Extractor`. It may
@@ -137,6 +155,8 @@
 *   Change the order of extractors for sniffing to reduce start-up latency in
     `DefaultExtractorsFactory` and `DefaultHlsExtractorsFactory`
     ([#6410](https://github.com/google/ExoPlayer/issues/6410)).
+*   Add missing `@Nullable` annotations to `MediaSessionConnector`
+    ([#7234](https://github.com/google/ExoPlayer/issues/7234)).
 
 ### 2.11.4 (2020-04-08)
 

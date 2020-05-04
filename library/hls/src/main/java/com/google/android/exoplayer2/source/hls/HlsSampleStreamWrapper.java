@@ -676,7 +676,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
         loader.startLoading(
             loadable, this, loadErrorHandlingPolicy.getMinimumLoadableRetryCount(loadable.type));
     eventDispatcher.loadStarted(
-        new LoadEventInfo(loadable.dataSpec, elapsedRealtimeMs),
+        new LoadEventInfo(loadable.loadTaskId, loadable.dataSpec, elapsedRealtimeMs),
         loadable.type,
         trackType,
         loadable.trackFormat,
@@ -702,14 +702,18 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   @Override
   public void onLoadCompleted(Chunk loadable, long elapsedRealtimeMs, long loadDurationMs) {
     chunkSource.onChunkLoadCompleted(loadable);
-    eventDispatcher.loadCompleted(
+    LoadEventInfo loadEventInfo =
         new LoadEventInfo(
+            loadable.loadTaskId,
             loadable.dataSpec,
             loadable.getUri(),
             loadable.getResponseHeaders(),
             elapsedRealtimeMs,
             loadDurationMs,
-            loadable.bytesLoaded()),
+            loadable.bytesLoaded());
+    loadErrorHandlingPolicy.onLoadTaskConcluded(loadable.loadTaskId);
+    eventDispatcher.loadCompleted(
+        loadEventInfo,
         loadable.type,
         trackType,
         loadable.trackFormat,
@@ -727,14 +731,18 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   @Override
   public void onLoadCanceled(
       Chunk loadable, long elapsedRealtimeMs, long loadDurationMs, boolean released) {
-    eventDispatcher.loadCanceled(
+    LoadEventInfo loadEventInfo =
         new LoadEventInfo(
+            loadable.loadTaskId,
             loadable.dataSpec,
             loadable.getUri(),
             loadable.getResponseHeaders(),
             elapsedRealtimeMs,
             loadDurationMs,
-            loadable.bytesLoaded()),
+            loadable.bytesLoaded());
+    loadErrorHandlingPolicy.onLoadTaskConcluded(loadable.loadTaskId);
+    eventDispatcher.loadCanceled(
+        loadEventInfo,
         loadable.type,
         trackType,
         loadable.trackFormat,
@@ -788,8 +796,10 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
               : Loader.DONT_RETRY_FATAL;
     }
 
+    boolean wasCanceled = !loadErrorAction.isRetry();
     eventDispatcher.loadError(
         new LoadEventInfo(
+            loadable.loadTaskId,
             loadable.dataSpec,
             loadable.getUri(),
             loadable.getResponseHeaders(),
@@ -804,7 +814,10 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
         loadable.startTimeUs,
         loadable.endTimeUs,
         error,
-        /* wasCanceled= */ !loadErrorAction.isRetry());
+        wasCanceled);
+    if (wasCanceled) {
+      loadErrorHandlingPolicy.onLoadTaskConcluded(loadable.loadTaskId);
+    }
 
     if (blacklistSucceeded) {
       if (!prepared) {

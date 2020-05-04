@@ -136,7 +136,8 @@ public final class DefaultHlsPlaylistTracker
             this,
             loadErrorHandlingPolicy.getMinimumLoadableRetryCount(masterPlaylistLoadable.type));
     eventDispatcher.loadStarted(
-        new LoadEventInfo(masterPlaylistLoadable.dataSpec, elapsedRealtime),
+        new LoadEventInfo(
+            masterPlaylistLoadable.loadTaskId, masterPlaylistLoadable.dataSpec, elapsedRealtime),
         masterPlaylistLoadable.type);
   }
 
@@ -241,15 +242,17 @@ public final class DefaultHlsPlaylistTracker
     } else {
       primaryBundle.loadPlaylist();
     }
-    eventDispatcher.loadCompleted(
+    LoadEventInfo loadEventInfo =
         new LoadEventInfo(
+            loadable.loadTaskId,
             loadable.dataSpec,
             loadable.getUri(),
             loadable.getResponseHeaders(),
             elapsedRealtimeMs,
             loadDurationMs,
-            loadable.bytesLoaded()),
-        C.DATA_TYPE_MANIFEST);
+            loadable.bytesLoaded());
+    loadErrorHandlingPolicy.onLoadTaskConcluded(loadable.loadTaskId);
+    eventDispatcher.loadCompleted(loadEventInfo, C.DATA_TYPE_MANIFEST);
   }
 
   @Override
@@ -258,15 +261,17 @@ public final class DefaultHlsPlaylistTracker
       long elapsedRealtimeMs,
       long loadDurationMs,
       boolean released) {
-    eventDispatcher.loadCanceled(
+    LoadEventInfo loadEventInfo =
         new LoadEventInfo(
+            loadable.loadTaskId,
             loadable.dataSpec,
             loadable.getUri(),
             loadable.getResponseHeaders(),
             elapsedRealtimeMs,
             loadDurationMs,
-            loadable.bytesLoaded()),
-        C.DATA_TYPE_MANIFEST);
+            loadable.bytesLoaded());
+    loadErrorHandlingPolicy.onLoadTaskConcluded(loadable.loadTaskId);
+    eventDispatcher.loadCanceled(loadEventInfo, C.DATA_TYPE_MANIFEST);
   }
 
   @Override
@@ -282,6 +287,7 @@ public final class DefaultHlsPlaylistTracker
     boolean isFatal = retryDelayMs == C.TIME_UNSET;
     eventDispatcher.loadError(
         new LoadEventInfo(
+            loadable.loadTaskId,
             loadable.dataSpec,
             loadable.getUri(),
             loadable.getResponseHeaders(),
@@ -291,6 +297,9 @@ public final class DefaultHlsPlaylistTracker
         C.DATA_TYPE_MANIFEST,
         error,
         isFatal);
+    if (isFatal) {
+      loadErrorHandlingPolicy.onLoadTaskConcluded(loadable.loadTaskId);
+    }
     return isFatal
         ? Loader.DONT_RETRY_FATAL
         : Loader.createRetryAction(/* resetErrorCount= */ false, retryDelayMs);
@@ -521,19 +530,23 @@ public final class DefaultHlsPlaylistTracker
     public void onLoadCompleted(
         ParsingLoadable<HlsPlaylist> loadable, long elapsedRealtimeMs, long loadDurationMs) {
       HlsPlaylist result = loadable.getResult();
+      LoadEventInfo loadEventInfo =
+          new LoadEventInfo(
+              loadable.loadTaskId,
+              loadable.dataSpec,
+              loadable.getUri(),
+              loadable.getResponseHeaders(),
+              elapsedRealtimeMs,
+              loadDurationMs,
+              loadable.bytesLoaded());
+      loadErrorHandlingPolicy.onLoadTaskConcluded(loadable.loadTaskId);
       if (result instanceof HlsMediaPlaylist) {
         processLoadedPlaylist((HlsMediaPlaylist) result, loadDurationMs);
-        eventDispatcher.loadCompleted(
-            new LoadEventInfo(
-                loadable.dataSpec,
-                loadable.getUri(),
-                loadable.getResponseHeaders(),
-                elapsedRealtimeMs,
-                loadDurationMs,
-                loadable.bytesLoaded()),
-            C.DATA_TYPE_MANIFEST);
+        eventDispatcher.loadCompleted(loadEventInfo, C.DATA_TYPE_MANIFEST);
       } else {
         playlistError = new ParserException("Loaded playlist has unexpected type.");
+        eventDispatcher.loadError(
+            loadEventInfo, C.DATA_TYPE_MANIFEST, playlistError, /* wasCanceled= */ true);
       }
     }
 
@@ -543,15 +556,17 @@ public final class DefaultHlsPlaylistTracker
         long elapsedRealtimeMs,
         long loadDurationMs,
         boolean released) {
-      eventDispatcher.loadCanceled(
+      LoadEventInfo loadEventInfo =
           new LoadEventInfo(
+              loadable.loadTaskId,
               loadable.dataSpec,
               loadable.getUri(),
               loadable.getResponseHeaders(),
               elapsedRealtimeMs,
               loadDurationMs,
-              loadable.bytesLoaded()),
-          C.DATA_TYPE_MANIFEST);
+              loadable.bytesLoaded());
+      loadErrorHandlingPolicy.onLoadTaskConcluded(loadable.loadTaskId);
+      eventDispatcher.loadCanceled(loadEventInfo, C.DATA_TYPE_MANIFEST);
     }
 
     @Override
@@ -586,8 +601,10 @@ public final class DefaultHlsPlaylistTracker
         loadErrorAction = Loader.DONT_RETRY;
       }
 
+      boolean wasCanceled = !loadErrorAction.isRetry();
       eventDispatcher.loadError(
           new LoadEventInfo(
+              loadable.loadTaskId,
               loadable.dataSpec,
               loadable.getUri(),
               loadable.getResponseHeaders(),
@@ -596,8 +613,10 @@ public final class DefaultHlsPlaylistTracker
               loadable.bytesLoaded()),
           C.DATA_TYPE_MANIFEST,
           error,
-          /* wasCanceled= */ !loadErrorAction.isRetry());
-
+          wasCanceled);
+      if (wasCanceled) {
+        loadErrorHandlingPolicy.onLoadTaskConcluded(loadable.loadTaskId);
+      }
       return loadErrorAction;
     }
 
@@ -618,7 +637,8 @@ public final class DefaultHlsPlaylistTracker
               this,
               loadErrorHandlingPolicy.getMinimumLoadableRetryCount(mediaPlaylistLoadable.type));
       eventDispatcher.loadStarted(
-          new LoadEventInfo(mediaPlaylistLoadable.dataSpec, elapsedRealtime),
+          new LoadEventInfo(
+              mediaPlaylistLoadable.loadTaskId, mediaPlaylistLoadable.dataSpec, elapsedRealtime),
           mediaPlaylistLoadable.type);
     }
 

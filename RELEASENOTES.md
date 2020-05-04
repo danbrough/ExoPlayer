@@ -3,6 +3,12 @@
 ### dev-v2 (not yet released)
 
 *   Core library:
+    *   Add opt-in to verify correct thread usage with
+        `SimpleExoPlayer.setThrowsWhenUsingWrongThread(true)`
+        ([#4463](https://github.com/google/ExoPlayer/issues/4463)).
+    *   Fix bug where `PlayerMessages` throw an exception after `MediaSources`
+        are removed from the playlist
+        ([#7278](https://github.com/google/ExoPlayer/issues/7278)).
     *   Add playbackPositionUs parameter to 'LoadControl.shouldContinueLoading'.
     *   The `DefaultLoadControl` default minimum buffer is set to 50 seconds,
         equal to the default maximum buffer. `DefaultLoadControl` applies the
@@ -104,6 +110,10 @@
     *   Implement timing-out of stuck CEA-608 captions (as permitted by
         ANSI/CTA-608-E R-2014 Annex C.9) and set the default timeout to 16
         seconds ([#7181](https://github.com/google/ExoPlayer/issues/7181)).
+    *   Add special-case positioning behaviour for vertical cues being rendered
+        horizontally.
+    *   Implement steps 4-10 of the
+        [WebVTT line computation algorithm](https://www.w3.org/TR/webvtt1/#cue-computed-line).
 *   DRM:
     *   Add support for attaching DRM sessions to clear content in the demo app.
     *   Remove `DrmSessionManager` references from all renderers.
@@ -144,6 +154,8 @@
     *   Upgrade Truth dependency from 0.44 to 1.0.
     *   Upgrade to JUnit 4.13-rc-2.
 *   UI
+    *   Remove deperecated `exo_simple_player_view.xml` and
+        `exo_playback_control_view.xml` from resource.
     *   Add `showScrubber` and `hideScrubber` methods to DefaultTimeBar.
     *   Move logic of prev, next, fast forward and rewind to ControlDispatcher
         ([#6926](https://github.com/google/ExoPlayer/issues/6926)).
@@ -157,6 +169,8 @@
     ([#6410](https://github.com/google/ExoPlayer/issues/6410)).
 *   Add missing `@Nullable` annotations to `MediaSessionConnector`
     ([#7234](https://github.com/google/ExoPlayer/issues/7234)).
+*   AV1 extension: Add a heuristic to determine the default number of threads
+    used for AV1 playback using the extension.
 
 ### 2.11.4 (2020-04-08)
 

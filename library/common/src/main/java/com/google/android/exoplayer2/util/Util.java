@@ -95,7 +95,7 @@ public final class Util {
    * Like {@link android.os.Build.VERSION#SDK_INT}, but in a place where it can be conveniently
    * overridden for local testing.
    */
-  public static final int SDK_INT = Build.VERSION.SDK_INT;
+  public static final int SDK_INT = "R".equals(Build.VERSION.CODENAME) ? 30 : Build.VERSION.SDK_INT;
 
   /**
    * Like {@link Build#DEVICE}, but in a place where it can be conveniently overridden for local
@@ -213,7 +213,7 @@ public final class Util {
       if (mediaItem.playbackProperties == null) {
         continue;
       }
-      if (isLocalFileUri(mediaItem.playbackProperties.sourceUri)) {
+      if (isLocalFileUri(mediaItem.playbackProperties.uri)) {
         return requestExternalStoragePermission(activity);
       }
       for (int i = 0; i < mediaItem.playbackProperties.subtitles.size(); i++) {
@@ -241,7 +241,7 @@ public final class Util {
       if (mediaItem.playbackProperties == null) {
         continue;
       }
-      if (isTrafficRestricted(mediaItem.playbackProperties.sourceUri)) {
+      if (isTrafficRestricted(mediaItem.playbackProperties.uri)) {
         return false;
       }
       for (int i = 0; i < mediaItem.playbackProperties.subtitles.size(); i++) {

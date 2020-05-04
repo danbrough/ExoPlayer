@@ -21,6 +21,8 @@ import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DataSpec;
+import com.google.android.exoplayer2.upstream.ParsingLoadable;
+import com.google.android.exoplayer2.upstream.ParsingLoadable.Parser;
 import com.google.android.exoplayer2.upstream.cache.Cache;
 import com.google.android.exoplayer2.upstream.cache.CacheDataSource;
 import com.google.android.exoplayer2.upstream.cache.CacheKeyFactory;
@@ -68,13 +70,17 @@ public abstract class SegmentDownloader<M extends FilterableManifest<M>> impleme
   private static final long MAX_MERGED_SEGMENT_START_TIME_DIFF_US = 20 * C.MICROS_PER_SECOND;
 
   private final DataSpec manifestDataSpec;
+  private final Parser<M> manifestParser;
   private final ArrayList<StreamKey> streamKeys;
   private final CacheDataSource.Factory cacheDataSourceFactory;
   private final Executor executor;
   private final AtomicBoolean isCanceled;
 
+  @Nullable private volatile Thread downloadThread;
+
   /**
    * @param manifestUri The {@link Uri} of the manifest to be downloaded.
+   * @param manifestParser A parser for the manifest.
    * @param streamKeys Keys defining which streams in the manifest should be selected for download.
    *     If empty, all streams are downloaded.
    * @param cacheDataSourceFactory A {@link CacheDataSource.Factory} for the cache into which the
@@ -85,32 +91,35 @@ public abstract class SegmentDownloader<M extends FilterableManifest<M>> impleme
    */
   public SegmentDownloader(
       Uri manifestUri,
+      Parser<M> manifestParser,
       List<StreamKey> streamKeys,
       CacheDataSource.Factory cacheDataSourceFactory,
       Executor executor) {
     this.manifestDataSpec = getCompressibleDataSpec(manifestUri);
+    this.manifestParser = manifestParser;
     this.streamKeys = new ArrayList<>(streamKeys);
     this.cacheDataSourceFactory = cacheDataSourceFactory;
     this.executor = executor;
     isCanceled = new AtomicBoolean();
   }
 
-  /**
-   * Downloads the selected streams in the media. If multiple streams are selected, they are
-   * downloaded in sync with one another.
-   *
-   * @throws IOException Thrown when there is an error downloading.
-   * @throws InterruptedException If the thread has been interrupted.
-   */
   @Override
-  public final void download(@Nullable ProgressListener progressListener)
-      throws IOException, InterruptedException {
-    CacheDataSource dataSource = cacheDataSourceFactory.createDataSourceForDownloading();
-    @Nullable PriorityTaskManager priorityTaskManager = dataSource.getUpstreamPriorityTaskManager();
+  public final void download(@Nullable ProgressListener progressListener) throws IOException {
+    downloadThread = Thread.currentThread();
+    if (isCanceled.get()) {
+      return;
+    }
+    @Nullable
+    PriorityTaskManager priorityTaskManager =
+        cacheDataSourceFactory.getUpstreamPriorityTaskManager();
     if (priorityTaskManager != null) {
       priorityTaskManager.add(C.PRIORITY_DOWNLOAD);
     }
     try {
+      Cache cache = Assertions.checkNotNull(cacheDataSourceFactory.getCache());
+      CacheKeyFactory cacheKeyFactory = cacheDataSourceFactory.getCacheKeyFactory();
+      CacheDataSource dataSource = cacheDataSourceFactory.createDataSourceForDownloading();
+
       // Get the manifest and all of the segments.
       M manifest = getManifest(dataSource, manifestDataSpec);
       if (!streamKeys.isEmpty()) {
@@ -118,7 +127,7 @@ public abstract class SegmentDownloader<M extends FilterableManifest<M>> impleme
       }
       List<Segment> segments = getSegments(dataSource, manifest, /* allowIncompleteList= */ false);
       Collections.sort(segments);
-      mergeSegments(segments, dataSource.getCacheKeyFactory());
+      mergeSegments(segments, cacheKeyFactory);
 
       // Scan the segments, removing any that are fully downloaded.
       int totalSegments = segments.size();
@@ -128,8 +137,7 @@ public abstract class SegmentDownloader<M extends FilterableManifest<M>> impleme
       for (int i = segments.size() - 1; i >= 0; i--) {
         Segment segment = segments.get(i);
         Pair<Long, Long> segmentLengthAndBytesDownloaded =
-            CacheUtil.getCached(
-                segment.dataSpec, dataSource.getCache(), dataSource.getCacheKeyFactory());
+            CacheUtil.getCached(segment.dataSpec, cache, cacheKeyFactory);
         long segmentLength = segmentLengthAndBytesDownloaded.first;
         long segmentBytesDownloaded = segmentLengthAndBytesDownloaded.second;
         bytesDownloaded += segmentBytesDownloaded;
@@ -181,13 +189,17 @@ public abstract class SegmentDownloader<M extends FilterableManifest<M>> impleme
   @Override
   public void cancel() {
     isCanceled.set(true);
+    @Nullable Thread downloadThread = this.downloadThread;
+    if (downloadThread != null) {
+      downloadThread.interrupt();
+    }
   }
 
   @Override
-  public final void remove() throws InterruptedException {
+  public final void remove() {
+    Cache cache = Assertions.checkNotNull(cacheDataSourceFactory.getCache());
+    CacheKeyFactory cacheKeyFactory = cacheDataSourceFactory.getCacheKeyFactory();
     CacheDataSource dataSource = cacheDataSourceFactory.createDataSourceForRemovingDownload();
-    Cache cache = dataSource.getCache();
-    CacheKeyFactory cacheKeyFactory = dataSource.getCacheKeyFactory();
     try {
       M manifest = getManifest(dataSource, manifestDataSpec);
       List<Segment> segments = getSegments(dataSource, manifest, true);
@@ -205,14 +217,16 @@ public abstract class SegmentDownloader<M extends FilterableManifest<M>> impleme
   // Internal methods.
 
   /**
-   * Loads and parses the manifest.
+   * Loads and parses a manifest.
    *
    * @param dataSource The {@link DataSource} through which to load.
    * @param dataSpec The manifest {@link DataSpec}.
    * @return The manifest.
    * @throws IOException If an error occurs reading data.
    */
-  protected abstract M getManifest(DataSource dataSource, DataSpec dataSpec) throws IOException;
+  protected final M getManifest(DataSource dataSource, DataSpec dataSpec) throws IOException {
+    return ParsingLoadable.load(dataSource, manifestParser, dataSpec, C.DATA_TYPE_MANIFEST);
+  }
 
   /**
    * Returns a list of all downloadable {@link Segment}s for a given manifest.
@@ -223,13 +237,11 @@ public abstract class SegmentDownloader<M extends FilterableManifest<M>> impleme
    *     segments from being listed. If true then a partial segment list will be returned. If false
    *     an {@link IOException} will be thrown.
    * @return The list of downloadable {@link Segment}s.
-   * @throws InterruptedException Thrown if the thread was interrupted.
    * @throws IOException Thrown if {@code allowPartialIndex} is false and a load error occurs, or if
    *     the media is not in a form that allows for its segments to be listed.
    */
   protected abstract List<Segment> getSegments(
-      DataSource dataSource, M manifest, boolean allowIncompleteList)
-      throws InterruptedException, IOException;
+      DataSource dataSource, M manifest, boolean allowIncompleteList) throws IOException;
 
   protected static DataSpec getCompressibleDataSpec(Uri uri) {
     return new DataSpec.Builder().setUri(uri).setFlags(DataSpec.FLAG_ALLOW_GZIP).build();

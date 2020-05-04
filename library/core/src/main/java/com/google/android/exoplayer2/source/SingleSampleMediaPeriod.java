@@ -154,13 +154,14 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     if (transferListener != null) {
       dataSource.addTransferListener(transferListener);
     }
+    SourceLoadable loadable = new SourceLoadable(dataSpec, dataSource);
     long elapsedRealtimeMs =
         loader.startLoading(
-            new SourceLoadable(dataSpec, dataSource),
+            loadable,
             /* callback= */ this,
             loadErrorHandlingPolicy.getMinimumLoadableRetryCount(C.DATA_TYPE_MEDIA));
     eventDispatcher.loadStarted(
-        new LoadEventInfo(dataSpec, elapsedRealtimeMs),
+        new LoadEventInfo(loadable.loadTaskId, dataSpec, elapsedRealtimeMs),
         C.DATA_TYPE_MEDIA,
         C.TRACK_TYPE_UNKNOWN,
         format,
@@ -217,14 +218,18 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     sampleData = Assertions.checkNotNull(loadable.sampleData);
     loadingFinished = true;
     StatsDataSource dataSource = loadable.dataSource;
-    eventDispatcher.loadCompleted(
+    LoadEventInfo loadEventInfo =
         new LoadEventInfo(
+            loadable.loadTaskId,
             loadable.dataSpec,
             dataSource.getLastOpenedUri(),
             dataSource.getLastResponseHeaders(),
             elapsedRealtimeMs,
             loadDurationMs,
-            sampleSize),
+            sampleSize);
+    loadErrorHandlingPolicy.onLoadTaskConcluded(loadable.loadTaskId);
+    eventDispatcher.loadCompleted(
+        loadEventInfo,
         C.DATA_TYPE_MEDIA,
         C.TRACK_TYPE_UNKNOWN,
         format,
@@ -238,14 +243,18 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   public void onLoadCanceled(
       SourceLoadable loadable, long elapsedRealtimeMs, long loadDurationMs, boolean released) {
     StatsDataSource dataSource = loadable.dataSource;
-    eventDispatcher.loadCanceled(
+    LoadEventInfo loadEventInfo =
         new LoadEventInfo(
+            loadable.loadTaskId,
             loadable.dataSpec,
             dataSource.getLastOpenedUri(),
             dataSource.getLastResponseHeaders(),
             elapsedRealtimeMs,
             loadDurationMs,
-            dataSource.getBytesRead()),
+            dataSource.getBytesRead());
+    loadErrorHandlingPolicy.onLoadTaskConcluded(loadable.loadTaskId);
+    eventDispatcher.loadCanceled(
+        loadEventInfo,
         C.DATA_TYPE_MEDIA,
         C.TRACK_TYPE_UNKNOWN,
         /* trackFormat= */ null,
@@ -281,8 +290,10 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
               : Loader.DONT_RETRY_FATAL;
     }
     StatsDataSource dataSource = loadable.dataSource;
+    boolean wasCanceled = !action.isRetry();
     eventDispatcher.loadError(
         new LoadEventInfo(
+            loadable.loadTaskId,
             loadable.dataSpec,
             dataSource.getLastOpenedUri(),
             dataSource.getLastResponseHeaders(),
@@ -297,7 +308,10 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
         /* mediaStartTimeUs= */ 0,
         durationUs,
         error,
-        /* wasCanceled= */ !action.isRetry());
+        wasCanceled);
+    if (wasCanceled) {
+      loadErrorHandlingPolicy.onLoadTaskConcluded(loadable.loadTaskId);
+    }
     return action;
   }
 
@@ -382,6 +396,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
   /* package */ static final class SourceLoadable implements Loadable {
 
+    public final long loadTaskId;
     public final DataSpec dataSpec;
 
     private final StatsDataSource dataSource;
@@ -389,6 +404,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     @Nullable private byte[] sampleData;
 
     public SourceLoadable(DataSpec dataSpec, DataSource dataSource) {
+      this.loadTaskId = LoadEventInfo.getNewId();
       this.dataSpec = dataSpec;
       this.dataSource = new StatsDataSource(dataSource);
     }

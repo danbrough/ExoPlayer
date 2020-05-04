@@ -178,7 +178,8 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     this.customCacheKey = customCacheKey;
     this.continueLoadingCheckIntervalBytes = continueLoadingCheckIntervalBytes;
     loader = new Loader("Loader:ProgressiveMediaPeriod");
-    progressiveMediaExtractor = new BundledExtractorsAdapter(extractors);
+    ProgressiveMediaExtractor progressiveMediaExtractor = new BundledExtractorsAdapter(extractors);
+    this.progressiveMediaExtractor = progressiveMediaExtractor;
     loadCondition = new ConditionVariable();
     maybeFinishPrepareRunnable = this::maybeFinishPrepare;
     onContinueLoadingRequestedRunnable =
@@ -553,14 +554,18 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
       listener.onSourceInfoRefreshed(durationUs, isSeekable, isLive);
     }
     StatsDataSource dataSource = loadable.dataSource;
-    eventDispatcher.loadCompleted(
+    LoadEventInfo loadEventInfo =
         new LoadEventInfo(
+            loadable.loadTaskId,
             loadable.dataSpec,
             dataSource.getLastOpenedUri(),
             dataSource.getLastResponseHeaders(),
             elapsedRealtimeMs,
             loadDurationMs,
-            dataSource.getBytesRead()),
+            dataSource.getBytesRead());
+    loadErrorHandlingPolicy.onLoadTaskConcluded(loadable.loadTaskId);
+    eventDispatcher.loadCompleted(
+        loadEventInfo,
         C.DATA_TYPE_MEDIA,
         C.TRACK_TYPE_UNKNOWN,
         /* trackFormat= */ null,
@@ -577,14 +582,18 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   public void onLoadCanceled(
       ExtractingLoadable loadable, long elapsedRealtimeMs, long loadDurationMs, boolean released) {
     StatsDataSource dataSource = loadable.dataSource;
-    eventDispatcher.loadCanceled(
+    LoadEventInfo loadEventInfo =
         new LoadEventInfo(
+            loadable.loadTaskId,
             loadable.dataSpec,
             dataSource.getLastOpenedUri(),
             dataSource.getLastResponseHeaders(),
             elapsedRealtimeMs,
             loadDurationMs,
-            dataSource.getBytesRead()),
+            dataSource.getBytesRead());
+    loadErrorHandlingPolicy.onLoadTaskConcluded(loadable.loadTaskId);
+    eventDispatcher.loadCanceled(
+        loadEventInfo,
         C.DATA_TYPE_MEDIA,
         C.TRACK_TYPE_UNKNOWN,
         /* trackFormat= */ null,
@@ -626,8 +635,10 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     }
 
     StatsDataSource dataSource = loadable.dataSource;
+    boolean wasCanceled = !loadErrorAction.isRetry();
     eventDispatcher.loadError(
         new LoadEventInfo(
+            loadable.loadTaskId,
             loadable.dataSpec,
             dataSource.getLastOpenedUri(),
             dataSource.getLastResponseHeaders(),
@@ -642,7 +653,10 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
         /* mediaStartTimeUs= */ loadable.seekTimeUs,
         durationUs,
         error,
-        !loadErrorAction.isRetry());
+        wasCanceled);
+    if (wasCanceled) {
+      loadErrorHandlingPolicy.onLoadTaskConcluded(loadable.loadTaskId);
+    }
     return loadErrorAction;
   }
 
@@ -789,7 +803,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
             loadable, this, loadErrorHandlingPolicy.getMinimumLoadableRetryCount(dataType));
     DataSpec dataSpec = loadable.dataSpec;
     eventDispatcher.loadStarted(
-        new LoadEventInfo(dataSpec, elapsedRealtimeMs),
+        new LoadEventInfo(loadable.loadTaskId, dataSpec, elapsedRealtimeMs),
         C.DATA_TYPE_MEDIA,
         C.TRACK_TYPE_UNKNOWN,
         /* trackFormat= */ null,
@@ -928,6 +942,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   /** Loads the media stream and extracts sample data from it. */
   /* package */ final class ExtractingLoadable implements Loadable, IcyDataSource.Listener {
 
+    private final long loadTaskId;
     private final Uri uri;
     private final StatsDataSource dataSource;
     private final ProgressiveMediaExtractor progressiveMediaExtractor;
@@ -959,6 +974,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
       this.positionHolder = new PositionHolder();
       this.pendingExtractorSeek = true;
       this.length = C.LENGTH_UNSET;
+      loadTaskId = LoadEventInfo.getNewId();
       dataSpec = buildDataSpec(/* position= */ 0);
     }
 

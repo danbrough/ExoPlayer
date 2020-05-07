@@ -3,6 +3,9 @@
 ### dev-v2 (not yet released)
 
 *   Core library:
+    *   Added `TextComponent.getCurrentCues` because the current cues are no
+        longer forwarded to a new `TextOutput` in `SimpleExoPlayer`
+        automatically.
     *   Add opt-in to verify correct thread usage with
         `SimpleExoPlayer.setThrowsWhenUsingWrongThread(true)`
         ([#4463](https://github.com/google/ExoPlayer/issues/4463)).
@@ -55,9 +58,6 @@
     *   Add `DataSpec.Builder` and deprecate most `DataSpec` constructors.
     *   Add `DataSpec.customData` to allow applications to pass custom data
         through `DataSource` chains.
-    *   Add a sample count parameter to `MediaCodecRenderer.processOutputBuffer`
-        and `AudioSink.handleBuffer` to allow batching multiple encoded frames
-        in one buffer.
     *   Add a `Format.Builder` and deprecate all `Format.create*` methods and
         most `Format.copyWith*` methods.
     *   Split `Format.bitrate` into `Format.averageBitrate` and
@@ -83,6 +83,7 @@
         ([#7247](https://github.com/google/ExoPlayer/pull/7247)).
     *   Replace `CacheDataSinkFactory` and `CacheDataSourceFactory` with
         `CacheDataSink.Factory` and `CacheDataSource.Factory` respectively.
+*   Video: Pass frame rate hint to `Surface.setFrameRate` on Android R devices.
 *   Text:
     *   Parse `<ruby>` and `<rt>` tags in WebVTT subtitles (rendering is coming
         later).
@@ -132,6 +133,11 @@
         directly instead.
     *   Update `CachedContentIndex` to use `SecureRandom` for generating the
         initialization vector used to encrypt the cache contents.
+*   Audio:
+    *   Add a sample count parameter to `MediaCodecRenderer.processOutputBuffer`
+        and `AudioSink.handleBuffer` to allow batching multiple encoded frames
+        in one buffer.
+    *   No longer use a `MediaCodec` in audio passthrough mode.
 *   DASH:
     *   Merge trick play adaptation sets (i.e., adaptation sets marked with
         `http://dashif.org/guidelines/trickmode`) into the same `TrackGroup` as
@@ -171,6 +177,13 @@
     ([#7234](https://github.com/google/ExoPlayer/issues/7234)).
 *   AV1 extension: Add a heuristic to determine the default number of threads
     used for AV1 playback using the extension.
+*   IMA extension: Upgrade to IMA SDK version 3.18.1, and migrate to new
+    preloading APIs ([#6429](https://github.com/google/ExoPlayer/issues/6429)).
+*   OkHttp extension: Upgrade OkHttp dependency to 3.12.11.
+*   Cronet extension: Default to using the Cronet implementation in Google Play
+    Services rather than Cronet Embedded. This allows Cronet to be used with a
+    negligible increase in application size, compared to approximately 8MB when
+    embedding the library.
 
 ### 2.11.4 (2020-04-08)
 

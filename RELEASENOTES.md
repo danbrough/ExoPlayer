@@ -3,9 +3,12 @@
 ### dev-v2 (not yet released)
 
 *   Core library:
+    *   Add `Player.getTrackSelector` to access track selector from UI module.
     *   Added `TextComponent.getCurrentCues` because the current cues are no
         longer forwarded to a new `TextOutput` in `SimpleExoPlayer`
         automatically.
+    *   Add additional options to `SimpleExoPlayer.Builder` that were previously
+        only accessible via setters.
     *   Add opt-in to verify correct thread usage with
         `SimpleExoPlayer.setThrowsWhenUsingWrongThread(true)`
         ([#4463](https://github.com/google/ExoPlayer/issues/4463)).
@@ -83,6 +86,8 @@
         ([#7247](https://github.com/google/ExoPlayer/pull/7247)).
     *   Replace `CacheDataSinkFactory` and `CacheDataSourceFactory` with
         `CacheDataSink.Factory` and `CacheDataSource.Factory` respectively.
+    *   Enable the configuration of `SilenceSkippingAudioProcessor`
+        ([#6705](https://github.com/google/ExoPlayer/issues/6705)).
 *   Video: Pass frame rate hint to `Surface.setFrameRate` on Android R devices.
 *   Text:
     *   Parse `<ruby>` and `<rt>` tags in WebVTT subtitles (rendering is coming
@@ -115,6 +120,11 @@
         horizontally.
     *   Implement steps 4-10 of the
         [WebVTT line computation algorithm](https://www.w3.org/TR/webvtt1/#cue-computed-line).
+    *   Stop parsing unsupported WebVTT CSS properties. The spec provides an
+        [exhaustive list](https://www.w3.org/TR/webvtt1/#the-cue-pseudo-element)
+        of which are supported.
+    *   Ignore excess characters in CEA-608 lines (max length is 32)
+        ([#7341](https://github.com/google/ExoPlayer/issues/7341)).
 *   DRM:
     *   Add support for attaching DRM sessions to clear content in the demo app.
     *   Remove `DrmSessionManager` references from all renderers.
@@ -177,13 +187,21 @@
     ([#7234](https://github.com/google/ExoPlayer/issues/7234)).
 *   AV1 extension: Add a heuristic to determine the default number of threads
     used for AV1 playback using the extension.
-*   IMA extension: Upgrade to IMA SDK version 3.18.1, and migrate to new
+*   IMA extension: Upgrade to IMA SDK version 3.18.2, and migrate to new
     preloading APIs ([#6429](https://github.com/google/ExoPlayer/issues/6429)).
+*   IMA extension:
+    *   Upgrade to IMA SDK version 3.19.0, and migrate to new preloading APIs
+        ([#6429](https://github.com/google/ExoPlayer/issues/6429)).
+    *   Add support for timing out ad preloading, to avoid playback getting
+        stuck if an ad group unexpectedly fails to load.
 *   OkHttp extension: Upgrade OkHttp dependency to 3.12.11.
 *   Cronet extension: Default to using the Cronet implementation in Google Play
     Services rather than Cronet Embedded. This allows Cronet to be used with a
     negligible increase in application size, compared to approximately 8MB when
     embedding the library.
+*   MediaSession extension: Set session playback state to BUFFERING only when
+    actually playing ([#7367](https://github.com/google/ExoPlayer/pull/7367),
+    [#7206](https://github.com/google/ExoPlayer/issues/7206)).
 
 ### 2.11.4 (2020-04-08)
 

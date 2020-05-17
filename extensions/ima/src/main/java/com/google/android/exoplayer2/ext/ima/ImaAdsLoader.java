@@ -41,7 +41,6 @@ import com.google.ads.interactivemedia.v3.api.AdsManager;
 import com.google.ads.interactivemedia.v3.api.AdsManagerLoadedEvent;
 import com.google.ads.interactivemedia.v3.api.AdsRenderingSettings;
 import com.google.ads.interactivemedia.v3.api.AdsRequest;
-import com.google.ads.interactivemedia.v3.api.CompanionAdSlot;
 import com.google.ads.interactivemedia.v3.api.ImaSdkFactory;
 import com.google.ads.interactivemedia.v3.api.ImaSdkSettings;
 import com.google.ads.interactivemedia.v3.api.UiElement;
@@ -69,7 +68,6 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -239,7 +237,7 @@ public final class ImaAdsLoader
           context,
           adTagUri,
           imaSdkSettings,
-          null,
+          /* adsResponse= */ null,
           vastLoadTimeoutMs,
           mediaLoadTimeoutMs,
           mediaBitrate,
@@ -259,7 +257,7 @@ public final class ImaAdsLoader
     public ImaAdsLoader buildForAdsResponse(String adsResponse) {
       return new ImaAdsLoader(
           context,
-          null,
+          /* adTagUri= */ null,
           imaSdkSettings,
           adsResponse,
           vastLoadTimeoutMs,
@@ -426,33 +424,6 @@ public final class ImaAdsLoader
         /* imaFactory= */ new DefaultImaFactory());
   }
 
-  /**
-   * Creates a new IMA ads loader.
-   *
-   * @param context The context.
-   * @param adTagUri The {@link Uri} of an ad tag compatible with the Android IMA SDK. See
-   *     https://developers.google.com/interactive-media-ads/docs/sdks/android/compatibility for
-   *     more information.
-   * @param imaSdkSettings {@link ImaSdkSettings} used to configure the IMA SDK, or {@code null} to
-   *     use the default settings. If set, the player type and version fields may be overwritten.
-   * @deprecated Use {@link ImaAdsLoader.Builder}.
-   */
-  @Deprecated
-  public ImaAdsLoader(Context context, Uri adTagUri, @Nullable ImaSdkSettings imaSdkSettings) {
-    this(
-        context,
-        adTagUri,
-        imaSdkSettings,
-        /* adsResponse= */ null,
-        /* vastLoadTimeoutMs= */ TIMEOUT_UNSET,
-        /* mediaLoadTimeoutMs= */ TIMEOUT_UNSET,
-        /* mediaBitrate= */ BITRATE_UNSET,
-        /* focusSkipButtonWhenAvailable= */ true,
-        /* adUiElements= */ null,
-        /* adEventListener= */ null,
-        /* imaFactory= */ new DefaultImaFactory());
-  }
-
   @SuppressWarnings({"nullness:argument.type.incompatible", "methodref.receiver.bound.invalid"})
   private ImaAdsLoader(
       Context context,
@@ -527,19 +498,6 @@ public final class ImaAdsLoader
    */
   public AdDisplayContainer getAdDisplayContainer() {
     return adDisplayContainer;
-  }
-
-  /**
-   * Sets the slots for displaying companion ads. Individual slots can be created using {@link
-   * ImaSdkFactory#createCompanionAdSlot()}.
-   *
-   * @param companionSlots Slots for displaying companion ads.
-   * @see AdDisplayContainer#setCompanionSlots(Collection)
-   * @deprecated Use {@code getAdDisplayContainer().setCompanionSlots(...)}.
-   */
-  @Deprecated
-  public void setCompanionSlots(Collection<CompanionAdSlot> companionSlots) {
-    adDisplayContainer.setCompanionSlots(companionSlots);
   }
 
   /**
@@ -730,7 +688,7 @@ public final class ImaAdsLoader
   @Override
   public void onAdEvent(AdEvent adEvent) {
     AdEventType adEventType = adEvent.getType();
-    if (DEBUG) {
+    if (DEBUG && adEventType != AdEventType.AD_PROGRESS) {
       Log.d(TAG, "onAdEvent: " + adEventType);
     }
     if (adsManager == null) {
@@ -775,24 +733,11 @@ public final class ImaAdsLoader
 
   @Override
   public VideoProgressUpdate getContentProgress() {
-    if (player == null) {
-      return lastContentProgress;
+    VideoProgressUpdate videoProgressUpdate = getContentVideoProgressUpdate();
+    if (DEBUG) {
+      Log.d(TAG, "Content progress: " + videoProgressUpdate);
     }
-    boolean hasContentDuration = contentDurationMs != C.TIME_UNSET;
-    long contentPositionMs;
-    if (pendingContentPositionMs != C.TIME_UNSET) {
-      sentPendingContentPositionMs = true;
-      contentPositionMs = pendingContentPositionMs;
-    } else if (fakeContentProgressElapsedRealtimeMs != C.TIME_UNSET) {
-      long elapsedSinceEndMs = SystemClock.elapsedRealtime() - fakeContentProgressElapsedRealtimeMs;
-      contentPositionMs = fakeContentProgressOffsetMs + elapsedSinceEndMs;
-    } else if (imaAdState == IMA_AD_STATE_NONE && !playingAd && hasContentDuration) {
-      contentPositionMs = getContentPeriodPositionMs(player, timeline, period);
-    } else {
-      return VideoProgressUpdate.VIDEO_TIME_NOT_READY;
-    }
-    long contentDurationMs = hasContentDuration ? this.contentDurationMs : IMA_DURATION_UNSET;
-    return new VideoProgressUpdate(contentPositionMs, contentDurationMs);
+    return videoProgressUpdate;
   }
 
   // VideoAdPlayer implementation.
@@ -1124,6 +1069,27 @@ public final class ImaAdsLoader
     }
   }
 
+  private VideoProgressUpdate getContentVideoProgressUpdate() {
+    if (player == null) {
+      return lastContentProgress;
+    }
+    boolean hasContentDuration = contentDurationMs != C.TIME_UNSET;
+    long contentPositionMs;
+    if (pendingContentPositionMs != C.TIME_UNSET) {
+      sentPendingContentPositionMs = true;
+      contentPositionMs = pendingContentPositionMs;
+    } else if (fakeContentProgressElapsedRealtimeMs != C.TIME_UNSET) {
+      long elapsedSinceEndMs = SystemClock.elapsedRealtime() - fakeContentProgressElapsedRealtimeMs;
+      contentPositionMs = fakeContentProgressOffsetMs + elapsedSinceEndMs;
+    } else if (imaAdState == IMA_AD_STATE_NONE && !playingAd && hasContentDuration) {
+      contentPositionMs = getContentPeriodPositionMs(player, timeline, period);
+    } else {
+      return VideoProgressUpdate.VIDEO_TIME_NOT_READY;
+    }
+    long contentDurationMs = hasContentDuration ? this.contentDurationMs : IMA_DURATION_UNSET;
+    return new VideoProgressUpdate(contentPositionMs, contentDurationMs);
+  }
+
   private VideoProgressUpdate getAdVideoProgressUpdate() {
     if (player == null) {
       return lastAdProgress;
@@ -1393,17 +1359,6 @@ public final class ImaAdsLoader
     }
   }
 
-  private static DataSpec getAdsDataSpec(@Nullable Uri adTagUri) {
-    return new DataSpec(adTagUri != null ? adTagUri : Uri.EMPTY);
-  }
-
-  private static long getContentPeriodPositionMs(
-      Player player, Timeline timeline, Timeline.Period period) {
-    long contentWindowPositionMs = player.getContentPosition();
-    return contentWindowPositionMs
-        - timeline.getPeriod(/* periodIndex= */ 0, period).getPositionInWindowMs();
-  }
-
   private int getAdGroupIndex(AdPodInfo adPodInfo) {
     if (adPodInfo.getPodIndex() == -1) {
       // This is a postroll ad.
@@ -1418,6 +1373,22 @@ public final class ImaAdsLoader
       }
     }
     throw new IllegalStateException("Failed to find cue point");
+  }
+
+  private String getAdMediaInfoString(AdMediaInfo adMediaInfo) {
+    @Nullable AdInfo adInfo = adInfoByAdMediaInfo.get(adMediaInfo);
+    return "AdMediaInfo[" + adMediaInfo.getUrl() + (adInfo != null ? ", " + adInfo : "") + "]";
+  }
+
+  private static DataSpec getAdsDataSpec(@Nullable Uri adTagUri) {
+    return new DataSpec(adTagUri != null ? adTagUri : Uri.EMPTY);
+  }
+
+  private static long getContentPeriodPositionMs(
+      Player player, Timeline timeline, Timeline.Period period) {
+    long contentWindowPositionMs = player.getContentPosition();
+    return contentWindowPositionMs
+        - timeline.getPeriod(/* periodIndex= */ 0, period).getPositionInWindowMs();
   }
 
   private static long[] getAdGroupTimesUs(List<Float> cuePoints) {
@@ -1481,11 +1452,6 @@ public final class ImaAdsLoader
     /** @see ImaSdkFactory#createAdsLoader(Context, ImaSdkSettings, AdDisplayContainer) */
     com.google.ads.interactivemedia.v3.api.AdsLoader createAdsLoader(
         Context context, ImaSdkSettings imaSdkSettings, AdDisplayContainer adDisplayContainer);
-  }
-
-  private String getAdMediaInfoString(AdMediaInfo adMediaInfo) {
-    @Nullable AdInfo adInfo = adInfoByAdMediaInfo.get(adMediaInfo);
-    return "AdMediaInfo[" + adMediaInfo.getUrl() + (adInfo != null ? ", " + adInfo : "") + "]";
   }
 
   // TODO: Consider moving this into AdPlaybackState.

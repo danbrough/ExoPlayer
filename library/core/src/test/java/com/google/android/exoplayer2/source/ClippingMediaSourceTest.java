@@ -25,6 +25,7 @@ import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.Timeline;
 import com.google.android.exoplayer2.Timeline.Period;
 import com.google.android.exoplayer2.Timeline.Window;
+import com.google.android.exoplayer2.drm.DrmSessionManager;
 import com.google.android.exoplayer2.source.ClippingMediaSource.IllegalClippingException;
 import com.google.android.exoplayer2.source.MaskingMediaSource.DummyTimeline;
 import com.google.android.exoplayer2.source.MediaSource.MediaPeriodId;
@@ -50,8 +51,8 @@ import org.robolectric.annotation.LooperMode.Mode;
 @LooperMode(Mode.PAUSED)
 public final class ClippingMediaSourceTest {
 
-  private static final long TEST_PERIOD_DURATION_US = 1000000;
-  private static final long TEST_CLIP_AMOUNT_US = 300000;
+  private static final long TEST_PERIOD_DURATION_US = 1_000_000;
+  private static final long TEST_CLIP_AMOUNT_US = 300_000;
 
   private Window window;
   private Period period;
@@ -566,6 +567,7 @@ public final class ClippingMediaSourceTest {
               MediaPeriodId id,
               TrackGroupArray trackGroupArray,
               Allocator allocator,
+              DrmSessionManager drmSessionManager,
               EventDispatcher eventDispatcher,
               @Nullable TransferListener transferListener) {
             eventDispatcher.downstreamFormatChanged(
@@ -578,7 +580,12 @@ public final class ClippingMediaSourceTest {
                     C.usToMs(eventStartUs),
                     C.usToMs(eventEndUs)));
             return super.createFakeMediaPeriod(
-                id, trackGroupArray, allocator, eventDispatcher, transferListener);
+                id,
+                trackGroupArray,
+                allocator,
+                drmSessionManager,
+                eventDispatcher,
+                transferListener);
           }
         };
     final ClippingMediaSource clippingMediaSource =

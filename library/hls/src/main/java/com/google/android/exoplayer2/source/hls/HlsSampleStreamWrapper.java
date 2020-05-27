@@ -146,6 +146,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   private @MonotonicNonNull Format upstreamTrackFormat;
   @Nullable private Format downstreamTrackFormat;
   private boolean released;
+  private int pendingDiscardUpstreamQueueSize;
 
   // Tracks are complicated in HLS. See documentation of buildTracksFromSampleStreams for details.
   // Indexed by track (as exposed by this source).
@@ -229,6 +230,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     handler = Util.createHandler();
     lastSeekPositionUs = positionUs;
     pendingResetPositionUs = positionUs;
+    pendingDiscardUpstreamQueueSize = C.LENGTH_UNSET;
   }
 
   public void continuePreparing() {
@@ -696,7 +698,21 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 
   @Override
   public void reevaluateBuffer(long positionUs) {
-    // Do nothing.
+    if (loader.hasFatalError() || isPendingReset()) {
+      return;
+    }
+
+    int currentQueueSize = mediaChunks.size();
+    int preferredQueueSize = chunkSource.getPreferredQueueSize(positionUs, readOnlyMediaChunks);
+    if (currentQueueSize <= preferredQueueSize) {
+      return;
+    }
+    if (loader.isLoading()) {
+      pendingDiscardUpstreamQueueSize = preferredQueueSize;
+      loader.cancelLoading();
+    } else {
+      discardUpstream(preferredQueueSize);
+    }
   }
 
   // Loader.Callback implementation.
@@ -753,7 +769,12 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
         loadable.startTimeUs,
         loadable.endTimeUs);
     if (!released) {
-      resetSampleQueues();
+      if (pendingDiscardUpstreamQueueSize != C.LENGTH_UNSET) {
+        discardUpstream(pendingDiscardUpstreamQueueSize);
+        pendingDiscardUpstreamQueueSize = C.LENGTH_UNSET;
+      } else {
+        resetSampleQueues();
+      }
       if (enabledTrackGroupCount > 0) {
         callback.onContinueLoadingRequested(this);
       }
@@ -851,16 +872,35 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     upstreamTrackFormat = chunk.trackFormat;
     pendingResetPositionUs = C.TIME_UNSET;
     mediaChunks.add(chunk);
-
-    chunk.init(this);
+    chunk.init(/* output= */ this, sampleQueues);
     for (HlsSampleQueue sampleQueue : sampleQueues) {
       sampleQueue.setSourceChunk(chunk);
     }
-    if (chunk.shouldSpliceIn) {
-      for (SampleQueue sampleQueue : sampleQueues) {
-        sampleQueue.splice();
+  }
+
+  private void discardUpstream(int preferredQueueSize) {
+    Assertions.checkState(!loader.isLoading());
+
+    int newQueueSize = C.LENGTH_UNSET;
+    for (int i = preferredQueueSize; i < mediaChunks.size(); i++) {
+      if (!haveReadFromMediaChunkDiscardRange(i)) {
+        newQueueSize = i;
+        break;
       }
     }
+    if (newQueueSize == C.LENGTH_UNSET) {
+      return;
+    }
+
+    long endTimeUs = getLastMediaChunk().endTimeUs;
+    HlsMediaChunk firstRemovedChunk = discardUpstreamMediaChunksFromIndex(newQueueSize);
+    if (mediaChunks.isEmpty()) {
+      pendingResetPositionUs = lastSeekPositionUs;
+    }
+    loadingFinished = false;
+
+    eventDispatcher.upstreamDiscarded(
+        primarySampleQueueType, firstRemovedChunk.startTimeUs, endTimeUs);
   }
 
   // ExtractorOutput implementation. Called by the loading thread.
@@ -1059,6 +1099,27 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
       }
     }
     return true;
+  }
+
+  private boolean haveReadFromMediaChunkDiscardRange(int mediaChunkIndex) {
+    HlsMediaChunk mediaChunk = mediaChunks.get(mediaChunkIndex);
+    for (SampleQueue sampleQueue : sampleQueues) {
+      int discardFromIndex = mediaChunk.getSampleQueueDiscardFromIndex(sampleQueue);
+      if (sampleQueue.getReadIndex() > discardFromIndex) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private HlsMediaChunk discardUpstreamMediaChunksFromIndex(int chunkIndex) {
+    HlsMediaChunk firstRemovedChunk = mediaChunks.get(chunkIndex);
+    Util.removeRange(mediaChunks, /* fromIndex= */ chunkIndex, /* toIndex= */ mediaChunks.size());
+    for (SampleQueue sampleQueue : sampleQueues) {
+      int discardFromIndex = firstRemovedChunk.getSampleQueueDiscardFromIndex(sampleQueue);
+      sampleQueue.discardUpstreamSamples(discardFromIndex);
+    }
+    return firstRemovedChunk;
   }
 
   private void resetSampleQueues() {
@@ -1388,22 +1449,25 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
    */
   private static final class HlsSampleQueue extends SampleQueue {
 
-    /**
-     * The fraction of the chunk duration from which timestamps of samples loaded from within a
-     * chunk are allowed to deviate from the expected range.
-     */
-    private static final double MAX_TIMESTAMP_DEVIATION_FRACTION = 0.5;
-
-    /**
-     * A minimum tolerance for sample timestamps in microseconds. Timestamps of samples loaded from
-     * within a chunk are always allowed to deviate up to this amount from the expected range.
-     */
-    private static final long MIN_TIMESTAMP_DEVIATION_TOLERANCE_US = 4_000_000;
-
-    @Nullable private HlsMediaChunk sourceChunk;
-    private long sourceChunkLastSampleTimeUs;
-    private long minAllowedSampleTimeUs;
-    private long maxAllowedSampleTimeUs;
+    // TODO: Uncomment this to reject samples with unexpected timestamps. See
+    // https://github.com/google/ExoPlayer/issues/7030.
+    // /**
+    //  * The fraction of the chunk duration from which timestamps of samples loaded from within a
+    //  * chunk are allowed to deviate from the expected range.
+    //  */
+    // private static final double MAX_TIMESTAMP_DEVIATION_FRACTION = 0.5;
+    //
+    // /**
+    //  * A minimum tolerance for sample timestamps in microseconds. Timestamps of samples loaded
+    //  * from within a chunk are always allowed to deviate up to this amount from the expected
+    //  * range.
+    //  */
+    // private static final long MIN_TIMESTAMP_DEVIATION_TOLERANCE_US = 4_000_000;
+    //
+    // @Nullable private HlsMediaChunk sourceChunk;
+    // private long sourceChunkLastSampleTimeUs;
+    // private long minAllowedSampleTimeUs;
+    // private long maxAllowedSampleTimeUs;
 
     private final Map<String, DrmInitData> overridingDrmInitData;
     @Nullable private DrmInitData drmInitData;
@@ -1419,16 +1483,18 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     }
 
     public void setSourceChunk(HlsMediaChunk chunk) {
-      sourceChunk = chunk;
-      sourceChunkLastSampleTimeUs = C.TIME_UNSET;
       sourceId(chunk.uid);
 
-      long allowedDeviationUs =
-          Math.max(
-              (long) ((chunk.endTimeUs - chunk.startTimeUs) * MAX_TIMESTAMP_DEVIATION_FRACTION),
-              MIN_TIMESTAMP_DEVIATION_TOLERANCE_US);
-      minAllowedSampleTimeUs = chunk.startTimeUs - allowedDeviationUs;
-      maxAllowedSampleTimeUs = chunk.endTimeUs + allowedDeviationUs;
+      // TODO: Uncomment this to reject samples with unexpected timestamps. See
+      // https://github.com/google/ExoPlayer/issues/7030.
+      // sourceChunk = chunk;
+      // sourceChunkLastSampleTimeUs = C.TIME_UNSET;
+      // long allowedDeviationUs =
+      //     Math.max(
+      //         (long) ((chunk.endTimeUs - chunk.startTimeUs) * MAX_TIMESTAMP_DEVIATION_FRACTION),
+      //         MIN_TIMESTAMP_DEVIATION_TOLERANCE_US);
+      // minAllowedSampleTimeUs = chunk.startTimeUs - allowedDeviationUs;
+      // maxAllowedSampleTimeUs = chunk.endTimeUs + allowedDeviationUs;
     }
 
     public void setDrmInitData(@Nullable DrmInitData drmInitData) {
@@ -1506,7 +1572,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
       //       new UnexpectedSampleTimestampException(
       //           sourceChunk, sourceChunkLastSampleTimeUs, timeUs));
       // }
-      sourceChunkLastSampleTimeUs = timeUs;
+      // sourceChunkLastSampleTimeUs = timeUs;
       super.sampleMetadata(timeUs, flags, size, offset, cryptoData);
     }
   }

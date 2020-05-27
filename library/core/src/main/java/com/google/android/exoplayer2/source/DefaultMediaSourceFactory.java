@@ -22,7 +22,6 @@ import android.util.SparseArray;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlayerLibraryInfo;
-import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.drm.DefaultDrmSessionManager;
 import com.google.android.exoplayer2.drm.DrmSessionManager;
@@ -42,6 +41,7 @@ import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.Util;
+import com.google.common.primitives.Ints;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -299,16 +299,9 @@ public final class DefaultMediaSourceFactory implements MediaSourceFactory {
       SingleSampleMediaSource.Factory singleSampleSourceFactory =
           new SingleSampleMediaSource.Factory(dataSourceFactory);
       for (int i = 0; i < subtitles.size(); i++) {
-        MediaItem.Subtitle subtitle = subtitles.get(i);
-        Format subtitleFormat =
-            new Format.Builder()
-                .setSampleMimeType(subtitle.mimeType)
-                .setLanguage(subtitle.language)
-                .setSelectionFlags(subtitle.selectionFlags)
-                .build();
         mediaSources[i + 1] =
             singleSampleSourceFactory.createMediaSource(
-                subtitle.uri, subtitleFormat, /* durationUs= */ C.TIME_UNSET);
+                subtitles.get(i), /* durationUs= */ C.TIME_UNSET);
       }
       mediaSource = new MergingMediaSource(mediaSources);
     }
@@ -331,7 +324,7 @@ public final class DefaultMediaSourceFactory implements MediaSourceFactory {
         .setPlayClearSamplesWithoutKeys(
             mediaItem.playbackProperties.drmConfiguration.playClearContentWithoutKey)
         .setUseDrmSessionsForClearContent(
-            Util.toArray(mediaItem.playbackProperties.drmConfiguration.sessionForClearTypes))
+            Ints.toArray(mediaItem.playbackProperties.drmConfiguration.sessionForClearTypes))
         .build(createHttpMediaDrmCallback(mediaItem.playbackProperties.drmConfiguration));
   }
 

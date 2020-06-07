@@ -19,9 +19,9 @@ if (project.ext.has("exoplayerPublishEnabled")
         desc = releaseDescription
         publishVersion = releaseVersion
         repoName = getBintrayRepo()
-        userOrg = 'google'
+        userOrg = 'danbrough'
         groupId = 'com.google.android.exoplayer'
-        website = 'https://github.com/google/ExoPlayer'
+        website = 'https://github.com/danbrough/ExoPlayer'
     }
 
     gradle.taskGraph.whenReady { taskGraph ->
@@ -66,3 +66,4 @@ static void addLicense(File pom) {
     printer.print(xml)
     writer.close()
 }
+

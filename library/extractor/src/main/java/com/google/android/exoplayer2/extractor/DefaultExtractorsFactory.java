@@ -15,6 +15,9 @@
  */
 package com.google.android.exoplayer2.extractor;
 
+import static com.google.android.exoplayer2.util.FileTypes.getFormatFromExtension;
+
+import android.net.Uri;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.extractor.amr.AmrExtractor;
 import com.google.android.exoplayer2.extractor.flac.FlacExtractor;
@@ -32,8 +35,11 @@ import com.google.android.exoplayer2.extractor.ts.PsExtractor;
 import com.google.android.exoplayer2.extractor.ts.TsExtractor;
 import com.google.android.exoplayer2.extractor.ts.TsPayloadReader;
 import com.google.android.exoplayer2.extractor.wav.WavExtractor;
+import com.google.android.exoplayer2.util.FileTypes;
 import com.google.android.exoplayer2.util.TimestampAdjuster;
 import java.lang.reflect.Constructor;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * An {@link ExtractorsFactory} that provides an array of extractors for the following formats:
@@ -62,6 +68,25 @@ import java.lang.reflect.Constructor;
  * </ul>
  */
 public final class DefaultExtractorsFactory implements ExtractorsFactory {
+
+  // Extractors order is optimized according to
+  // https://docs.google.com/document/d/1w2mKaWMxfz2Ei8-LdxqbPs1VLe_oudB-eryXXw9OvQQ.
+  private static final int[] DEFAULT_EXTRACTOR_ORDER =
+      new int[] {
+        FileTypes.FLV,
+        FileTypes.FLAC,
+        FileTypes.WAV,
+        FileTypes.MP4,
+        FileTypes.AMR,
+        FileTypes.PS,
+        FileTypes.OGG,
+        FileTypes.TS,
+        FileTypes.MATROSKA,
+        FileTypes.ADTS,
+        FileTypes.AC3,
+        FileTypes.AC4,
+        FileTypes.MP3,
+      };
 
   @Nullable
   private static final Constructor<? extends Extractor> FLAC_EXTENSION_EXTRACTOR_CONSTRUCTOR;
@@ -240,48 +265,93 @@ public final class DefaultExtractorsFactory implements ExtractorsFactory {
 
   @Override
   public synchronized Extractor[] createExtractors() {
-    Extractor[] extractors = new Extractor[14];
-    // Extractors order is optimized according to
-    // https://docs.google.com/document/d/1w2mKaWMxfz2Ei8-LdxqbPs1VLe_oudB-eryXXw9OvQQ.
-    extractors[0] = new FlvExtractor();
-    if (FLAC_EXTENSION_EXTRACTOR_CONSTRUCTOR != null) {
-      try {
-        extractors[1] = FLAC_EXTENSION_EXTRACTOR_CONSTRUCTOR.newInstance();
-      } catch (Exception e) {
-        // Should never happen.
-        throw new IllegalStateException("Unexpected error creating FLAC extractor", e);
-      }
-    } else {
-      extractors[1] = new FlacExtractor(coreFlacFlags);
-    }
-    extractors[2] = new WavExtractor();
-    extractors[3] = new FragmentedMp4Extractor(fragmentedMp4Flags);
-    extractors[4] = new Mp4Extractor(mp4Flags);
-    extractors[5] =
-        new AmrExtractor(
-            amrFlags
-                | (constantBitrateSeekingEnabled
-                    ? AmrExtractor.FLAG_ENABLE_CONSTANT_BITRATE_SEEKING
-                    : 0));
-    extractors[6] = new PsExtractor();
-    extractors[7] = new OggExtractor();
-    extractors[8] = new TsExtractor(tsMode, tsFlags);
-    extractors[9] = new MatroskaExtractor(matroskaFlags);
-    extractors[10] =
-        new AdtsExtractor(
-            adtsFlags
-                | (constantBitrateSeekingEnabled
-                    ? AdtsExtractor.FLAG_ENABLE_CONSTANT_BITRATE_SEEKING
-                    : 0));
-    extractors[11] = new Ac3Extractor();
-    extractors[12] = new Ac4Extractor();
-    extractors[13] =
-        new Mp3Extractor(
-            mp3Flags
-                | (constantBitrateSeekingEnabled
-                    ? Mp3Extractor.FLAG_ENABLE_CONSTANT_BITRATE_SEEKING
-                    : 0));
-    return extractors;
+    return createExtractors(Uri.EMPTY);
   }
 
+  @Override
+  public synchronized Extractor[] createExtractors(Uri uri) {
+    List<Extractor> extractors = new ArrayList<>(/* initialCapacity= */ 14);
+
+    @FileTypes.Type int extensionFormat = getFormatFromExtension(uri);
+    addExtractorsForFormat(extensionFormat, extractors);
+
+    for (int format : DEFAULT_EXTRACTOR_ORDER) {
+      if (format != extensionFormat) {
+        addExtractorsForFormat(format, extractors);
+      }
+    }
+
+    return extractors.toArray(new Extractor[extractors.size()]);
+  }
+
+  private void addExtractorsForFormat(@FileTypes.Type int fileFormat, List<Extractor> extractors) {
+    switch (fileFormat) {
+      case FileTypes.AC3:
+        extractors.add(new Ac3Extractor());
+        break;
+      case FileTypes.AC4:
+        extractors.add(new Ac4Extractor());
+        break;
+      case FileTypes.ADTS:
+        extractors.add(
+            new AdtsExtractor(
+                adtsFlags
+                    | (constantBitrateSeekingEnabled
+                        ? AdtsExtractor.FLAG_ENABLE_CONSTANT_BITRATE_SEEKING
+                        : 0)));
+        break;
+      case FileTypes.AMR:
+        extractors.add(
+            new AmrExtractor(
+                amrFlags
+                    | (constantBitrateSeekingEnabled
+                        ? AmrExtractor.FLAG_ENABLE_CONSTANT_BITRATE_SEEKING
+                        : 0)));
+        break;
+      case FileTypes.FLAC:
+        if (FLAC_EXTENSION_EXTRACTOR_CONSTRUCTOR != null) {
+          try {
+            extractors.add(FLAC_EXTENSION_EXTRACTOR_CONSTRUCTOR.newInstance());
+          } catch (Exception e) {
+            // Should never happen.
+            throw new IllegalStateException("Unexpected error creating FLAC extractor", e);
+          }
+        } else {
+          extractors.add(new FlacExtractor(coreFlacFlags));
+        }
+        break;
+      case FileTypes.FLV:
+        extractors.add(new FlvExtractor());
+        break;
+      case FileTypes.MATROSKA:
+        extractors.add(new MatroskaExtractor(matroskaFlags));
+        break;
+      case FileTypes.MP3:
+        extractors.add(
+            new Mp3Extractor(
+                mp3Flags
+                    | (constantBitrateSeekingEnabled
+                        ? Mp3Extractor.FLAG_ENABLE_CONSTANT_BITRATE_SEEKING
+                        : 0)));
+        break;
+      case FileTypes.MP4:
+        extractors.add(new FragmentedMp4Extractor(fragmentedMp4Flags));
+        extractors.add(new Mp4Extractor(mp4Flags));
+        break;
+      case FileTypes.OGG:
+        extractors.add(new OggExtractor());
+        break;
+      case FileTypes.PS:
+        extractors.add(new PsExtractor());
+        break;
+      case FileTypes.TS:
+        extractors.add(new TsExtractor(tsMode, tsFlags));
+        break;
+      case FileTypes.WAV:
+        extractors.add(new WavExtractor());
+        break;
+      default:
+        break;
+    }
+  }
 }

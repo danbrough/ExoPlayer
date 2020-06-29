@@ -4,7 +4,6 @@
 
 *   Core library:
     *   Implement getTag for SilenceMediaSource.
-    *   Add `Player.getTrackSelector` to access track selector from UI module.
     *   Added `TextComponent.getCurrentCues` because the current cues are no
         longer forwarded to a new `TextOutput` in `SimpleExoPlayer`
         automatically.
@@ -75,7 +74,8 @@
     *   `SimpleDecoderVideoRenderer` and `SimpleDecoderAudioRenderer` renamed to
         `DecoderVideoRenderer` and `DecoderAudioRenderer` respectively, and
         generalized to work with `Decoder` rather than `SimpleDecoder`.
-    *   Add media item based playlist API to Player.
+    *   Add media item based playlist API to `Player`.
+    *   Add `getCurrentMediaItem` to `Player`.
     *   Remove deprecated members in `DefaultTrackSelector`.
     *   Add `Player.DeviceComponent` and implement it for `SimpleExoPlayer` so
         that the device volume can be controlled by player.
@@ -88,7 +88,16 @@
         ([#7332](https://github.com/google/ExoPlayer/issues/7332)).
     *   Add `HttpDataSource.InvalidResponseCodeException#responseBody` field
         ([#6853](https://github.com/google/ExoPlayer/issues/6853)).
+    *   Add `TrackSelection.shouldCancelMediaChunkLoad` to check whether an
+        ongoing load should be canceled. Only supported by HLS streams so far.
+        ([#2848](https://github.com/google/ExoPlayer/issues/2848)).
 *   Video: Pass frame rate hint to `Surface.setFrameRate` on Android R devices.
+*   Track selection:
+    *   Add `Player.getTrackSelector`.
+    *   Remove deprecated members in `DefaultTrackSelector`.
+    *   Add `DefaultTrackSelector` constraints for minimum video resolution,
+        bitrate and frame rate
+        ([#4511](https://github.com/google/ExoPlayer/issues/4511)).
 *   Text:
     *   Parse `<ruby>` and `<rt>` tags in WebVTT subtitles (rendering is coming
         later).
@@ -122,6 +131,10 @@
     *   Ignore excess characters in CEA-608 lines (max length is 32)
         ([#7341](https://github.com/google/ExoPlayer/issues/7341)).
     *   Add support for WebVTT's `ruby-position` CSS property.
+    *   Fix positioning for CEA-608 roll-up captions in the top half of screen
+        ([#7475](https://github.com/google/ExoPlayer/issues/7475)).
+    *   Redefine `Cue.lineType=LINE_TYPE_NUMBER` in terms of aligning the cue
+        text lines to grid of viewport lines, and ignore `Cue.lineAnchor`.
 *   DRM:
     *   Add support for attaching DRM sessions to clear content in the demo app.
     *   Remove `DrmSessionManager` references from all renderers.
@@ -144,6 +157,8 @@
         initialization vector used to encrypt the cache contents.
     *   Add `Requirements.DEVICE_STORAGE_NOT_LOW`, which can be specified as a
         requirement to a `DownloadManager` for it to proceed with downloading.
+    *   For failed downloads, propagate the `Exception` that caused the failure
+        to `DownloadManager.Listener.onDownloadChanged`.
 *   Audio:
     *   Add a sample count parameter to `MediaCodecRenderer.processOutputBuffer`
         and `AudioSink.handleBuffer` to allow batching multiple encoded frames
@@ -151,7 +166,12 @@
     *   No longer use a `MediaCodec` in audio passthrough mode.
     *   Check `DefaultAudioSink` supports passthrough, in addition to checking
         the `AudioCapabilities`
+    *   Add an experimental scheduling mode to save power in offload.
         ([#7404](https://github.com/google/ExoPlayer/issues/7404)).
+    *   Adjust input timestamps in `MediaCodecRenderer` to account for the
+        Codec2 MP3 decoder having lower timestamps on the output side.
+    *   Propagate gapless audio metadata without the need to recreate the audio
+        decoders.
 *   DASH:
     *   Enable support for embedded CEA-708.
 *   HLS:
@@ -161,6 +181,7 @@
         timestamps ([#7464](https://github.com/google/ExoPlayer/issues/7464)).
 *   Ogg: Allow non-contiguous pages
     ([#7230](https://github.com/google/ExoPlayer/issues/7230)).
+*   Matroska: Remove support for "Invisible" block header flag.
 *   Extractors:
     *   Add `IndexSeeker` for accurate seeks in VBR MP3 streams
         ([#6787](https://github.com/google/ExoPlayer/issues/6787)). This seeker
@@ -170,16 +191,20 @@
     *   Change the order of extractors for sniffing to reduce start-up latency
         in `DefaultExtractorsFactory` and `DefaultHlsExtractorsFactory`
         ([#6410](https://github.com/google/ExoPlayer/issues/6410)).
-    *   Select first extractors based on the filename extension in
-        `DefaultExtractorsFactory`.
+    *   Select first extractors based on the filename extension and the response
+        headers mime type in `DefaultExtractorsFactory`.
 *   Testing
     *   Add `TestExoPlayer`, a utility class with APIs to create
         `SimpleExoPlayer` instances with fake components for testing.
     *   Upgrade Truth dependency from 0.44 to 1.0.
     *   Upgrade to JUnit 4.13-rc-2.
 *   UI
+    *   Remove `SimpleExoPlayerView` and `PlaybackControlView`.
     *   Remove deperecated `exo_simple_player_view.xml` and
         `exo_playback_control_view.xml` from resource.
+    *   Add setter methods to `PlayerView` and `PlayerControlView` to set
+        whether the rewind, fast forward, previous and next buttons are shown
+        ([#7410](https://github.com/google/ExoPlayer/issues/7410)).
     *   Move logic of prev, next, fast forward and rewind to ControlDispatcher
         ([#6926](https://github.com/google/ExoPlayer/issues/6926)).
     *   Update `TrackSelectionDialogBuilder` to use AndroidX Compat Dialog
@@ -190,6 +215,30 @@
     manipulation API.
 *   Demo app: Retain previous position in list of samples.
 *   Add Guava dependency.
+*   IMA extension: Fix the way 'content complete' is handled to avoid repeatedly
+    refreshing the timeline after playback ends.
+
+### 2.11.6 (2020-06-19) ###
+
+*   UI: Prevent `PlayerView` from temporarily hiding the video surface when
+    seeking to an unprepared period within the current window. For example when
+    seeking over an ad group, or to the next period in a multi-period DASH
+    stream ([#5507](https://github.com/google/ExoPlayer/issues/5507)).
+*   IMA extension:
+    *   Add option to skip ads before the start position.
+    *   Catch unexpected errors in `stopAd` to avoid a crash
+        ([#7492](https://github.com/google/ExoPlayer/issues/7492)).
+    *   Fix a bug that caused playback to be stuck buffering on resuming from
+        the background after all ads had played to the end
+        ([#7508](https://github.com/google/ExoPlayer/issues/7508)).
+    *   Fix a bug where the number of ads in an ad group couldn't change
+        ([#7477](https://github.com/google/ExoPlayer/issues/7477)).
+    *   Work around unexpected `pauseAd`/`stopAd` for ads that have preloaded
+        on seeking to another position
+        ([#7492](https://github.com/google/ExoPlayer/issues/7492)).
+    *   Fix incorrect rounding of ad cue points.
+    *   Fix handling of postrolls preloading
+        ([#7518](https://github.com/google/ExoPlayer/issues/7518)).
 
 ### 2.11.5 (2020-06-05) ###
 
@@ -207,10 +256,10 @@
     ([#7306](https://github.com/google/ExoPlayer/issues/7306)).
 *   Fix issue in `AudioTrackPositionTracker` that could cause negative positions
     to be reported at the start of playback and immediately after seeking
-    ([#7456](https://github.com/google/ExoPlayer/issues/7456).
+    ([#7456](https://github.com/google/ExoPlayer/issues/7456)).
 *   Fix further cases where downloads would sometimes not resume after their
     network requirements are met
-    ([#7453](https://github.com/google/ExoPlayer/issues/7453).
+    ([#7453](https://github.com/google/ExoPlayer/issues/7453)).
 *   DASH:
     *   Merge trick play adaptation sets (i.e., adaptation sets marked with
         `http://dashif.org/guidelines/trickmode`) into the same `TrackGroup` as
@@ -291,11 +340,12 @@
         to the `DefaultAudioSink` constructor
         ([#7134](https://github.com/google/ExoPlayer/issues/7134)).
     *   Workaround issue that could cause slower than realtime playback of AAC
-        on Android 10 ([#6671](https://github.com/google/ExoPlayer/issues/6671).
+        on Android 10
+        ([#6671](https://github.com/google/ExoPlayer/issues/6671)).
     *   Fix case where another app spuriously holding transient audio focus
         could prevent ExoPlayer from acquiring audio focus for an indefinite
         period of time
-        ([#7182](https://github.com/google/ExoPlayer/issues/7182).
+        ([#7182](https://github.com/google/ExoPlayer/issues/7182)).
     *   Fix case where the player volume could be permanently ducked if audio
         focus was released whilst ducking.
     *   Fix playback of WAV files with trailing non-media bytes
@@ -1244,7 +1294,7 @@
     ([#4492](https://github.com/google/ExoPlayer/issues/4492) and
     [#4634](https://github.com/google/ExoPlayer/issues/4634)).
 *   Fix issue where removing looping media from a playlist throws an exception
-    ([#4871](https://github.com/google/ExoPlayer/issues/4871).
+    ([#4871](https://github.com/google/ExoPlayer/issues/4871)).
 *   Fix issue where the preferred audio or text track would not be selected if
     mapped onto a secondary renderer of the corresponding type
     ([#4711](http://github.com/google/ExoPlayer/issues/4711)).
@@ -1675,7 +1725,7 @@
     resources when the playback thread has quit by the time the loading task has
     completed.
 *   ID3: Better handle malformed ID3 data
-    ([#3792](https://github.com/google/ExoPlayer/issues/3792).
+    ([#3792](https://github.com/google/ExoPlayer/issues/3792)).
 *   Support 14-bit mode and little endianness in DTS PES packets
     ([#3340](https://github.com/google/ExoPlayer/issues/3340)).
 *   Demo app: Add ability to download not DRM protected content.

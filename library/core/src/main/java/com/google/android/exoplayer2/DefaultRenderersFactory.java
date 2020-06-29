@@ -90,7 +90,8 @@ public class DefaultRenderersFactory implements RenderersFactory {
   private long allowedVideoJoiningTimeMs;
   private boolean enableDecoderFallback;
   private MediaCodecSelector mediaCodecSelector;
-  private @MediaCodecRenderer.MediaCodecOperationMode int mediaCodecOperationMode;
+  private @MediaCodecRenderer.MediaCodecOperationMode int audioMediaCodecOperationMode;
+  private @MediaCodecRenderer.MediaCodecOperationMode int videoMediaCodecOperationMode;
   private boolean enableOffload;
 
   /** @param context A {@link Context}. */
@@ -99,7 +100,8 @@ public class DefaultRenderersFactory implements RenderersFactory {
     extensionRendererMode = EXTENSION_RENDERER_MODE_OFF;
     allowedVideoJoiningTimeMs = DEFAULT_ALLOWED_VIDEO_JOINING_TIME_MS;
     mediaCodecSelector = MediaCodecSelector.DEFAULT;
-    mediaCodecOperationMode = MediaCodecRenderer.OPERATION_MODE_SYNCHRONOUS;
+    audioMediaCodecOperationMode = MediaCodecRenderer.OPERATION_MODE_SYNCHRONOUS;
+    videoMediaCodecOperationMode = MediaCodecRenderer.OPERATION_MODE_SYNCHRONOUS;
   }
 
   /**
@@ -145,8 +147,38 @@ public class DefaultRenderersFactory implements RenderersFactory {
   }
 
   /**
-   * Set the {@link MediaCodecRenderer.MediaCodecOperationMode} of {@link MediaCodecRenderer}
+   * Set the {@link MediaCodecRenderer.MediaCodecOperationMode} of {@link MediaCodecAudioRenderer}
    * instances.
+   *
+   * <p>This method is experimental, and will be renamed or removed in a future release.
+   *
+   * @param mode The {@link MediaCodecRenderer.MediaCodecOperationMode} to set.
+   * @return This factory, for convenience.
+   */
+  public DefaultRenderersFactory experimental_setAudioMediaCodecOperationMode(
+      @MediaCodecRenderer.MediaCodecOperationMode int mode) {
+    audioMediaCodecOperationMode = mode;
+    return this;
+  }
+
+  /**
+   * Set the {@link MediaCodecRenderer.MediaCodecOperationMode} of {@link MediaCodecVideoRenderer}
+   * instances.
+   *
+   * <p>This method is experimental, and will be renamed or removed in a future release.
+   *
+   * @param mode The {@link MediaCodecRenderer.MediaCodecOperationMode} to set.
+   * @return This factory, for convenience.
+   */
+  public DefaultRenderersFactory experimental_setVideoMediaCodecOperationMode(
+      @MediaCodecRenderer.MediaCodecOperationMode int mode) {
+    videoMediaCodecOperationMode = mode;
+    return this;
+  }
+
+  /**
+   * Set the {@link MediaCodecRenderer.MediaCodecOperationMode} for both {@link
+   * MediaCodecAudioRenderer} {@link MediaCodecVideoRenderer} instances.
    *
    * <p>This method is experimental, and will be renamed or removed in a future release.
    *
@@ -155,7 +187,8 @@ public class DefaultRenderersFactory implements RenderersFactory {
    */
   public DefaultRenderersFactory experimental_setMediaCodecOperationMode(
       @MediaCodecRenderer.MediaCodecOperationMode int mode) {
-    mediaCodecOperationMode = mode;
+    experimental_setAudioMediaCodecOperationMode(mode);
+    experimental_setVideoMediaCodecOperationMode(mode);
     return this;
   }
 
@@ -186,12 +219,20 @@ public class DefaultRenderersFactory implements RenderersFactory {
   }
 
   /**
-   * Sets whether audio should be played using the offload path. Audio offload disables audio
-   * processors (for example speed adjustment).
+   * Sets whether audio should be played using the offload path.
+   *
+   * <p>Audio offload disables ExoPlayer audio processing, but significantly reduces the energy
+   * consumption of the playback when {@link
+   * ExoPlayer#experimental_enableOffloadScheduling(boolean)} is enabled.
+   *
+   * <p>Most Android devices can only support one offload {@link android.media.AudioTrack} at a time
+   * and can invalidate it at any time. Thus an app can never be guaranteed that it will be able to
+   * play in offload.
    *
    * <p>The default value is {@code false}.
    *
-   * @param enableOffload If audio offload should be used.
+   * @param enableOffload Whether to enable use of audio offload for supported formats, if
+   *     available.
    * @return This factory, for convenience.
    */
   public DefaultRenderersFactory setEnableAudioOffload(boolean enableOffload) {
@@ -283,7 +324,7 @@ public class DefaultRenderersFactory implements RenderersFactory {
             eventHandler,
             eventListener,
             MAX_DROPPED_VIDEO_FRAME_COUNT_TO_NOTIFY);
-    videoRenderer.experimental_setMediaCodecOperationMode(mediaCodecOperationMode);
+    videoRenderer.experimental_setMediaCodecOperationMode(videoMediaCodecOperationMode);
     out.add(videoRenderer);
 
     if (extensionRendererMode == EXTENSION_RENDERER_MODE_OFF) {
@@ -390,7 +431,8 @@ public class DefaultRenderersFactory implements RenderersFactory {
    *     before output. May be empty.
    * @param eventHandler A handler to use when invoking event listeners and outputs.
    * @param eventListener An event listener.
-   * @param enableOffload If the renderer should use audio offload for all supported formats.
+   * @param enableOffload Whether to enable use of audio offload for supported formats, if
+   *     available.
    * @param out An array to which the built renderers should be appended.
    */
   protected void buildAudioRenderers(
@@ -415,7 +457,7 @@ public class DefaultRenderersFactory implements RenderersFactory {
                 new DefaultAudioProcessorChain(audioProcessors),
                 /* enableFloatOutput= */ false,
                 enableOffload));
-    audioRenderer.experimental_setMediaCodecOperationMode(mediaCodecOperationMode);
+    audioRenderer.experimental_setMediaCodecOperationMode(audioMediaCodecOperationMode);
     out.add(audioRenderer);
 
     if (extensionRendererMode == EXTENSION_RENDERER_MODE_OFF) {

@@ -15,7 +15,8 @@
  */
 package com.google.android.exoplayer2.extractor;
 
-import static com.google.android.exoplayer2.util.FileTypes.getFormatFromExtension;
+import static com.google.android.exoplayer2.util.FileTypes.inferFileTypeFromResponseHeaders;
+import static com.google.android.exoplayer2.util.FileTypes.inferFileTypeFromUri;
 
 import android.net.Uri;
 import androidx.annotation.Nullable;
@@ -39,7 +40,9 @@ import com.google.android.exoplayer2.util.FileTypes;
 import com.google.android.exoplayer2.util.TimestampAdjuster;
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * An {@link ExtractorsFactory} that provides an array of extractors for the following formats:
@@ -60,7 +63,8 @@ import java.util.List;
  *   <li>AMR ({@link AmrExtractor})
  *   <li>FLAC
  *       <ul>
- *         <li>If available, the FLAC extension extractor is used.
+ *         <li>If available, the FLAC extension's {@code
+ *             com.google.android.exoplayer2.ext.flac.FlacExtractor} is used.
  *         <li>Otherwise, the core {@link FlacExtractor} is used. Note that Android devices do not
  *             generally include a FLAC decoder before API 27. This can be worked around by using
  *             the FLAC extension or the FFmpeg extension.
@@ -105,7 +109,7 @@ public final class DefaultExtractorsFactory implements ExtractorsFactory {
         flacExtensionExtractorConstructor =
             Class.forName("com.google.android.exoplayer2.ext.flac.FlacExtractor")
                 .asSubclass(Extractor.class)
-                .getConstructor();
+                .getConstructor(int.class);
       }
       // LINT.ThenChange(../../../../../../../../proguard-rules.txt)
     } catch (ClassNotFoundException e) {
@@ -120,7 +124,7 @@ public final class DefaultExtractorsFactory implements ExtractorsFactory {
   private boolean constantBitrateSeekingEnabled;
   @AdtsExtractor.Flags private int adtsFlags;
   @AmrExtractor.Flags private int amrFlags;
-  @FlacExtractor.Flags private int coreFlacFlags;
+  @FlacExtractor.Flags private int flacFlags;
   @MatroskaExtractor.Flags private int matroskaFlags;
   @Mp4Extractor.Flags private int mp4Flags;
   @FragmentedMp4Extractor.Flags private int fragmentedMp4Flags;
@@ -175,15 +179,17 @@ public final class DefaultExtractorsFactory implements ExtractorsFactory {
   }
 
   /**
-   * Sets flags for {@link FlacExtractor} instances created by the factory.
+   * Sets flags for {@link FlacExtractor} instances created by the factory. The flags are also used
+   * by {@code com.google.android.exoplayer2.ext.flac.FlacExtractor} instances if the FLAC extension
+   * is being used.
    *
    * @see FlacExtractor#FlacExtractor(int)
    * @param flags The flags to use.
    * @return The factory, for convenience.
    */
-  public synchronized DefaultExtractorsFactory setCoreFlacExtractorFlags(
+  public synchronized DefaultExtractorsFactory setFlacExtractorFlags(
       @FlacExtractor.Flags int flags) {
-    this.coreFlacFlags = flags;
+    this.flacFlags = flags;
     return this;
   }
 
@@ -265,27 +271,37 @@ public final class DefaultExtractorsFactory implements ExtractorsFactory {
 
   @Override
   public synchronized Extractor[] createExtractors() {
-    return createExtractors(Uri.EMPTY);
+    return createExtractors(Uri.EMPTY, new HashMap<>());
   }
 
   @Override
-  public synchronized Extractor[] createExtractors(Uri uri) {
+  public synchronized Extractor[] createExtractors(
+      Uri uri, Map<String, List<String>> responseHeaders) {
     List<Extractor> extractors = new ArrayList<>(/* initialCapacity= */ 14);
 
-    @FileTypes.Type int extensionFormat = getFormatFromExtension(uri);
-    addExtractorsForFormat(extensionFormat, extractors);
+    @FileTypes.Type
+    int responseHeadersInferredFileType = inferFileTypeFromResponseHeaders(responseHeaders);
+    if (responseHeadersInferredFileType != FileTypes.UNKNOWN) {
+      addExtractorsForFileType(responseHeadersInferredFileType, extractors);
+    }
 
-    for (int format : DEFAULT_EXTRACTOR_ORDER) {
-      if (format != extensionFormat) {
-        addExtractorsForFormat(format, extractors);
+    @FileTypes.Type int uriInferredFileType = inferFileTypeFromUri(uri);
+    if (uriInferredFileType != FileTypes.UNKNOWN
+        && uriInferredFileType != responseHeadersInferredFileType) {
+      addExtractorsForFileType(uriInferredFileType, extractors);
+    }
+
+    for (int fileType : DEFAULT_EXTRACTOR_ORDER) {
+      if (fileType != responseHeadersInferredFileType && fileType != uriInferredFileType) {
+        addExtractorsForFileType(fileType, extractors);
       }
     }
 
     return extractors.toArray(new Extractor[extractors.size()]);
   }
 
-  private void addExtractorsForFormat(@FileTypes.Type int fileFormat, List<Extractor> extractors) {
-    switch (fileFormat) {
+  private void addExtractorsForFileType(@FileTypes.Type int fileType, List<Extractor> extractors) {
+    switch (fileType) {
       case FileTypes.AC3:
         extractors.add(new Ac3Extractor());
         break;
@@ -311,13 +327,13 @@ public final class DefaultExtractorsFactory implements ExtractorsFactory {
       case FileTypes.FLAC:
         if (FLAC_EXTENSION_EXTRACTOR_CONSTRUCTOR != null) {
           try {
-            extractors.add(FLAC_EXTENSION_EXTRACTOR_CONSTRUCTOR.newInstance());
+            extractors.add(FLAC_EXTENSION_EXTRACTOR_CONSTRUCTOR.newInstance(flacFlags));
           } catch (Exception e) {
             // Should never happen.
             throw new IllegalStateException("Unexpected error creating FLAC extractor", e);
           }
         } else {
-          extractors.add(new FlacExtractor(coreFlacFlags));
+          extractors.add(new FlacExtractor(flacFlags));
         }
         break;
       case FileTypes.FLV:

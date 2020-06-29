@@ -51,6 +51,7 @@ import com.google.android.exoplayer2.upstream.DefaultLoadErrorHandlingPolicy;
 import com.google.android.exoplayer2.upstream.LoadErrorHandlingPolicy;
 import com.google.android.exoplayer2.upstream.TransferListener;
 import com.google.android.exoplayer2.util.MimeTypes;
+import com.google.android.exoplayer2.util.Util;
 import java.io.IOException;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
@@ -425,13 +426,18 @@ public final class HlsMediaSource extends BaseMediaSource
     this.useSessionKeys = useSessionKeys;
   }
 
+  /**
+   * @deprecated Use {@link #getMediaItem()} and {@link MediaItem.PlaybackProperties#tag} instead.
+   */
+  @SuppressWarnings("deprecation")
+  @Deprecated
   @Override
   @Nullable
   public Object getTag() {
     return playbackProperties.tag;
   }
 
-  // TODO(bachinger): add @Override annotation once the method is defined by MediaSource.
+  @Override
   public MediaItem getMediaItem() {
     return mediaItem;
   }

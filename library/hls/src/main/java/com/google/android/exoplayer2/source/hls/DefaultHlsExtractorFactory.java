@@ -15,7 +15,7 @@
  */
 package com.google.android.exoplayer2.source.hls;
 
-import static com.google.android.exoplayer2.util.FileTypes.getFormatFromExtension;
+import static com.google.android.exoplayer2.util.Assertions.checkNotNull;
 
 import android.net.Uri;
 import android.text.TextUtils;
@@ -31,12 +31,12 @@ import com.google.android.exoplayer2.extractor.ts.AdtsExtractor;
 import com.google.android.exoplayer2.extractor.ts.DefaultTsPayloadReaderFactory;
 import com.google.android.exoplayer2.extractor.ts.TsExtractor;
 import com.google.android.exoplayer2.metadata.Metadata;
-import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.FileTypes;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.TimestampAdjuster;
 import java.io.EOFException;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +45,19 @@ import java.util.Map;
  * Default {@link HlsExtractorFactory} implementation.
  */
 public final class DefaultHlsExtractorFactory implements HlsExtractorFactory {
+
+  // Extractors order is optimized according to
+  // https://docs.google.com/document/d/1w2mKaWMxfz2Ei8-LdxqbPs1VLe_oudB-eryXXw9OvQQ.
+  private static final int[] DEFAULT_EXTRACTOR_ORDER =
+      new int[] {
+        FileTypes.MP4,
+        FileTypes.WEBVTT,
+        FileTypes.TS,
+        FileTypes.ADTS,
+        FileTypes.AC3,
+        FileTypes.AC4,
+        FileTypes.MP3,
+      };
 
   @DefaultTsPayloadReaderFactory.Flags private final int payloadReaderFactoryFlags;
   private final boolean exposeCea608WhenMissingDeclarations;
@@ -75,8 +88,7 @@ public final class DefaultHlsExtractorFactory implements HlsExtractorFactory {
   }
 
   @Override
-  public Result createExtractor(
-      @Nullable Extractor previousExtractor,
+  public BundledHlsMediaChunkExtractor createExtractor(
       Uri uri,
       Format format,
       @Nullable List<Format> muxedCaptionFormats,
@@ -84,112 +96,58 @@ public final class DefaultHlsExtractorFactory implements HlsExtractorFactory {
       Map<String, List<String>> responseHeaders,
       ExtractorInput extractorInput)
       throws IOException {
+    @FileTypes.Type
+    int formatInferredFileType = FileTypes.inferFileTypeFromMimeType(format.sampleMimeType);
+    @FileTypes.Type
+    int responseHeadersInferredFileType =
+        FileTypes.inferFileTypeFromResponseHeaders(responseHeaders);
+    @FileTypes.Type int uriInferredFileType = FileTypes.inferFileTypeFromUri(uri);
 
-    if (previousExtractor != null) {
-      // An extractor has already been successfully used. Return one of the same type.
-      if (isReusable(previousExtractor)) {
-        return buildResult(previousExtractor);
-      } else {
-        Result result =
-            buildResultForSameExtractorType(previousExtractor, format, timestampAdjuster);
-        if (result == null) {
-          throw new IllegalArgumentException(
-              "Unexpected previousExtractor type: " + previousExtractor.getClass().getSimpleName());
-        }
-      }
+    // Defines the order in which to try the extractors.
+    List<Integer> fileTypeOrder =
+        new ArrayList<>(/* initialCapacity= */ DEFAULT_EXTRACTOR_ORDER.length);
+    addFileTypeIfNotPresent(formatInferredFileType, fileTypeOrder);
+    addFileTypeIfNotPresent(responseHeadersInferredFileType, fileTypeOrder);
+    addFileTypeIfNotPresent(uriInferredFileType, fileTypeOrder);
+    for (int fileType : DEFAULT_EXTRACTOR_ORDER) {
+      addFileTypeIfNotPresent(fileType, fileTypeOrder);
     }
-
-    // Try selecting the extractor by the file extension.
-    @Nullable
-    Extractor extractorByFileExtension =
-        createExtractorByFileExtension(uri, format, muxedCaptionFormats, timestampAdjuster);
-    extractorInput.resetPeekPosition();
-    if (extractorByFileExtension != null
-        && sniffQuietly(extractorByFileExtension, extractorInput)) {
-      return buildResult(extractorByFileExtension);
-    }
-
-    // We need to manually sniff each known type, without retrying the one selected by file
-    // extension. Extractors order is optimized according to
-    // https://docs.google.com/document/d/1w2mKaWMxfz2Ei8-LdxqbPs1VLe_oudB-eryXXw9OvQQ.
 
     // Extractor to be used if the type is not recognized.
-    @Nullable Extractor fallBackExtractor = extractorByFileExtension;
-
-    if (!(extractorByFileExtension instanceof FragmentedMp4Extractor)) {
-      FragmentedMp4Extractor fragmentedMp4Extractor =
-          createFragmentedMp4Extractor(timestampAdjuster, format, muxedCaptionFormats);
-      if (sniffQuietly(fragmentedMp4Extractor, extractorInput)) {
-        return buildResult(fragmentedMp4Extractor);
+    @Nullable Extractor fallBackExtractor = null;
+    extractorInput.resetPeekPosition();
+    for (int i = 0; i < fileTypeOrder.size(); i++) {
+      int fileType = fileTypeOrder.get(i);
+      Extractor extractor =
+          checkNotNull(
+              createExtractorByFileType(fileType, format, muxedCaptionFormats, timestampAdjuster));
+      if (sniffQuietly(extractor, extractorInput)) {
+        return new BundledHlsMediaChunkExtractor(extractor, format, timestampAdjuster);
+      }
+      if (fileType == FileTypes.TS) {
+        fallBackExtractor = extractor;
       }
     }
 
-    if (!(extractorByFileExtension instanceof WebvttExtractor)) {
-      WebvttExtractor webvttExtractor = new WebvttExtractor(format.language, timestampAdjuster);
-      if (sniffQuietly(webvttExtractor, extractorInput)) {
-        return buildResult(webvttExtractor);
-      }
-    }
+    return new BundledHlsMediaChunkExtractor(
+        checkNotNull(fallBackExtractor), format, timestampAdjuster);
+  }
 
-    if (!(extractorByFileExtension instanceof TsExtractor)) {
-      TsExtractor tsExtractor =
-          createTsExtractor(
-              payloadReaderFactoryFlags,
-              exposeCea608WhenMissingDeclarations,
-              format,
-              muxedCaptionFormats,
-              timestampAdjuster);
-      if (sniffQuietly(tsExtractor, extractorInput)) {
-        return buildResult(tsExtractor);
-      }
-      if (fallBackExtractor == null) {
-        fallBackExtractor = tsExtractor;
-      }
+  private static void addFileTypeIfNotPresent(
+      @FileTypes.Type int fileType, List<Integer> fileTypes) {
+    if (fileType == FileTypes.UNKNOWN || fileTypes.contains(fileType)) {
+      return;
     }
-
-    if (!(extractorByFileExtension instanceof AdtsExtractor)) {
-      AdtsExtractor adtsExtractor = new AdtsExtractor();
-      if (sniffQuietly(adtsExtractor, extractorInput)) {
-        return buildResult(adtsExtractor);
-      }
-    }
-
-    if (!(extractorByFileExtension instanceof Ac3Extractor)) {
-      Ac3Extractor ac3Extractor = new Ac3Extractor();
-      if (sniffQuietly(ac3Extractor, extractorInput)) {
-        return buildResult(ac3Extractor);
-      }
-    }
-
-    if (!(extractorByFileExtension instanceof Ac4Extractor)) {
-      Ac4Extractor ac4Extractor = new Ac4Extractor();
-      if (sniffQuietly(ac4Extractor, extractorInput)) {
-        return buildResult(ac4Extractor);
-      }
-    }
-
-    if (!(extractorByFileExtension instanceof Mp3Extractor)) {
-      Mp3Extractor mp3Extractor =
-          new Mp3Extractor(/* flags= */ 0, /* forcedFirstSampleTimestampUs= */ 0);
-      if (sniffQuietly(mp3Extractor, extractorInput)) {
-        return buildResult(mp3Extractor);
-      }
-    }
-
-    return buildResult(Assertions.checkNotNull(fallBackExtractor));
+    fileTypes.add(fileType);
   }
 
   @Nullable
-  private Extractor createExtractorByFileExtension(
-      Uri uri,
+  private Extractor createExtractorByFileType(
+      @FileTypes.Type int fileType,
       Format format,
       @Nullable List<Format> muxedCaptionFormats,
       TimestampAdjuster timestampAdjuster) {
-    if (MimeTypes.TEXT_VTT.equals(format.sampleMimeType)) {
-      return new WebvttExtractor(format.language, timestampAdjuster);
-    }
-    @FileTypes.Type int fileFormat = getFormatFromExtension(uri);
-    switch (fileFormat) {
+    switch (fileType) {
       case FileTypes.WEBVTT:
         return new WebvttExtractor(format.language, timestampAdjuster);
       case FileTypes.ADTS:
@@ -283,34 +241,6 @@ public final class DefaultHlsExtractorFactory implements HlsExtractorFactory {
     return false;
   }
 
-  @Nullable
-  private static Result buildResultForSameExtractorType(
-      Extractor previousExtractor, Format format, TimestampAdjuster timestampAdjuster) {
-    if (previousExtractor instanceof WebvttExtractor) {
-      return buildResult(new WebvttExtractor(format.language, timestampAdjuster));
-    } else if (previousExtractor instanceof AdtsExtractor) {
-      return buildResult(new AdtsExtractor());
-    } else if (previousExtractor instanceof Ac3Extractor) {
-      return buildResult(new Ac3Extractor());
-    } else if (previousExtractor instanceof Ac4Extractor) {
-      return buildResult(new Ac4Extractor());
-    } else if (previousExtractor instanceof Mp3Extractor) {
-      return buildResult(new Mp3Extractor());
-    } else {
-      return null;
-    }
-  }
-
-  private static Result buildResult(Extractor extractor) {
-    return new Result(
-        extractor,
-        extractor instanceof AdtsExtractor
-            || extractor instanceof Ac3Extractor
-            || extractor instanceof Ac4Extractor
-            || extractor instanceof Mp3Extractor,
-        isReusable(extractor));
-  }
-
   private static boolean sniffQuietly(Extractor extractor, ExtractorInput input)
       throws IOException {
     boolean result = false;
@@ -322,10 +252,5 @@ public final class DefaultHlsExtractorFactory implements HlsExtractorFactory {
       input.resetPeekPosition();
     }
     return result;
-  }
-
-  private static boolean isReusable(Extractor previousExtractor) {
-    return previousExtractor instanceof TsExtractor
-        || previousExtractor instanceof FragmentedMp4Extractor;
   }
 }

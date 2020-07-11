@@ -28,6 +28,7 @@ import com.google.android.exoplayer2.drm.ExoMediaCrypto;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.TraceUtil;
+import com.google.android.exoplayer2.util.Util;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
 /** Decodes and renders audio using FFmpeg. */
@@ -137,25 +138,26 @@ public final class FfmpegAudioRenderer extends DecoderAudioRenderer {
         .setSampleMimeType(MimeTypes.AUDIO_RAW)
         .setChannelCount(decoder.getChannelCount())
         .setSampleRate(decoder.getSampleRate())
-        .setPcmEncoding(decoder.getEncoding())
+        .setEncoding(decoder.getEncoding())
         .build();
   }
 
   private boolean isOutputSupported(Format inputFormat) {
-    return shouldUseFloatOutput(inputFormat) || supportsOutput(inputFormat, C.ENCODING_PCM_16BIT);
+    return shouldUseFloatOutput(inputFormat)
+        || sinkSupportsFormat(inputFormat, C.ENCODING_PCM_16BIT);
   }
 
   private boolean shouldUseFloatOutput(Format inputFormat) {
     Assertions.checkNotNull(inputFormat.sampleMimeType);
-    if (!enableFloatOutput || !supportsOutput(inputFormat, C.ENCODING_PCM_FLOAT)) {
+    if (!enableFloatOutput || !sinkSupportsFormat(inputFormat, C.ENCODING_PCM_FLOAT)) {
       return false;
     }
     switch (inputFormat.sampleMimeType) {
       case MimeTypes.AUDIO_RAW:
         // For raw audio, output in 32-bit float encoding if the bit depth is > 16-bit.
-        return inputFormat.pcmEncoding == C.ENCODING_PCM_24BIT
-            || inputFormat.pcmEncoding == C.ENCODING_PCM_32BIT
-            || inputFormat.pcmEncoding == C.ENCODING_PCM_FLOAT;
+        return inputFormat.encoding == C.ENCODING_PCM_24BIT
+            || inputFormat.encoding == C.ENCODING_PCM_32BIT
+            || inputFormat.encoding == C.ENCODING_PCM_FLOAT;
       case MimeTypes.AUDIO_AC3:
         // AC-3 is always 16-bit, so there is no point outputting in 32-bit float encoding.
         return false;
@@ -165,4 +167,12 @@ public final class FfmpegAudioRenderer extends DecoderAudioRenderer {
     }
   }
 
+  /**
+   * Returns whether the renderer's {@link AudioSink} supports the PCM format that will be output
+   * from the decoder for the given input format and requested output encoding.
+   */
+  private boolean sinkSupportsFormat(Format inputFormat, @C.PcmEncoding int pcmEncoding) {
+    return sinkSupportsFormat(
+        Util.getPcmFormat(pcmEncoding, inputFormat.channelCount, inputFormat.sampleRate));
+  }
 }

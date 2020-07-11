@@ -72,7 +72,7 @@ public final class MaskingMediaSource extends CompositeMediaSource<Void> {
   }
 
   /** Returns the {@link Timeline}. */
-  public synchronized Timeline getTimeline() {
+  public Timeline getTimeline() {
     return timeline;
   }
 
@@ -150,7 +150,7 @@ public final class MaskingMediaSource extends CompositeMediaSource<Void> {
   }
 
   @Override
-  protected synchronized void onChildSourceInfoRefreshed(
+  protected void onChildSourceInfoRefreshed(
       Void id, MediaSource mediaSource, Timeline newTimeline) {
     @Nullable MediaPeriodId idForMaskingPeriodPreparation = null;
     if (isPrepared) {
@@ -275,9 +275,9 @@ public final class MaskingMediaSource extends CompositeMediaSource<Void> {
     @Nullable private final Object replacedInternalPeriodUid;
 
     /**
-     * Returns an instance with a dummy timeline using the provided window tag.
+     * Returns an instance with a dummy timeline using the provided {@link MediaItem}.
      *
-     * @param windowTag A window tag.
+     * @param mediaItem A {@link MediaItem}.
      */
     public static MaskingTimeline createWithDummyTimeline(MediaItem mediaItem) {
       return new MaskingTimeline(

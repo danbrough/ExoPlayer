@@ -173,7 +173,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
     this.pauseAtEndOfWindow = pauseAtEndOfWindow;
     this.eventHandler = eventHandler;
     this.clock = clock;
-    this.queue = new MediaPeriodQueue();
+    this.queue = new MediaPeriodQueue(analyticsCollector, eventHandler);
 
     backBufferDurationUs = loadControl.getBackBufferDurationUs();
     retainBackBufferFromKeyframe = loadControl.retainBackBufferFromKeyframe();
@@ -596,7 +596,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
     if (mediaSourceListUpdateMessage.windowIndex != C.INDEX_UNSET) {
       pendingInitialSeekPosition =
           new SeekPosition(
-              new MediaSourceList.PlaylistTimeline(
+              new PlaylistTimeline(
                   mediaSourceListUpdateMessage.mediaSourceHolders,
                   mediaSourceListUpdateMessage.shuffleOrder),
               mediaSourceListUpdateMessage.windowIndex,

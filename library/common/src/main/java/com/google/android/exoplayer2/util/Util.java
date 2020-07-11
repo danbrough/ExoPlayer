@@ -16,6 +16,7 @@
 package com.google.android.exoplayer2.util;
 
 import static android.content.Context.UI_MODE_SERVICE;
+import static com.google.android.exoplayer2.util.Assertions.checkNotNull;
 
 import android.Manifest.permission;
 import android.annotation.SuppressLint;
@@ -64,6 +65,7 @@ import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
@@ -1430,13 +1432,29 @@ public final class Util {
   }
 
   /**
+   * Gets a PCM {@link Format} with the specified parameters.
+   *
+   * @param pcmEncoding The {@link C.PcmEncoding}.
+   * @param channels The number of channels, or {@link Format#NO_VALUE} if unknown.
+   * @param sampleRate The sample rate in Hz, or {@link Format#NO_VALUE} if unknown.
+   * @return The PCM format.
+   */
+  public static Format getPcmFormat(@C.PcmEncoding int pcmEncoding, int channels, int sampleRate) {
+    return new Format.Builder()
+        .setSampleMimeType(MimeTypes.AUDIO_RAW)
+        .setChannelCount(channels)
+        .setSampleRate(sampleRate)
+        .setEncoding(pcmEncoding)
+        .build();
+  }
+
+  /**
    * Converts a sample bit depth to a corresponding PCM encoding constant.
    *
    * @param bitDepth The bit depth. Supported values are 8, 16, 24 and 32.
-   * @return The corresponding encoding. One of {@link C#ENCODING_PCM_8BIT},
-   *     {@link C#ENCODING_PCM_16BIT}, {@link C#ENCODING_PCM_24BIT} and
-   *     {@link C#ENCODING_PCM_32BIT}. If the bit depth is unsupported then
-   *     {@link C#ENCODING_INVALID} is returned.
+   * @return The corresponding encoding. One of {@link C#ENCODING_PCM_8BIT}, {@link
+   *     C#ENCODING_PCM_16BIT}, {@link C#ENCODING_PCM_24BIT} and {@link C#ENCODING_PCM_32BIT}. If
+   *     the bit depth is unsupported then {@link C#ENCODING_INVALID} is returned.
    */
   @C.PcmEncoding
   public static int getPcmEncoding(int bitDepth) {
@@ -1828,8 +1846,7 @@ public final class Util {
     Matcher matcher = ESCAPED_CHARACTER_PATTERN.matcher(fileName);
     int startOfNotEscaped = 0;
     while (percentCharacterCount > 0 && matcher.find()) {
-      char unescapedCharacter =
-          (char) Integer.parseInt(Assertions.checkNotNull(matcher.group(1)), 16);
+      char unescapedCharacter = (char) Integer.parseInt(checkNotNull(matcher.group(1)), 16);
       builder.append(fileName, startOfNotEscaped, matcher.start()).append(unescapedCharacter);
       startOfNotEscaped = matcher.end();
       percentCharacterCount--;
@@ -1936,6 +1953,8 @@ public final class Util {
    * @param context A context to access the connectivity manager.
    * @return The {@link C.NetworkType} of the current network connection.
    */
+  // Intentional null check to guard against user input.
+  @SuppressWarnings("known.nonnull")
   @C.NetworkType
   public static int getNetworkType(Context context) {
     if (context == null) {
@@ -1943,6 +1962,7 @@ public final class Util {
       return C.NETWORK_TYPE_UNKNOWN;
     }
     NetworkInfo networkInfo;
+    @Nullable
     ConnectivityManager connectivityManager =
         (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
     if (connectivityManager == null) {
@@ -1982,6 +2002,7 @@ public final class Util {
    */
   public static String getCountryCode(@Nullable Context context) {
     if (context != null) {
+      @Nullable
       TelephonyManager telephonyManager =
           (TelephonyManager) context.getSystemService(Context.TELEPHONY_SERVICE);
       if (telephonyManager != null) {
@@ -2061,6 +2082,7 @@ public final class Util {
    */
   public static boolean isTv(Context context) {
     // See https://developer.android.com/training/tv/start/hardware.html#runtime-check.
+    @Nullable
     UiModeManager uiModeManager =
         (UiModeManager) context.getApplicationContext().getSystemService(UI_MODE_SERVICE);
     return uiModeManager != null
@@ -2080,7 +2102,8 @@ public final class Util {
    * @return The size of the current mode, in pixels.
    */
   public static Point getCurrentDisplayModeSize(Context context) {
-    WindowManager windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
+    WindowManager windowManager =
+        checkNotNull((WindowManager) context.getSystemService(Context.WINDOW_SERVICE));
     return getCurrentDisplayModeSize(context, windowManager.getDefaultDisplay());
   }
 
@@ -2184,6 +2207,24 @@ public final class Util {
     return elapsedRealtimeEpochOffsetMs == C.TIME_UNSET
         ? System.currentTimeMillis()
         : SystemClock.elapsedRealtime() + elapsedRealtimeEpochOffsetMs;
+  }
+
+  /**
+   * Moves the elements starting at {@code fromIndex} to {@code newFromIndex}.
+   *
+   * @param items The list of which to move elements.
+   * @param fromIndex The index at which the items to move start.
+   * @param toIndex The index up to which elements should be moved (exclusive).
+   * @param newFromIndex The new from index.
+   */
+  public static <T extends Object> void moveItems(
+      List<T> items, int fromIndex, int toIndex, int newFromIndex) {
+    ArrayDeque<T> removedItems = new ArrayDeque<>();
+    int removedItemsLength = toIndex - fromIndex;
+    for (int i = removedItemsLength - 1; i >= 0; i--) {
+      removedItems.addFirst(items.remove(fromIndex + i));
+    }
+    items.addAll(Math.min(newFromIndex, items.size()), removedItems);
   }
 
   @Nullable
@@ -2303,7 +2344,7 @@ public final class Util {
   private static boolean isTrafficRestricted(Uri uri) {
     return "http".equals(uri.getScheme())
         && !NetworkSecurityPolicy.getInstance()
-            .isCleartextTrafficPermitted(Assertions.checkNotNull(uri.getHost()));
+            .isCleartextTrafficPermitted(checkNotNull(uri.getHost()));
   }
 
   private static String maybeReplaceGrandfatheredLanguageTags(String languageTag) {

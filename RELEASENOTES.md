@@ -91,6 +91,11 @@
     *   Add `TrackSelection.shouldCancelMediaChunkLoad` to check whether an
         ongoing load should be canceled. Only supported by HLS streams so far.
         ([#2848](https://github.com/google/ExoPlayer/issues/2848)).
+    *   Remove throws clause from Renderer.stop.
+    *   Don't clear `exception` in `SimpleDecoder#flush()`
+        ([#7590](https://github.com/google/ExoPlayer/issues/7590)).
+    *   Remove `AdaptiveTrackSelection.minTimeBetweenBufferReevaluationMs`
+        parameter ([#7582](https://github.com/google/ExoPlayer/issues/7582)).
 *   Video: Pass frame rate hint to `Surface.setFrameRate` on Android R devices.
 *   Track selection:
     *   Add `Player.getTrackSelector`.
@@ -135,6 +140,11 @@
         ([#7475](https://github.com/google/ExoPlayer/issues/7475)).
     *   Redefine `Cue.lineType=LINE_TYPE_NUMBER` in terms of aligning the cue
         text lines to grid of viewport lines, and ignore `Cue.lineAnchor`.
+    *   Check `CaptionManager.isEnabled()` before using it for user-specified
+        font-scaling.
+    *   Recreate the decoder when handling & swallowing decode errors in
+        `TextRenderer`
+        ([#7590](https://github.com/google/ExoPlayer/issues/7590)).
 *   DRM:
     *   Add support for attaching DRM sessions to clear content in the demo app.
     *   Remove `DrmSessionManager` references from all renderers.
@@ -144,8 +154,15 @@
         `OfflineLicenseHelper`
         ([#7078](https://github.com/google/ExoPlayer/issues/7078)).
     *   Remove generics from DRM components.
+    *   Keep DRM sessions alive for a short time before fully releasing them
+        ([#7011](https://github.com/google/ExoPlayer/issues/7011),
+        [#6725](https://github.com/google/ExoPlayer/issues/6725),
+        [#7066](https://github.com/google/ExoPlayer/issues/7066)).
 *   Downloads and caching:
-    *   Merge downloads in `SegmentDownloader` to improve overall download speed
+    *   Support passing an `Executor` to `DefaultDownloaderFactory` on which
+        data downloads are performed.
+    *   Parallelize and merge downloads in `SegmentDownloader` to improve
+        overall download speed
         ([#5978](https://github.com/google/ExoPlayer/issues/5978)).
     *   Support multiple non-overlapping write locks for the same key in
         `SimpleCache`.
@@ -193,12 +210,15 @@
         ([#6410](https://github.com/google/ExoPlayer/issues/6410)).
     *   Select first extractors based on the filename extension and the response
         headers mime type in `DefaultExtractorsFactory`.
+    *   Add support for partially fragmented MP4s
+        ([#7308](https://github.com/google/ExoPlayer/issues/7308)).
 *   Testing
     *   Add `TestExoPlayer`, a utility class with APIs to create
         `SimpleExoPlayer` instances with fake components for testing.
     *   Upgrade Truth dependency from 0.44 to 1.0.
     *   Upgrade to JUnit 4.13-rc-2.
 *   UI
+    *   Add `StyledPlayerView` and `StyledPlayerControlView`.
     *   Remove `SimpleExoPlayerView` and `PlaybackControlView`.
     *   Remove deperecated `exo_simple_player_view.xml` and
         `exo_playback_control_view.xml` from resource.
@@ -211,12 +231,21 @@
         ([#7357](https://github.com/google/ExoPlayer/issues/7357)).
 *   Metadata: Add minimal DVB Application Information Table (AIT) support
     ([#6922](https://github.com/google/ExoPlayer/pull/6922)).
+*   Media2 extension: Publish media2 extension for integrating ExoPlayer with
+    `androidx.media2.common.SessionPlayer` and
+    `androidx.media2.session.MediaSession`.
 *   Cast extension: Implement playlist API and deprecate the old queue
     manipulation API.
+*   IMA extension: Upgrade to IMA SDK 3.19.4, bringing in a fix for setting the
+    media load timeout
+    ([#7170](https://github.com/google/ExoPlayer/issues/7170)).
 *   Demo app: Retain previous position in list of samples.
 *   Add Guava dependency.
-*   IMA extension: Fix the way 'content complete' is handled to avoid repeatedly
-    refreshing the timeline after playback ends.
+
+### 2.11.7 (2020-06-29) ###
+
+*   IMA extension: Fix the way postroll "content complete" notifications are
+    handled to avoid repeatedly refreshing the timeline after playback ends.
 
 ### 2.11.6 (2020-06-19) ###
 

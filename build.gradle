@@ -29,7 +29,7 @@ allprojects {
         maven { url "https://oss.sonatype.org/content/repositories/snapshots" }
     }
     project.ext {
-        exoplayerPublishEnabled = false
+        exoplayerPublishEnabled = true
     }
     if (it.hasProperty('externalBuildDir')) {
         if (!new File(externalBuildDir).isAbsolute()) {

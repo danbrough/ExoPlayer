@@ -4,7 +4,7 @@ cd `dirname $0`
 
 EXOPLAYER_ROOT="$(pwd)"
 FLAC_EXT_PATH="${EXOPLAYER_ROOT}/extensions/flac/src/main"
-NDK_PATH=/mnt/files/android/android-ndk-r17c
+NDK_PATH=/mnt/sdk/android/ndk-bundle
 FLAC_VERSION=1.3.3
 
 cd "${FLAC_EXT_PATH}/jni" 

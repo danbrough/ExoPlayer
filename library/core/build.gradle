@@ -31,6 +31,7 @@ android {
         androidTest.assets.srcDir '../../testdata/src/test/assets/'
         test.assets.srcDir '../../testdata/src/test/assets/'
     }
+artifacts { archives sourcesJar }
 }
 
 dependencies {

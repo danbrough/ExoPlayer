@@ -30,23 +30,4 @@ public final class MetadataUtilTest {
     // Check that we haven't forgotten a genre in the list.
     assertThat(MetadataUtil.STANDARD_GENRES).hasLength(192);
   }
-
-  /**
-   * Test case for https://github.com/google/ExoPlayer/issues/6774. The sample file contains an mdat
-   * atom whose size indicates that it extends 8 bytes beyond the end of the file.
-   */
-  @Test
-  public void testMp4SampleWithMdatTooLong() throws Exception {
-    ExtractorAsserts.assertBehavior(Mp4Extractor::new, "mp4/sample_mdat_too_long.mp4");
-  }
-
-  @Test
-  public void testMp4SampleWithAc4Track() throws Exception {
-    ExtractorAsserts.assertBehavior(Mp4Extractor::new, "mp4/sample_ac4.mp4");
-  }
-
-  @Test
-  public void testMp4SampleWithSlowMotionMetadata() throws Exception {
-    ExtractorAsserts.assertBehavior(Mp4Extractor::new, "mp4/sample_android_slow_motion.mp4");
-  }
 }

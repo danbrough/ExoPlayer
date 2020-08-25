@@ -15,6 +15,9 @@
  */
 package com.google.android.exoplayer2.upstream;
 
+import static java.lang.Math.max;
+import static java.lang.Math.min;
+
 import android.net.Uri;
 import android.text.TextUtils;
 import androidx.annotation.Nullable;
@@ -23,8 +26,8 @@ import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.upstream.DataSpec.HttpMethod;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.Log;
-import com.google.android.exoplayer2.util.Predicate;
 import com.google.android.exoplayer2.util.Util;
+import com.google.common.base.Predicate;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -150,6 +153,7 @@ public class DefaultHttpDataSource extends BaseDataSource implements HttpDataSou
    * @deprecated Use {@link #DefaultHttpDataSource(String)} and {@link
    *     #setContentTypePredicate(Predicate)}.
    */
+  @SuppressWarnings("deprecation")
   @Deprecated
   public DefaultHttpDataSource(String userAgent, @Nullable Predicate<String> contentTypePredicate) {
     this(
@@ -296,9 +300,20 @@ public class DefaultHttpDataSource extends BaseDataSource implements HttpDataSou
     // Check for a valid response code.
     if (responseCode < 200 || responseCode > 299) {
       Map<String, List<String>> headers = connection.getHeaderFields();
+      @Nullable InputStream errorStream = connection.getErrorStream();
+      byte[] errorResponseBody;
+      try {
+        errorResponseBody =
+            errorStream != null ? Util.toByteArray(errorStream) : Util.EMPTY_BYTE_ARRAY;
+      } catch (IOException e) {
+        throw new HttpDataSourceException(
+            "Error reading non-2xx response body", e, dataSpec, HttpDataSourceException.TYPE_OPEN);
+      }
       closeConnectionQuietly();
       InvalidResponseCodeException exception =
-          new InvalidResponseCodeException(responseCode, responseMessage, headers, dataSpec);
+          new InvalidResponseCodeException(
+              responseCode, responseMessage, headers, dataSpec, errorResponseBody);
+
       if (responseCode == 416) {
         exception.initCause(new DataSourceException(DataSourceException.POSITION_OUT_OF_RANGE));
       }
@@ -307,7 +322,7 @@ public class DefaultHttpDataSource extends BaseDataSource implements HttpDataSou
 
     // Check for a valid content type.
     String contentType = connection.getContentType();
-    if (contentTypePredicate != null && !contentTypePredicate.evaluate(contentType)) {
+    if (contentTypePredicate != null && !contentTypePredicate.apply(contentType)) {
       closeConnectionQuietly();
       throw new InvalidContentTypeException(contentType, dataSpec);
     }
@@ -386,7 +401,8 @@ public class DefaultHttpDataSource extends BaseDataSource implements HttpDataSou
    *
    * @return The current open connection, or null.
    */
-  protected final @Nullable HttpURLConnection getConnection() {
+  @Nullable
+  protected final HttpURLConnection getConnection() {
     return connection;
   }
 
@@ -428,7 +444,7 @@ public class DefaultHttpDataSource extends BaseDataSource implements HttpDataSou
   private HttpURLConnection makeConnection(DataSpec dataSpec) throws IOException {
     URL url = new URL(dataSpec.uri.toString());
     @HttpMethod int httpMethod = dataSpec.httpMethod;
-    byte[] httpBody = dataSpec.httpBody;
+    @Nullable byte[] httpBody = dataSpec.httpBody;
     long position = dataSpec.position;
     long length = dataSpec.length;
     boolean allowGzip = dataSpec.isFlagSet(DataSpec.FLAG_ALLOW_GZIP);
@@ -495,7 +511,7 @@ public class DefaultHttpDataSource extends BaseDataSource implements HttpDataSou
    *
    * @param url The url to connect to.
    * @param httpMethod The http method.
-   * @param httpBody The body data.
+   * @param httpBody The body data, or {@code null} if not required.
    * @param position The byte offset of the requested data.
    * @param length The length of the requested data, or {@link C#LENGTH_UNSET}.
    * @param allowGzip Whether to allow the use of gzip.
@@ -505,7 +521,7 @@ public class DefaultHttpDataSource extends BaseDataSource implements HttpDataSou
   private HttpURLConnection makeConnection(
       URL url,
       @HttpMethod int httpMethod,
-      byte[] httpBody,
+      @Nullable byte[] httpBody,
       long position,
       long length,
       boolean allowGzip,
@@ -539,7 +555,7 @@ public class DefaultHttpDataSource extends BaseDataSource implements HttpDataSou
     connection.setInstanceFollowRedirects(followRedirects);
     connection.setDoOutput(httpBody != null);
     connection.setRequestMethod(DataSpec.getStringForHttpMethod(httpMethod));
-    
+
     if (httpBody != null) {
       connection.setFixedLengthStreamingMode(httpBody.length);
       connection.connect();
@@ -562,11 +578,11 @@ public class DefaultHttpDataSource extends BaseDataSource implements HttpDataSou
    * Handles a redirect.
    *
    * @param originalUrl The original URL.
-   * @param location The Location header in the response.
+   * @param location The Location header in the response. May be {@code null}.
    * @return The next URL.
    * @throws IOException If redirection isn't possible.
    */
-  private static URL handleRedirect(URL originalUrl, String location) throws IOException {
+  private static URL handleRedirect(URL originalUrl, @Nullable String location) throws IOException {
     if (location == null) {
       throw new ProtocolException("Null location redirect");
     }
@@ -621,7 +637,7 @@ public class DefaultHttpDataSource extends BaseDataSource implements HttpDataSou
             // increase it.
             Log.w(TAG, "Inconsistent headers [" + contentLengthHeader + "] [" + contentRangeHeader
                 + "]");
-            contentLength = Math.max(contentLength, contentLengthFromRange);
+            contentLength = max(contentLength, contentLengthFromRange);
           }
         } catch (NumberFormatException e) {
           Log.e(TAG, "Unexpected Content-Range [" + contentRangeHeader + "]");
@@ -651,7 +667,7 @@ public class DefaultHttpDataSource extends BaseDataSource implements HttpDataSou
     }
 
     while (bytesSkipped != bytesToSkip) {
-      int readLength = (int) Math.min(bytesToSkip - bytesSkipped, skipBuffer.length);
+      int readLength = (int) min(bytesToSkip - bytesSkipped, skipBuffer.length);
       int read = inputStream.read(skipBuffer, 0, readLength);
       if (Thread.currentThread().isInterrupted()) {
         throw new InterruptedIOException();
@@ -690,7 +706,7 @@ public class DefaultHttpDataSource extends BaseDataSource implements HttpDataSou
       if (bytesRemaining == 0) {
         return C.RESULT_END_OF_INPUT;
       }
-      readLength = (int) Math.min(readLength, bytesRemaining);
+      readLength = (int) min(readLength, bytesRemaining);
     }
 
     int read = inputStream.read(buffer, offset, readLength);

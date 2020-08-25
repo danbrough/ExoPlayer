@@ -46,19 +46,19 @@ On returning to the foreground, seek to that position before preparing the new
 player instance. Finally, it is important to call `ImaAdsLoader.release()` when
 playback of the content/ads has finished and will not be resumed.
 
-You can try the IMA extension in the ExoPlayer demo app. To do this you must
-select and build one of the `withExtensions` build variants of the demo app in
-Android Studio. You can find IMA test content in the "IMA sample ad tags"
-section of the app. The demo app's `PlayerActivity` also shows how to persist
-the `ImaAdsLoader` instance and the player position when backgrounded during ad
-playback.
+You can try the IMA extension in the ExoPlayer demo app, which has test content
+in the "IMA sample ad tags" section of the sample chooser. The demo app's
+`PlayerActivity` also shows how to persist the `ImaAdsLoader` instance and the
+player position when backgrounded during ad playback.
 
 [top level README]: https://github.com/google/ExoPlayer/blob/release-v2/README.md
 [sample ad tags]: https://developers.google.com/interactive-media-ads/docs/sdks/android/tags
 
 ## Links ##
 
+* [ExoPlayer documentation on ad insertion][]
 * [Javadoc][]: Classes matching `com.google.android.exoplayer2.ext.ima.*`
   belong to this module.
 
+[ExoPlayer documentation on ad insertion]: https://exoplayer.dev/ad-insertion.html
 [Javadoc]: https://exoplayer.dev/doc/reference/index.html

@@ -16,6 +16,7 @@
 package com.google.android.exoplayer2.ext.okhttp;
 
 import static com.google.android.exoplayer2.util.Util.castNonNull;
+import static java.lang.Math.min;
 
 import android.net.Uri;
 import androidx.annotation.Nullable;
@@ -26,8 +27,8 @@ import com.google.android.exoplayer2.upstream.DataSourceException;
 import com.google.android.exoplayer2.upstream.DataSpec;
 import com.google.android.exoplayer2.upstream.HttpDataSource;
 import com.google.android.exoplayer2.util.Assertions;
-import com.google.android.exoplayer2.util.Predicate;
 import com.google.android.exoplayer2.util.Util;
+import com.google.common.base.Predicate;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -119,6 +120,7 @@ public class OkHttpDataSource extends BaseDataSource implements HttpDataSource {
    * @deprecated Use {@link #OkHttpDataSource(Call.Factory, String)} and {@link
    *     #setContentTypePredicate(Predicate)}.
    */
+  @SuppressWarnings("deprecation")
   @Deprecated
   public OkHttpDataSource(
       Call.Factory callFactory,
@@ -230,10 +232,18 @@ public class OkHttpDataSource extends BaseDataSource implements HttpDataSource {
 
     // Check for a valid response code.
     if (!response.isSuccessful()) {
+      byte[] errorResponseBody;
+      try {
+        errorResponseBody = Util.toByteArray(Assertions.checkNotNull(responseByteStream));
+      } catch (IOException e) {
+        throw new HttpDataSourceException(
+            "Error reading non-2xx response body", e, dataSpec, HttpDataSourceException.TYPE_OPEN);
+      }
       Map<String, List<String>> headers = response.headers().toMultimap();
       closeConnectionQuietly();
       InvalidResponseCodeException exception =
-          new InvalidResponseCodeException(responseCode, response.message(), headers, dataSpec);
+          new InvalidResponseCodeException(
+              responseCode, response.message(), headers, dataSpec, errorResponseBody);
       if (responseCode == 416) {
         exception.initCause(new DataSourceException(DataSourceException.POSITION_OUT_OF_RANGE));
       }
@@ -243,7 +253,7 @@ public class OkHttpDataSource extends BaseDataSource implements HttpDataSource {
     // Check for a valid content type.
     MediaType mediaType = responseBody.contentType();
     String contentType = mediaType != null ? mediaType.toString() : "";
-    if (contentTypePredicate != null && !contentTypePredicate.evaluate(contentType)) {
+    if (contentTypePredicate != null && !contentTypePredicate.apply(contentType)) {
       closeConnectionQuietly();
       throw new InvalidContentTypeException(contentType, dataSpec);
     }
@@ -386,7 +396,7 @@ public class OkHttpDataSource extends BaseDataSource implements HttpDataSource {
     }
 
     while (bytesSkipped != bytesToSkip) {
-      int readLength = (int) Math.min(bytesToSkip - bytesSkipped, SKIP_BUFFER.length);
+      int readLength = (int) min(bytesToSkip - bytesSkipped, SKIP_BUFFER.length);
       int read = castNonNull(responseByteStream).read(SKIP_BUFFER, 0, readLength);
       if (Thread.currentThread().isInterrupted()) {
         throw new InterruptedIOException();
@@ -422,7 +432,7 @@ public class OkHttpDataSource extends BaseDataSource implements HttpDataSource {
       if (bytesRemaining == 0) {
         return C.RESULT_END_OF_INPUT;
       }
-      readLength = (int) Math.min(readLength, bytesRemaining);
+      readLength = (int) min(readLength, bytesRemaining);
     }
 
     int read = castNonNull(responseByteStream).read(buffer, offset, readLength);

@@ -14,26 +14,32 @@
 
 apply from: "$gradle.ext.exoplayerSettingsDir/constants.gradle"
 apply plugin: 'com.android.library'
+//apply plugin: 'maven-publish'
+apply plugin: 'digital.wup.android-maven-publish'
 
 android {
-    compileSdkVersion project.ext.compileSdkVersion
+  compileSdkVersion project.ext.compileSdkVersion
 
-    defaultConfig {
-        minSdkVersion project.ext.minSdkVersion
-        targetSdkVersion project.ext.targetSdkVersion
-        consumerProguardFiles 'proguard-rules.txt'
-        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
-    }
+  defaultConfig {
+    minSdkVersion project.ext.minSdkVersion
+    targetSdkVersion project.ext.targetSdkVersion
+    consumerProguardFiles 'proguard-rules.txt'
+    testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+  }
 
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
-    }
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_1_8
+    targetCompatibility JavaVersion.VERSION_1_8
+  }
 
-    testOptions.unitTests.includeAndroidResources = true
-task sourcesJar(type:Jar) {
-from android.sourceSets.main.java.srcDirs
- classifier = 'sources'
-}
-artifacts { archives sourcesJar }
+  testOptions.unitTests.includeAndroidResources = true
+  task sourcesJar(type: Jar) {
+    from android.sourceSets.main.java.srcDirs
+    classifier = 'sources'
+  }
+  artifacts { archives sourcesJar }
+
+
+
+
 }

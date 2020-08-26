@@ -22,7 +22,8 @@ if (project.ext.has("exoplayerPublishEnabled")
 
         mavenAar(MavenPublication) {
           from components.android
-          groupId 'com.google.android.exoplayer'
+          //groupId 'com.google.android.exoplayer'
+	groupId 'com.github.danbrough.exoplayer'
           artifactId releaseArtifact
           version releaseVersion
         }

@@ -1,6 +1,6 @@
 # Release notes
 
-### 2.12.0 (not yet released - targeted for 2020-09-03) ###
+### 2.12.0 (2020-09-11) ###
 
 *   Core library:
     *   `Player`:
@@ -8,8 +8,9 @@
             ([#6161](https://github.com/google/ExoPlayer/issues/6161)). The
             new methods for playlist manipulation are `setMediaItem(s)`,
             `addMediaItem(s)`, `moveMediaItem(s)`, `removeMediaItem(s)` and
-            `clearMediaItems`. This API should be used instead of
-            `ConcatenatingMediaSource` in most cases.
+            `clearMediaItems`. The playlist can be queried using
+            `getMediaItemCount` and `getMediaItemAt`. This API should be used
+            instead of `ConcatenatingMediaSource` in most cases.
         *   Add `getCurrentMediaItem` for getting the currently playing item
             in the playlist.
         *   Add `EventListener.onMediaItemTransition` to report when
@@ -137,7 +138,7 @@
     *   Recreate the decoder when handling and swallowing decode errors in
         `TextRenderer`. This fixes a case where playback would never end when
         playing content with malformed subtitles
-        ([#7590](https://github.com/google/ExoPlayer/issues/790)).
+        ([#7590](https://github.com/google/ExoPlayer/issues/7590)).
     *   Only apply `CaptionManager` font scaling in
         `SubtitleView.setUserDefaultTextSize` if the `CaptionManager` is
         enabled.
@@ -315,6 +316,10 @@
     *   Add `ImaAdsLoader.Builder.setCompanionAdSlots` so it's possible to set
         companion ad slots without accessing the `AdDisplayContainer`.
     *   Add missing notification of `VideoAdPlayerCallback.onLoaded`.
+    *   Fix handling of incompatible VPAID ads
+        ([#7832](https://github.com/google/ExoPlayer/issues/7832)).
+    *   Fix handling of empty ads at non-integer cue points
+        ([#7889](https://github.com/google/ExoPlayer/issues/7889)).
 *   Demo app:
     *   Replace the `extensions` variant with `decoderExtensions` and update the
         demo app use the Cronet and IMA extensions by default.

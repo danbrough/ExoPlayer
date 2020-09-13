@@ -38,6 +38,8 @@ import com.google.android.exoplayer2.audio.AuxEffectInfo;
 import com.google.android.exoplayer2.decoder.DecoderCounters;
 import com.google.android.exoplayer2.device.DeviceInfo;
 import com.google.android.exoplayer2.device.DeviceListener;
+import com.google.android.exoplayer2.extractor.DefaultExtractorsFactory;
+import com.google.android.exoplayer2.extractor.ExtractorsFactory;
 import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.metadata.MetadataOutput;
 import com.google.android.exoplayer2.source.DefaultMediaSourceFactory;
@@ -115,9 +117,11 @@ public class SimpleExoPlayer extends BasePlayer
     /**
      * Creates a builder.
      *
-     * <p>Use {@link #Builder(Context, RenderersFactory)} instead, if you intend to provide a custom
-     * {@link RenderersFactory}. This is to ensure that ProGuard or R8 can remove ExoPlayer's {@link
-     * DefaultRenderersFactory} from the APK.
+     * <p>Use {@link #Builder(Context, RenderersFactory)}, {@link #Builder(Context,
+     * RenderersFactory)} or {@link #Builder(Context, RenderersFactory, ExtractorsFactory)} instead,
+     * if you intend to provide a custom {@link RenderersFactory} or a custom {@link
+     * ExtractorsFactory}. This is to ensure that ProGuard or R8 can remove ExoPlayer's {@link
+     * DefaultRenderersFactory} and {@link DefaultExtractorsFactory} from the APK.
      *
      * <p>The builder uses the following default values:
      *
@@ -146,7 +150,7 @@ public class SimpleExoPlayer extends BasePlayer
      * @param context A {@link Context}.
      */
     public Builder(Context context) {
-      this(context, new DefaultRenderersFactory(context));
+      this(context, new DefaultRenderersFactory(context), new DefaultExtractorsFactory());
     }
 
     /**
@@ -159,11 +163,40 @@ public class SimpleExoPlayer extends BasePlayer
      *     player.
      */
     public Builder(Context context, RenderersFactory renderersFactory) {
+      this(context, renderersFactory, new DefaultExtractorsFactory());
+    }
+
+    /**
+     * Creates a builder with a custom {@link ExtractorsFactory}.
+     *
+     * <p>See {@link #Builder(Context)} for a list of default values.
+     *
+     * @param context A {@link Context}.
+     * @param extractorsFactory An {@link ExtractorsFactory} used to extract progressive media from
+     *     its container.
+     */
+    public Builder(Context context, ExtractorsFactory extractorsFactory) {
+      this(context, new DefaultRenderersFactory(context), extractorsFactory);
+    }
+
+    /**
+     * Creates a builder with a custom {@link RenderersFactory} and {@link ExtractorsFactory}.
+     *
+     * <p>See {@link #Builder(Context)} for a list of default values.
+     *
+     * @param context A {@link Context}.
+     * @param renderersFactory A factory for creating {@link Renderer Renderers} to be used by the
+     *     player.
+     * @param extractorsFactory An {@link ExtractorsFactory} used to extract progressive media from
+     *     its container.
+     */
+    public Builder(
+        Context context, RenderersFactory renderersFactory, ExtractorsFactory extractorsFactory) {
       this(
           context,
           renderersFactory,
           new DefaultTrackSelector(context),
-          DefaultMediaSourceFactory.newInstance(context),
+          new DefaultMediaSourceFactory(context, extractorsFactory),
           new DefaultLoadControl(),
           DefaultBandwidthMeter.getSingletonInstance(context),
           new AnalyticsCollector(Clock.DEFAULT));
@@ -312,7 +345,7 @@ public class SimpleExoPlayer extends BasePlayer
      * IllegalArgumentException}.
      *
      * @param audioAttributes {@link AudioAttributes}.
-     * @param handleAudioFocus Whether the player should hanlde audio focus.
+     * @param handleAudioFocus Whether the player should handle audio focus.
      * @return This builder.
      * @throws IllegalStateException If {@link #build()} has already been called.
      */

@@ -128,7 +128,6 @@ public abstract class ExoHostedTest implements AnalyticsListener, HostedTest {
     this.surface = surface;
     // Build the player.
     trackSelector = buildTrackSelector(host);
-    String userAgent = "ExoPlayerPlaybackTests";
     player = buildExoPlayer(host, surface, trackSelector);
     player.play();
     player.addAnalyticsListener(this);
@@ -140,10 +139,8 @@ public abstract class ExoHostedTest implements AnalyticsListener, HostedTest {
       pendingSchedule.start(player, trackSelector, surface, actionHandler, /* callback= */ null);
       pendingSchedule = null;
     }
-    DrmSessionManager drmSessionManager = buildDrmSessionManager(userAgent);
-    player.setMediaSource(
-        buildSource(
-            host, Util.getUserAgent(host, userAgent), drmSessionManager, overlayFrameLayout));
+    DrmSessionManager drmSessionManager = buildDrmSessionManager();
+    player.setMediaSource(buildSource(host, drmSessionManager, overlayFrameLayout));
     player.prepare();
   }
 
@@ -160,7 +157,7 @@ public abstract class ExoHostedTest implements AnalyticsListener, HostedTest {
   @Override
   public final void onFinished() {
     if (failOnPlayerError && playerError != null) {
-      throw new Error(playerError);
+      throw new RuntimeException(playerError);
     }
     logMetrics(audioDecoderCounters, videoDecoderCounters);
     if (expectedPlayingTimeMs != EXPECTED_PLAYING_TIME_UNSET) {
@@ -232,7 +229,7 @@ public abstract class ExoHostedTest implements AnalyticsListener, HostedTest {
     return true;
   }
 
-  protected DrmSessionManager buildDrmSessionManager(String userAgent) {
+  protected DrmSessionManager buildDrmSessionManager() {
     // Do nothing. Interested subclasses may override.
     return DrmSessionManager.getDummyDrmSessionManager();
   }
@@ -256,7 +253,6 @@ public abstract class ExoHostedTest implements AnalyticsListener, HostedTest {
 
   protected abstract MediaSource buildSource(
       HostActivity host,
-      String userAgent,
       DrmSessionManager drmSessionManager,
       FrameLayout overlayFrameLayout);
 

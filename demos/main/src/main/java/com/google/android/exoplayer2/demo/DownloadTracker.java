@@ -16,10 +16,12 @@
 package com.google.android.exoplayer2.demo;
 
 import static com.google.android.exoplayer2.util.Assertions.checkNotNull;
+import static com.google.android.exoplayer2.util.Assertions.checkStateNotNull;
 
 import android.content.Context;
 import android.content.DialogInterface;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -170,6 +172,7 @@ public class DownloadTracker {
 
     private TrackSelectionDialog trackSelectionDialog;
     private MappedTrackInfo mappedTrackInfo;
+    private WidevineOfflineLicenseFetchTask widevineOfflineLicenseFetchTask;
     @Nullable private byte[] keySetId;
 
     public StartDownloadDialogHelper(
@@ -185,6 +188,9 @@ public class DownloadTracker {
       if (trackSelectionDialog != null) {
         trackSelectionDialog.dismiss();
       }
+      if (widevineOfflineLicenseFetchTask != null) {
+        widevineOfflineLicenseFetchTask.cancel(false);
+      }
     }
 
     // DownloadHelper.Callback implementation.
@@ -192,59 +198,36 @@ public class DownloadTracker {
     @Override
     public void onPrepared(@NonNull DownloadHelper helper) {
       @Nullable Format format = getFirstFormatWithDrmInitData(helper);
-      if (format != null) {
-        if (Util.SDK_INT < 18) {
-          Toast.makeText(context, R.string.error_drm_unsupported_before_api_18, Toast.LENGTH_LONG)
-              .show();
-          Log.e(TAG, "Downloading DRM protected content is not supported on API versions below 18");
-          return;
-        }
-        // TODO(internal b/163107948): Support cases where DrmInitData are not in the manifest.
-        if (!hasSchemaData(format.drmInitData)) {
-          Toast.makeText(context, R.string.download_start_error_offline_license, Toast.LENGTH_LONG)
-              .show();
-          Log.e(
-              TAG,
-              "Downloading content where DRM scheme data is not located in the manifest is not"
-                  + " supported");
-          return;
-        }
-        try {
-          // TODO(internal b/163107948): Download the license on another thread to keep the UI
-          //  thread unblocked.
-          fetchOfflineLicense(format);
-        } catch (DrmSession.DrmSessionException e) {
-          Toast.makeText(context, R.string.download_start_error_offline_license, Toast.LENGTH_LONG)
-              .show();
-          Log.e(TAG, "Failed to fetch offline DRM license", e);
-          return;
-        }
-      }
-
-      if (helper.getPeriodCount() == 0) {
-        Log.d(TAG, "No periods found. Downloading entire stream.");
-        startDownload();
-        downloadHelper.release();
+      if (format == null) {
+        onDownloadPrepared(helper);
         return;
       }
 
-      mappedTrackInfo = downloadHelper.getMappedTrackInfo(/* periodIndex= */ 0);
-      if (!TrackSelectionDialog.willHaveContent(mappedTrackInfo)) {
-        Log.d(TAG, "No dialog content. Downloading entire stream.");
-        startDownload();
-        downloadHelper.release();
+      // The content is DRM protected. We need to acquire an offline license.
+      if (Util.SDK_INT < 18) {
+        Toast.makeText(context, R.string.error_drm_unsupported_before_api_18, Toast.LENGTH_LONG)
+            .show();
+        Log.e(TAG, "Downloading DRM protected content is not supported on API versions below 18");
         return;
       }
-      trackSelectionDialog =
-          TrackSelectionDialog.createForMappedTrackInfoAndParameters(
-              /* titleId= */ R.string.exo_download_description,
-              mappedTrackInfo,
-              trackSelectorParameters,
-              /* allowAdaptiveSelections =*/ false,
-              /* allowMultipleOverrides= */ true,
-              /* onClickListener= */ this,
-              /* onDismissListener= */ this);
-      trackSelectionDialog.show(fragmentManager, /* tag= */ null);
+      // TODO(internal b/163107948): Support cases where DrmInitData are not in the manifest.
+      if (!hasSchemaData(format.drmInitData)) {
+        Toast.makeText(context, R.string.download_start_error_offline_license, Toast.LENGTH_LONG)
+            .show();
+        Log.e(
+            TAG,
+            "Downloading content where DRM scheme data is not located in the manifest is not"
+                + " supported");
+        return;
+      }
+      widevineOfflineLicenseFetchTask =
+          new WidevineOfflineLicenseFetchTask(
+              format,
+              mediaItem.playbackProperties.drmConfiguration.licenseUri,
+              httpDataSourceFactory,
+              /* dialogHelper= */ this,
+              helper);
+      widevineOfflineLicenseFetchTask.execute();
     }
 
     @Override
@@ -292,6 +275,83 @@ public class DownloadTracker {
 
     // Internal methods.
 
+    /**
+     * Returns the first {@link Format} with a non-null {@link Format#drmInitData} found in the
+     * content's tracks, or null if none is found.
+     */
+    @Nullable
+    private Format getFirstFormatWithDrmInitData(DownloadHelper helper) {
+      for (int periodIndex = 0; periodIndex < helper.getPeriodCount(); periodIndex++) {
+        MappedTrackInfo mappedTrackInfo = helper.getMappedTrackInfo(periodIndex);
+        for (int rendererIndex = 0;
+            rendererIndex < mappedTrackInfo.getRendererCount();
+            rendererIndex++) {
+          TrackGroupArray trackGroups = mappedTrackInfo.getTrackGroups(rendererIndex);
+          for (int trackGroupIndex = 0; trackGroupIndex < trackGroups.length; trackGroupIndex++) {
+            TrackGroup trackGroup = trackGroups.get(trackGroupIndex);
+            for (int formatIndex = 0; formatIndex < trackGroup.length; formatIndex++) {
+              Format format = trackGroup.getFormat(formatIndex);
+              if (format.drmInitData != null) {
+                return format;
+              }
+            }
+          }
+        }
+      }
+      return null;
+    }
+
+    private void onOfflineLicenseFetched(DownloadHelper helper, byte[] keySetId) {
+      this.keySetId = keySetId;
+      onDownloadPrepared(helper);
+    }
+
+    private void onOfflineLicenseFetchedError(DrmSession.DrmSessionException e) {
+      Toast.makeText(context, R.string.download_start_error_offline_license, Toast.LENGTH_LONG)
+          .show();
+      Log.e(TAG, "Failed to fetch offline DRM license", e);
+    }
+
+    private void onDownloadPrepared(DownloadHelper helper) {
+      if (helper.getPeriodCount() == 0) {
+        Log.d(TAG, "No periods found. Downloading entire stream.");
+        startDownload();
+        downloadHelper.release();
+        return;
+      }
+
+      mappedTrackInfo = downloadHelper.getMappedTrackInfo(/* periodIndex= */ 0);
+      if (!TrackSelectionDialog.willHaveContent(mappedTrackInfo)) {
+        Log.d(TAG, "No dialog content. Downloading entire stream.");
+        startDownload();
+        downloadHelper.release();
+        return;
+      }
+      trackSelectionDialog =
+          TrackSelectionDialog.createForMappedTrackInfoAndParameters(
+              /* titleId= */ R.string.exo_download_description,
+              mappedTrackInfo,
+              trackSelectorParameters,
+              /* allowAdaptiveSelections =*/ false,
+              /* allowMultipleOverrides= */ true,
+              /* onClickListener= */ this,
+              /* onDismissListener= */ this);
+      trackSelectionDialog.show(fragmentManager, /* tag= */ null);
+    }
+
+    /**
+     * Returns whether any the {@link DrmInitData.SchemeData} contained in {@code drmInitData} has
+     * non-null {@link DrmInitData.SchemeData#data}.
+     */
+    private boolean hasSchemaData(DrmInitData drmInitData) {
+      for (int i = 0; i < drmInitData.schemeDataCount; i++) {
+        if (drmInitData.get(i).hasData()) {
+          return true;
+        }
+      }
+      return false;
+    }
+
     private void startDownload() {
       startDownload(buildDownloadRequest());
     }
@@ -306,54 +366,58 @@ public class DownloadTracker {
           .getDownloadRequest(Util.getUtf8Bytes(checkNotNull(mediaItem.mediaMetadata.title)))
           .copyWithKeySetId(keySetId);
     }
+  }
 
-    @RequiresApi(18)
-    private void fetchOfflineLicense(Format format) throws DrmSession.DrmSessionException {
+  /** Downloads a Widevine offline license in a background thread. */
+  @RequiresApi(18)
+  private static final class WidevineOfflineLicenseFetchTask extends AsyncTask<Void, Void, Void> {
+
+    private final Format format;
+    private final Uri licenseUri;
+    private final HttpDataSource.Factory httpDataSourceFactory;
+    private final StartDownloadDialogHelper dialogHelper;
+    private final DownloadHelper downloadHelper;
+
+    @Nullable private byte[] keySetId;
+    @Nullable private DrmSession.DrmSessionException drmSessionException;
+
+    public WidevineOfflineLicenseFetchTask(
+        Format format,
+        Uri licenseUri,
+        HttpDataSource.Factory httpDataSourceFactory,
+        StartDownloadDialogHelper dialogHelper,
+        DownloadHelper downloadHelper) {
+      this.format = format;
+      this.licenseUri = licenseUri;
+      this.httpDataSourceFactory = httpDataSourceFactory;
+      this.dialogHelper = dialogHelper;
+      this.downloadHelper = downloadHelper;
+    }
+
+    @Override
+    protected Void doInBackground(Void... voids) {
       OfflineLicenseHelper offlineLicenseHelper =
           OfflineLicenseHelper.newWidevineInstance(
-              mediaItem.playbackProperties.drmConfiguration.licenseUri.toString(),
+              licenseUri.toString(),
               httpDataSourceFactory,
               new DrmSessionEventListener.EventDispatcher());
-      keySetId = offlineLicenseHelper.downloadLicense(format);
+      try {
+        keySetId = offlineLicenseHelper.downloadLicense(format);
+      } catch (DrmSession.DrmSessionException e) {
+        drmSessionException = e;
+      } finally {
+        offlineLicenseHelper.release();
+      }
+      return null;
     }
-  }
 
-  /**
-   * Returns whether any the {@link DrmInitData.SchemeData} contained in {@code drmInitData} has
-   * non-null {@link DrmInitData.SchemeData#data}.
-   */
-  private static boolean hasSchemaData(DrmInitData drmInitData) {
-    for (int i = 0; i < drmInitData.schemeDataCount; i++) {
-      if (drmInitData.get(i).hasData()) {
-        return true;
+    @Override
+    protected void onPostExecute(Void aVoid) {
+      if (drmSessionException != null) {
+        dialogHelper.onOfflineLicenseFetchedError(drmSessionException);
+      } else {
+        dialogHelper.onOfflineLicenseFetched(downloadHelper, checkStateNotNull(keySetId));
       }
     }
-    return false;
-  }
-
-  /**
-   * Returns the first {@link Format} with a non-null {@link Format#drmInitData} found in the
-   * content's tracks, or null if none is found.
-   */
-  @Nullable
-  private Format getFirstFormatWithDrmInitData(DownloadHelper helper) {
-    for (int periodIndex = 0; periodIndex < helper.getPeriodCount(); periodIndex++) {
-      MappedTrackInfo mappedTrackInfo = helper.getMappedTrackInfo(periodIndex);
-      for (int rendererIndex = 0;
-          rendererIndex < mappedTrackInfo.getRendererCount();
-          rendererIndex++) {
-        TrackGroupArray trackGroups = mappedTrackInfo.getTrackGroups(rendererIndex);
-        for (int trackGroupIndex = 0; trackGroupIndex < trackGroups.length; trackGroupIndex++) {
-          TrackGroup trackGroup = trackGroups.get(trackGroupIndex);
-          for (int formatIndex = 0; formatIndex < trackGroup.length; formatIndex++) {
-            Format format = trackGroup.getFormat(formatIndex);
-            if (format.drmInitData != null) {
-              return format;
-            }
-          }
-        }
-      }
-    }
-    return null;
   }
 }

@@ -22,10 +22,10 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.SimpleExoPlayer;
+import com.google.android.exoplayer2.e2etest.util.PlaybackOutput;
+import com.google.android.exoplayer2.e2etest.util.ShadowMediaCodecConfig;
 import com.google.android.exoplayer2.testutil.AutoAdvancingFakeClock;
 import com.google.android.exoplayer2.testutil.DumpFileAsserts;
-import com.google.android.exoplayer2.testutil.PlaybackOutput;
-import com.google.android.exoplayer2.testutil.ShadowMediaCodecConfig;
 import com.google.android.exoplayer2.testutil.TestExoPlayer;
 import org.junit.Rule;
 import org.junit.Test;
@@ -55,6 +55,7 @@ public class TsPlaybackTest {
     player.prepare();
     player.play();
     TestExoPlayer.runUntilPlaybackState(player, Player.STATE_ENDED);
+    player.release();
 
     DumpFileAsserts.assertOutput(
         ApplicationProvider.getApplicationContext(),

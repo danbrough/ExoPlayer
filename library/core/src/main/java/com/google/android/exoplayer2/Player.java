@@ -374,8 +374,6 @@ public interface Player {
   }
 
   /** The device component of a {@link Player}. */
-  // Note: It's mostly from the androidx.media.VolumeProviderCompat and
-  //  androidx.media.MediaControllerCompat.PlaybackInfo.
   interface DeviceComponent {
 
     /** Adds a listener to receive device events. */
@@ -1285,6 +1283,12 @@ public interface Player {
    */
   @Nullable
   MediaItem getCurrentMediaItem();
+
+  /** Returns the number of {@link MediaItem media items} in the playlist. */
+  int getMediaItemCount();
+
+  /** Returns the {@link MediaItem} at the given index. */
+  MediaItem getMediaItemAt(int index);
 
   /**
    * Returns the duration of the current content window or ad in milliseconds, or {@link

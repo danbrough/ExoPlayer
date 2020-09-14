@@ -19,16 +19,21 @@ FFMPEG_EXT_PATH=$1
 NDK_PATH=$2
 HOST_PLATFORM=$3
 ENABLED_DECODERS=("${@:4}")
+#    --disable-programs
+#    --disable-everything
+
+
 COMMON_OPTIONS="
     --target-os=android
     --disable-static
     --enable-shared
+	--disable-everything
     --disable-doc
-    --disable-programs
-    --disable-everything
     --disable-avdevice
     --disable-avformat
     --disable-swscale
+	--enable-libopus 
+	--enable-libvorbis
     --disable-postproc
     --disable-avfilter
     --disable-symver

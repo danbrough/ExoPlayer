@@ -41,6 +41,8 @@ for decoder in "${ENABLED_DECODERS[@]}"
 do
     COMMON_OPTIONS="${COMMON_OPTIONS} --enable-decoder=${decoder}"
 done
+
+echo COMMON_OPTIONS $COMMON_OPTIONS 
 cd "${FFMPEG_EXT_PATH}/jni/ffmpeg"
 ./configure \
     --libdir=android-libs/armeabi-v7a \

@@ -22,18 +22,29 @@ ENABLED_DECODERS=("${@:4}")
 #    --disable-programs
 #    --disable-everything
 
+EXTRAS="
+	--enable-parser=opus
+	--enable-parser=flac
+	--enable-parser=vorbis
+	--enable-decoder=flac
+	--enable-decoder=opus
+	--enable-decoder=vorbis
+	--enable-decoder=mp3
+	--enable-demuxer=mp3
+	--enable-demuxer=ogg
+	--enable-demuxer=flac
+
+"
 
 COMMON_OPTIONS="
     --target-os=android
     --disable-static
     --enable-shared
-	--disable-everything
+    --disable-everything
     --disable-doc
     --disable-avdevice
     --disable-avformat
     --disable-swscale
-	--enable-libopus 
-	--enable-libvorbis
     --disable-postproc
     --disable-avfilter
     --disable-symver
@@ -44,7 +55,7 @@ COMMON_OPTIONS="
 TOOLCHAIN_PREFIX="${NDK_PATH}/toolchains/llvm/prebuilt/${HOST_PLATFORM}/bin"
 for decoder in "${ENABLED_DECODERS[@]}"
 do
-    COMMON_OPTIONS="${COMMON_OPTIONS} --enable-decoder=${decoder}"
+    COMMON_OPTIONS="${COMMON_OPTIONS} --enable-decoder=${decoder} $EXTRAS"
 done
 
 echo COMMON_OPTIONS $COMMON_OPTIONS 

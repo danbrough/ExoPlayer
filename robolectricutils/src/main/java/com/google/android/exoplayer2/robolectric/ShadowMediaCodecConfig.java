@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.google.android.exoplayer2.e2etest.util;
+package com.google.android.exoplayer2.robolectric;
 
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
@@ -120,7 +120,7 @@ public final class ShadowMediaCodecConfig extends ExternalResource {
     ShadowMediaCodec.addDecoder(
         codecName,
         new ShadowMediaCodec.CodecConfig(
-            /* inputBufferSize= */ 50_000, /* outputBufferSize= */ 50_000, codec));
+            /* inputBufferSize= */ 100_000, /* outputBufferSize= */ 100_000, codec));
     codecsByMimeType.put(mimeType, codec);
   }
 

@@ -13,9 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.google.android.exoplayer2.robolectric;
+package com.google.android.exoplayer2.testutil;
 
-import static com.google.android.exoplayer2.robolectric.RobolectricUtil.createRobolectricConditionVariable;
 import static com.google.common.truth.Truth.assertThat;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.junit.Assert.fail;
@@ -47,8 +46,8 @@ public final class TestDownloadManagerListener implements DownloadManager.Listen
   public TestDownloadManagerListener(DownloadManager downloadManager) {
     this.downloadManager = downloadManager;
     downloadStates = new HashMap<>();
-    initializedCondition = createRobolectricConditionVariable();
-    idleCondition = createRobolectricConditionVariable();
+    initializedCondition = TestUtil.createRobolectricConditionVariable();
+    idleCondition = TestUtil.createRobolectricConditionVariable();
     downloadManager.addListener(this);
   }
 
@@ -62,7 +61,7 @@ public final class TestDownloadManagerListener implements DownloadManager.Listen
     idleCondition.close();
     // If the manager is already idle the condition will be opened by the code immediately below.
     // Else it will be opened by onIdle().
-    ConditionVariable checkedOnMainThread = createRobolectricConditionVariable();
+    ConditionVariable checkedOnMainThread = TestUtil.createRobolectricConditionVariable();
     new Handler(downloadManager.getApplicationLooper())
         .post(
             () -> {

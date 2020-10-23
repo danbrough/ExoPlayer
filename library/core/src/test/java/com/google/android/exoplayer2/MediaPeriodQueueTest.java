@@ -432,7 +432,6 @@ public final class MediaPeriodQueueTest {
             /* isLoading= */ false,
             /* trackGroups= */ null,
             /* trackSelectorResult= */ null,
-            /* staticMetadata= */ ImmutableList.of(),
             /* loadingMediaPeriodId= */ null,
             /* playWhenReady= */ false,
             Player.PLAYBACK_SUPPRESSION_REASON_NONE,
@@ -440,8 +439,7 @@ public final class MediaPeriodQueueTest {
             /* bufferedPositionUs= */ 0,
             /* totalBufferedDurationUs= */ 0,
             /* positionUs= */ 0,
-            /* offloadSchedulingEnabled= */ false,
-            /* sleepingForOffload= */ false);
+            /* offloadSchedulingEnabled= */ false);
   }
 
   private void advance() {

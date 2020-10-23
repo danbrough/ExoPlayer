@@ -134,12 +134,6 @@ import java.util.List;
 public interface ExoPlayer extends Player {
 
   /**
-   * The default timeout for calls to {@link #release} and {@link #setForegroundMode}, in
-   * milliseconds.
-   */
-  long DEFAULT_RELEASE_TIMEOUT_MS = 500;
-
-  /**
    * A builder for {@link ExoPlayer} instances.
    *
    * <p>See {@link #Builder(Context, Renderer...)} for the list of default values.
@@ -158,10 +152,9 @@ public interface ExoPlayer extends Player {
     private boolean useLazyPreparation;
     private SeekParameters seekParameters;
     private boolean pauseAtEndOfMediaItems;
-    private long releaseTimeoutMs;
-    private LivePlaybackSpeedControl livePlaybackSpeedControl;
     private boolean buildCalled;
 
+    private long releaseTimeoutMs;
     private boolean throwWhenStuckBuffering;
 
     /**
@@ -174,14 +167,12 @@ public interface ExoPlayer extends Player {
      *   <li>{@link MediaSourceFactory}: {@link DefaultMediaSourceFactory}
      *   <li>{@link LoadControl}: {@link DefaultLoadControl}
      *   <li>{@link BandwidthMeter}: {@link DefaultBandwidthMeter#getSingletonInstance(Context)}
-     *   <li>{@link LivePlaybackSpeedControl}: {@link DefaultLivePlaybackSpeedControl}
      *   <li>{@link Looper}: The {@link Looper} associated with the current thread, or the {@link
      *       Looper} of the application's main thread if the current thread doesn't have a {@link
      *       Looper}
      *   <li>{@link AnalyticsCollector}: {@link AnalyticsCollector} with {@link Clock#DEFAULT}
      *   <li>{@code useLazyPreparation}: {@code true}
      *   <li>{@link SeekParameters}: {@link SeekParameters#DEFAULT}
-     *   <li>{@code releaseTimeoutMs}: {@link ExoPlayer#DEFAULT_RELEASE_TIMEOUT_MS}
      *   <li>{@code pauseAtEndOfMediaItems}: {@code false}
      *   <li>{@link Clock}: {@link Clock#DEFAULT}
      * </ul>
@@ -225,10 +216,22 @@ public interface ExoPlayer extends Player {
       looper = Util.getCurrentOrMainLooper();
       useLazyPreparation = true;
       seekParameters = SeekParameters.DEFAULT;
-      livePlaybackSpeedControl = new DefaultLivePlaybackSpeedControl.Builder().build();
       clock = Clock.DEFAULT;
       throwWhenStuckBuffering = true;
-      releaseTimeoutMs = DEFAULT_RELEASE_TIMEOUT_MS;
+    }
+
+    /**
+     * Set a limit on the time a call to {@link ExoPlayer#release()} can spend. If a call to {@link
+     * ExoPlayer#release()} takes more than {@code timeoutMs} milliseconds to complete, the player
+     * will raise an error via {@link Player.EventListener#onPlayerError}.
+     *
+     * <p>This method is experimental, and will be renamed or removed in a future release.
+     *
+     * @param timeoutMs The time limit in milliseconds, or 0 for no limit.
+     */
+    public Builder experimentalSetReleaseTimeoutMs(long timeoutMs) {
+      releaseTimeoutMs = timeoutMs;
+      return this;
     }
 
     /**
@@ -354,23 +357,6 @@ public interface ExoPlayer extends Player {
     }
 
     /**
-     * Sets a timeout for calls to {@link #release} and {@link #setForegroundMode}.
-     *
-     * <p>If a call to {@link #release} or {@link #setForegroundMode} takes more than {@code
-     * timeoutMs} to complete, the player will report an error via {@link
-     * Player.EventListener#onPlayerError}.
-     *
-     * @param releaseTimeoutMs The release timeout, in milliseconds.
-     * @return This builder.
-     * @throws IllegalStateException If {@link #build()} has already been called.
-     */
-    public Builder setReleaseTimeoutMs(long releaseTimeoutMs) {
-      Assertions.checkState(!buildCalled);
-      this.releaseTimeoutMs = releaseTimeoutMs;
-      return this;
-    }
-
-    /**
      * Sets whether to pause playback at the end of each media item.
      *
      * <p>This means the player will pause at the end of each window in the current {@link
@@ -385,20 +371,6 @@ public interface ExoPlayer extends Player {
     public Builder setPauseAtEndOfMediaItems(boolean pauseAtEndOfMediaItems) {
       Assertions.checkState(!buildCalled);
       this.pauseAtEndOfMediaItems = pauseAtEndOfMediaItems;
-      return this;
-    }
-
-    /**
-     * Sets the {@link LivePlaybackSpeedControl} that will control the playback speed when playing
-     * live streams, in order to maintain a steady target offset from the live stream edge.
-     *
-     * @param livePlaybackSpeedControl The {@link LivePlaybackSpeedControl}.
-     * @return This builder.
-     * @throws IllegalStateException If {@link #build()} has already been called.
-     */
-    public Builder setLivePlaybackSpeedControl(LivePlaybackSpeedControl livePlaybackSpeedControl) {
-      Assertions.checkState(!buildCalled);
-      this.livePlaybackSpeedControl = livePlaybackSpeedControl;
       return this;
     }
 
@@ -435,12 +407,13 @@ public interface ExoPlayer extends Player {
               analyticsCollector,
               useLazyPreparation,
               seekParameters,
-              livePlaybackSpeedControl,
-              releaseTimeoutMs,
               pauseAtEndOfMediaItems,
               clock,
               looper);
 
+      if (releaseTimeoutMs > 0) {
+        player.experimentalSetReleaseTimeoutMs(releaseTimeoutMs);
+      }
       if (!throwWhenStuckBuffering) {
         player.experimentalDisableThrowWhenStuckBuffering();
       }

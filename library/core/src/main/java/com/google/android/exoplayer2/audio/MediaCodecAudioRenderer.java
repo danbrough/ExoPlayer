@@ -37,8 +37,6 @@ import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.PlayerMessage.Target;
 import com.google.android.exoplayer2.RendererCapabilities;
 import com.google.android.exoplayer2.audio.AudioRendererEventListener.EventDispatcher;
-import com.google.android.exoplayer2.audio.AudioSink.InitializationException;
-import com.google.android.exoplayer2.audio.AudioSink.WriteException;
 import com.google.android.exoplayer2.decoder.DecoderInputBuffer;
 import com.google.android.exoplayer2.mediacodec.MediaCodecAdapter;
 import com.google.android.exoplayer2.mediacodec.MediaCodecInfo;
@@ -618,10 +616,8 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
     boolean fullyConsumed;
     try {
       fullyConsumed = audioSink.handleBuffer(buffer, bufferPresentationTimeUs, sampleCount);
-    } catch (InitializationException e) {
-      throw createRendererException(e, format, e.isRecoverable);
-    } catch (WriteException e) {
-      throw createRendererException(e, format, e.isRecoverable);
+    } catch (AudioSink.InitializationException | AudioSink.WriteException e) {
+      throw createRendererException(e, format);
     }
 
     if (fullyConsumed) {
@@ -641,8 +637,7 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
       audioSink.playToEndOfStream();
     } catch (AudioSink.WriteException e) {
       @Nullable Format outputFormat = getOutputFormat();
-      throw createRendererException(
-          e, outputFormat != null ? outputFormat : getInputFormat(), e.isRecoverable);
+      throw createRendererException(e, outputFormat != null ? outputFormat : getInputFormat());
     }
   }
 
@@ -861,11 +856,6 @@ public class MediaCodecAudioRenderer extends MediaCodecRenderer implements Media
       if (wakeupListener != null) {
         wakeupListener.onSleep(bufferEmptyingDeadlineMs);
       }
-    }
-
-    @Override
-    public void onAudioSinkError(Exception audioSinkError) {
-      eventDispatcher.audioSinkError(audioSinkError);
     }
   }
 }

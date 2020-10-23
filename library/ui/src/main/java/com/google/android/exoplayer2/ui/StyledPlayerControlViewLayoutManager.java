@@ -125,8 +125,13 @@ import java.util.List;
     }
 
     Resources resources = styledPlayerControlView.getResources();
-    float progressBarHeight = resources.getDimension(R.dimen.exo_custom_progress_thumb_size);
-    float bottomBarHeight = resources.getDimension(R.dimen.exo_bottom_bar_height);
+    float bottomBarHeight =
+        resources.getDimension(R.dimen.exo_bottom_bar_height)
+            - resources.getDimension(R.dimen.exo_styled_progress_bar_height);
+    float progressBarHeight =
+        resources.getDimension(R.dimen.exo_styled_progress_margin_bottom)
+            + resources.getDimension(R.dimen.exo_styled_progress_layout_height)
+            - bottomBarHeight;
 
     ValueAnimator fadeOutAnimator = ValueAnimator.ofFloat(1.0f, 0.0f);
     fadeOutAnimator.setInterpolator(new LinearInterpolator());
@@ -590,7 +595,7 @@ import java.util.List;
       int timeBarMarginBottom =
           styledPlayerControlView
               .getResources()
-              .getDimensionPixelSize(R.dimen.exo_custom_progress_margin_bottom);
+              .getDimensionPixelSize(R.dimen.exo_styled_progress_margin_bottom);
       timeBarParams.bottomMargin = (isMinimalMode ? 0 : timeBarMarginBottom);
       timeBar.setLayoutParams(timeBarParams);
       if (timeBar instanceof DefaultTimeBar
@@ -634,16 +639,16 @@ import java.util.List;
       bottomBarWidth += basicControls.getChildAt(i).getWidth();
     }
 
+    // BasicControls keeps overflow button at least.
+    int minBasicControlsChildCount = 1;
+    // ExtraControls keeps overflow button and settings button at least.
+    int minExtraControlsChildCount = 2;
+
     if (bottomBarWidth > width) {
-      if (overflowShowButton != null && overflowShowButton.getVisibility() != View.VISIBLE) {
-        overflowShowButton.setVisibility(View.VISIBLE);
-        bottomBarWidth += overflowShowButton.getWidth();
-      }
-      // Move control views from basicControls to extraControls
+      // move control views from basicControls to extraControls
       ArrayList<View> movingChildren = new ArrayList<>();
       int movingWidth = 0;
-      // The last child is overflow show button, which shouldn't move.
-      int endIndex = basicControls.getChildCount() - 1;
+      int endIndex = basicControls.getChildCount() - minBasicControlsChildCount;
       for (int index = 0; index < endIndex; index++) {
         View child = basicControls.getChildAt(index);
         movingWidth += child.getWidth();
@@ -657,9 +662,7 @@ import java.util.List;
         basicControls.removeViews(0, movingChildren.size());
 
         for (View child : movingChildren) {
-          // The last child of extra controls is the overflow hide button. Adding other buttons
-          // before it.
-          int index = extraControls.getChildCount() - 1;
+          int index = extraControls.getChildCount() - minExtraControlsChildCount;
           extraControls.addView(child, index);
         }
       }
@@ -668,9 +671,8 @@ import java.util.List;
       // Move controls from extraControls to basicControls if possible, else do nothing.
       ArrayList<View> movingChildren = new ArrayList<>();
       int movingWidth = 0;
-      // The last child of extra controls is the overflow button, which shouldn't move.
-      int endIndex = extraControls.getChildCount() - 2;
-      for (int index = endIndex; index >= 0; index--) {
+      int startIndex = extraControls.getChildCount() - minExtraControlsChildCount - 1;
+      for (int index = startIndex; index >= 0; index--) {
         View child = extraControls.getChildAt(index);
         movingWidth += child.getWidth();
         if (bottomBarWidth + movingWidth > width) {
@@ -680,14 +682,11 @@ import java.util.List;
       }
 
       if (!movingChildren.isEmpty()) {
-        extraControls.removeViews(endIndex - movingChildren.size() + 1, movingChildren.size());
+        extraControls.removeViews(startIndex - movingChildren.size() + 1, movingChildren.size());
 
         for (View child : movingChildren) {
           basicControls.addView(child, 0);
         }
-      }
-      if (extraControls.getChildCount() == 1 && overflowShowButton != null) {
-        overflowShowButton.setVisibility(View.GONE);
       }
     }
   }

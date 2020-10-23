@@ -28,7 +28,6 @@ import com.google.android.exoplayer2.Player.PlaybackSuppressionReason;
 import com.google.android.exoplayer2.Player.TimelineChangeReason;
 import com.google.android.exoplayer2.Timeline;
 import com.google.android.exoplayer2.audio.AudioAttributes;
-import com.google.android.exoplayer2.audio.AudioSink;
 import com.google.android.exoplayer2.decoder.DecoderCounters;
 import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.source.LoadEventInfo;
@@ -38,7 +37,6 @@ import com.google.android.exoplayer2.source.TrackGroupArray;
 import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
 import com.google.common.base.Objects;
 import java.io.IOException;
-import java.util.List;
 
 /**
  * A listener for analytics events.
@@ -339,23 +337,6 @@ public interface AnalyticsListener {
       EventTime eventTime, TrackGroupArray trackGroups, TrackSelectionArray trackSelections) {}
 
   /**
-   * Called when the static metadata changes.
-   *
-   * <p>The provided {@code metadataList} is an immutable list of {@link Metadata} instances, where
-   * the elements correspond to the current track selections (as returned by {@link
-   * #onTracksChanged(EventTime, TrackGroupArray, TrackSelectionArray)}, or an empty list if there
-   * are no track selections or the implementation does not support metadata.
-   *
-   * <p>The metadata is considered static in the sense that it comes from the tracks' declared
-   * Formats, rather than being timed (or dynamic) metadata, which is represented within a metadata
-   * track.
-   *
-   * @param eventTime The event time.
-   * @param metadataList The static metadata.
-   */
-  default void onStaticMetadataChanged(EventTime eventTime, List<Metadata> metadataList) {}
-
-  /**
    * Called when a media source started loading data.
    *
    * @param eventTime The event time.
@@ -543,16 +524,6 @@ public interface AnalyticsListener {
    * @param skipSilenceEnabled Whether skipping silences in the audio stream is enabled.
    */
   default void onSkipSilenceEnabledChanged(EventTime eventTime, boolean skipSilenceEnabled) {}
-
-  /**
-   * Called when {@link AudioSink} has encountered an error. These errors are just for informational
-   * purposes and the player may recover.
-   *
-   * @param eventTime The event time.
-   * @param audioSinkError Either a {@link AudioSink.InitializationException} or a {@link
-   *     AudioSink.WriteException} describing the error.
-   */
-  default void onAudioSinkError(EventTime eventTime, Exception audioSinkError) {}
 
   /**
    * Called when the volume changes.

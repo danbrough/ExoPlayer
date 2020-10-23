@@ -15,7 +15,6 @@
  */
 package com.google.android.exoplayer2;
 
-import static com.google.android.exoplayer2.util.Assertions.checkState;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
 
@@ -130,7 +129,7 @@ public class DefaultLoadControl implements LoadControl {
      * @throws IllegalStateException If {@link #build()} has already been called.
      */
     public Builder setAllocator(DefaultAllocator allocator) {
-      checkState(!buildCalled);
+      Assertions.checkState(!buildCalled);
       this.allocator = allocator;
       return this;
     }
@@ -155,7 +154,7 @@ public class DefaultLoadControl implements LoadControl {
         int maxBufferMs,
         int bufferForPlaybackMs,
         int bufferForPlaybackAfterRebufferMs) {
-      checkState(!buildCalled);
+      Assertions.checkState(!buildCalled);
       assertGreaterOrEqual(bufferForPlaybackMs, 0, "bufferForPlaybackMs", "0");
       assertGreaterOrEqual(
           bufferForPlaybackAfterRebufferMs, 0, "bufferForPlaybackAfterRebufferMs", "0");
@@ -182,7 +181,7 @@ public class DefaultLoadControl implements LoadControl {
      * @throws IllegalStateException If {@link #build()} has already been called.
      */
     public Builder setTargetBufferBytes(int targetBufferBytes) {
-      checkState(!buildCalled);
+      Assertions.checkState(!buildCalled);
       this.targetBufferBytes = targetBufferBytes;
       return this;
     }
@@ -197,7 +196,7 @@ public class DefaultLoadControl implements LoadControl {
      * @throws IllegalStateException If {@link #build()} has already been called.
      */
     public Builder setPrioritizeTimeOverSizeThresholds(boolean prioritizeTimeOverSizeThresholds) {
-      checkState(!buildCalled);
+      Assertions.checkState(!buildCalled);
       this.prioritizeTimeOverSizeThresholds = prioritizeTimeOverSizeThresholds;
       return this;
     }
@@ -213,7 +212,7 @@ public class DefaultLoadControl implements LoadControl {
      * @throws IllegalStateException If {@link #build()} has already been called.
      */
     public Builder setBackBuffer(int backBufferDurationMs, boolean retainBackBufferFromKeyframe) {
-      checkState(!buildCalled);
+      Assertions.checkState(!buildCalled);
       assertGreaterOrEqual(backBufferDurationMs, 0, "backBufferDurationMs", "0");
       this.backBufferDurationMs = backBufferDurationMs;
       this.retainBackBufferFromKeyframe = retainBackBufferFromKeyframe;
@@ -228,7 +227,7 @@ public class DefaultLoadControl implements LoadControl {
 
     /** Creates a {@link DefaultLoadControl}. */
     public DefaultLoadControl build() {
-      checkState(!buildCalled);
+      Assertions.checkState(!buildCalled);
       buildCalled = true;
       if (allocator == null) {
         allocator = new DefaultAllocator(/* trimOnReset= */ true, C.DEFAULT_BUFFER_SEGMENT_SIZE);
@@ -258,7 +257,7 @@ public class DefaultLoadControl implements LoadControl {
   private final boolean retainBackBufferFromKeyframe;
 
   private int targetBufferBytes;
-  private boolean isLoading;
+  private boolean isBuffering;
 
   /** Constructs a new instance, using the {@code DEFAULT_*} constants defined in this class. */
   @SuppressWarnings("deprecation")
@@ -395,26 +394,23 @@ public class DefaultLoadControl implements LoadControl {
     // Prevent playback from getting stuck if minBufferUs is too small.
     minBufferUs = max(minBufferUs, 500_000);
     if (bufferedDurationUs < minBufferUs) {
-      isLoading = prioritizeTimeOverSizeThresholds || !targetBufferSizeReached;
-      if (!isLoading && bufferedDurationUs < 500_000) {
+      isBuffering = prioritizeTimeOverSizeThresholds || !targetBufferSizeReached;
+      if (!isBuffering && bufferedDurationUs < 500_000) {
         Log.w(
             "DefaultLoadControl",
             "Target buffer size reached with less than 500ms of buffered media data.");
       }
     } else if (bufferedDurationUs >= maxBufferUs || targetBufferSizeReached) {
-      isLoading = false;
-    } // Else don't change the loading state.
-    return isLoading;
+      isBuffering = false;
+    } // Else don't change the buffering state
+    return isBuffering;
   }
 
   @Override
   public boolean shouldStartPlayback(
-      long bufferedDurationUs, float playbackSpeed, boolean rebuffering, long targetLiveOffsetUs) {
+      long bufferedDurationUs, float playbackSpeed, boolean rebuffering) {
     bufferedDurationUs = Util.getPlayoutDurationForMediaDuration(bufferedDurationUs, playbackSpeed);
     long minBufferDurationUs = rebuffering ? bufferForPlaybackAfterRebufferUs : bufferForPlaybackUs;
-    if (targetLiveOffsetUs != C.TIME_UNSET) {
-      minBufferDurationUs = min(targetLiveOffsetUs / 2, minBufferDurationUs);
-    }
     return minBufferDurationUs <= 0
         || bufferedDurationUs >= minBufferDurationUs
         || (!prioritizeTimeOverSizeThresholds
@@ -445,7 +441,7 @@ public class DefaultLoadControl implements LoadControl {
         targetBufferBytesOverwrite == C.LENGTH_UNSET
             ? DEFAULT_MIN_BUFFER_SIZE
             : targetBufferBytesOverwrite;
-    isLoading = false;
+    isBuffering = false;
     if (resetAllocator) {
       allocator.reset();
     }

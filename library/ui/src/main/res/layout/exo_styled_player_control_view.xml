@@ -88,11 +88,7 @@
       <ImageButton android:id="@+id/exo_fullscreen"
           style="@style/ExoStyledControls.Button.Bottom.FullScreen"/>
 
-      <ImageButton android:id="@+id/exo_settings"
-          style="@style/ExoStyledControls.Button.Bottom.Settings"/>
-
       <ImageButton android:id="@+id/exo_overflow_show"
-          android:visibility="gone"
           style="@style/ExoStyledControls.Button.Bottom.OverflowShow"/>
 
     </LinearLayout>
@@ -110,6 +106,9 @@
           android:orientation="horizontal"
           android:layoutDirection="ltr">
 
+        <ImageButton android:id="@+id/exo_settings"
+            style="@style/ExoStyledControls.Button.Bottom.Settings"/>
+
         <ImageButton android:id="@+id/exo_overflow_hide"
             style="@style/ExoStyledControls.Button.Bottom.OverflowHide"/>
 
@@ -124,15 +123,14 @@
       android:layout_height="wrap_content"
       android:orientation="vertical"
       android:layout_gravity="bottom|end"
-      android:layout_marginBottom="@dimen/exo_custom_progress_thumb_size"
+      android:layout_marginBottom="@dimen/exo_styled_progress_layout_height"
       android:visibility="invisible">
 
   </LinearLayout>
 
   <View android:id="@id/exo_progress_placeholder"
       android:layout_width="match_parent"
-      android:layout_height="@dimen/exo_custom_progress_thumb_size"
+      android:layout_height="@dimen/exo_styled_progress_layout_height"
       android:layout_gravity="bottom"
-      android:layout_marginBottom="@dimen/exo_custom_progress_margin_bottom"/>
-
+      android:layout_marginBottom="@dimen/exo_styled_progress_margin_bottom"/>
 </merge>

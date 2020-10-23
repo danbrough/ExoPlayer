@@ -259,14 +259,6 @@ public class AnalyticsCollector
   }
 
   @Override
-  public void onAudioSinkError(Exception audioSinkError) {
-    EventTime eventTime = generateReadingMediaPeriodEventTime();
-    for (AnalyticsListener listener : listeners) {
-      listener.onAudioSinkError(eventTime, audioSinkError);
-    }
-  }
-
-  @Override
   public void onVolumeChanged(float audioVolume) {
     EventTime eventTime = generateReadingMediaPeriodEventTime();
     for (AnalyticsListener listener : listeners) {
@@ -467,14 +459,6 @@ public class AnalyticsCollector
     EventTime eventTime = generateCurrentPlayerMediaPeriodEventTime();
     for (AnalyticsListener listener : listeners) {
       listener.onTracksChanged(eventTime, trackGroups, trackSelections);
-    }
-  }
-
-  @Override
-  public final void onStaticMetadataChanged(List<Metadata> metadataList) {
-    EventTime eventTime = generateCurrentPlayerMediaPeriodEventTime();
-    for (AnalyticsListener listener : listeners) {
-      listener.onStaticMetadataChanged(eventTime, metadataList);
     }
   }
 

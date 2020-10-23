@@ -28,7 +28,6 @@ import android.util.Pair;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.PlayerMessage.Target;
 import com.google.android.exoplayer2.analytics.AnalyticsCollector;
-import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.source.MediaSource.MediaPeriodId;
 import com.google.android.exoplayer2.source.MediaSourceFactory;
@@ -44,7 +43,6 @@ import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.Clock;
 import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.Util;
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -117,8 +115,6 @@ import java.util.concurrent.TimeoutException;
    *     loads and other initial preparation steps happen immediately. If true, these initial
    *     preparations are triggered only when the player starts buffering the media.
    * @param seekParameters The {@link SeekParameters}.
-   * @param livePlaybackSpeedControl The {@link LivePlaybackSpeedControl}.
-   * @param releaseTimeoutMs The timeout for calls to {@link #release()} in milliseconds.
    * @param pauseAtEndOfMediaItems Whether to pause playback at the end of each media item.
    * @param clock The {@link Clock}.
    * @param applicationLooper The {@link Looper} that must be used for all calls to the player and
@@ -134,8 +130,6 @@ import java.util.concurrent.TimeoutException;
       @Nullable AnalyticsCollector analyticsCollector,
       boolean useLazyPreparation,
       SeekParameters seekParameters,
-      LivePlaybackSpeedControl livePlaybackSpeedControl,
-      long releaseTimeoutMs,
       boolean pauseAtEndOfMediaItems,
       Clock clock,
       Looper applicationLooper) {
@@ -184,13 +178,25 @@ import java.util.concurrent.TimeoutException;
             shuffleModeEnabled,
             analyticsCollector,
             seekParameters,
-            livePlaybackSpeedControl,
-            releaseTimeoutMs,
             pauseAtEndOfMediaItems,
             applicationLooper,
             clock,
             playbackInfoUpdateListener);
     internalPlayerHandler = new Handler(internalPlayer.getPlaybackLooper());
+  }
+
+  /**
+   * Set a limit on the time a call to {@link #release()} can spend. If a call to {@link #release()}
+   * takes more than {@code timeoutMs} milliseconds to complete, the player will raise an error via
+   * {@link Player.EventListener#onPlayerError}.
+   *
+   * <p>This method is experimental, and will be renamed or removed in a future release. It should
+   * only be called before the player is used.
+   *
+   * @param timeoutMs The time limit in milliseconds, or 0 for no limit.
+   */
+  public void experimentalSetReleaseTimeoutMs(long timeoutMs) {
+    internalPlayer.experimentalSetReleaseTimeoutMs(timeoutMs);
   }
 
   /**
@@ -664,28 +670,18 @@ import java.util.concurrent.TimeoutException;
     if (this.foregroundMode != foregroundMode) {
       this.foregroundMode = foregroundMode;
       if (!internalPlayer.setForegroundMode(foregroundMode)) {
-        stop(
-            /* reset= */ false,
-            ExoPlaybackException.createForTimeout(
-                new TimeoutException("Setting foreground mode timed out."),
-                ExoPlaybackException.TIMEOUT_OPERATION_SET_FOREGROUND_MODE));
+        notifyListeners(
+            listener ->
+                listener.onPlayerError(
+                    ExoPlaybackException.createForTimeout(
+                        new TimeoutException("Setting foreground mode timed out."),
+                        ExoPlaybackException.TIMEOUT_OPERATION_SET_FOREGROUND_MODE)));
       }
     }
   }
 
   @Override
   public void stop(boolean reset) {
-    stop(reset, /* error= */ null);
-  }
-
-  /**
-   * Stops the player.
-   *
-   * @param reset Whether the playlist should be cleared and whether the playback position and
-   *     playback error should be reset.
-   * @param error An optional {@link ExoPlaybackException} to set.
-   */
-  public void stop(boolean reset, @Nullable ExoPlaybackException error) {
     PlaybackInfo playbackInfo;
     if (reset) {
       playbackInfo =
@@ -698,9 +694,6 @@ import java.util.concurrent.TimeoutException;
       playbackInfo.totalBufferedDurationUs = 0;
     }
     playbackInfo = playbackInfo.copyWithPlaybackState(Player.STATE_IDLE);
-    if (error != null) {
-      playbackInfo = playbackInfo.copyWithPlaybackError(error);
-    }
     pendingOperationAcks++;
     internalPlayer.stop();
     updatePlaybackInfo(
@@ -871,11 +864,6 @@ import java.util.concurrent.TimeoutException;
   @Override
   public TrackSelectionArray getCurrentTrackSelections() {
     return playbackInfo.trackSelectorResult.selections;
-  }
-
-  @Override
-  public List<Metadata> getCurrentStaticMetadata() {
-    return playbackInfo.staticMetadata;
   }
 
   @Override
@@ -1185,8 +1173,7 @@ import java.util.concurrent.TimeoutException;
               /* requestedContentPositionUs= */ C.msToUs(maskingWindowPositionMs),
               /* totalBufferedDurationUs= */ 0,
               TrackGroupArray.EMPTY,
-              emptyTrackSelectorResult,
-              ImmutableList.of());
+              emptyTrackSelectorResult);
       playbackInfo = playbackInfo.copyWithLoadingMediaPeriodId(dummyMediaPeriodId);
       playbackInfo.bufferedPositionUs = playbackInfo.positionUs;
       return playbackInfo;
@@ -1213,8 +1200,7 @@ import java.util.concurrent.TimeoutException;
               /* requestedContentPositionUs= */ newContentPositionUs,
               /* totalBufferedDurationUs= */ 0,
               playingPeriodChanged ? TrackGroupArray.EMPTY : playbackInfo.trackGroups,
-              playingPeriodChanged ? emptyTrackSelectorResult : playbackInfo.trackSelectorResult,
-              playingPeriodChanged ? ImmutableList.of() : playbackInfo.staticMetadata);
+              playingPeriodChanged ? emptyTrackSelectorResult : playbackInfo.trackSelectorResult);
       playbackInfo = playbackInfo.copyWithLoadingMediaPeriodId(newPeriodId);
       playbackInfo.bufferedPositionUs = newContentPositionUs;
     } else if (newContentPositionUs == oldContentPositionUs) {
@@ -1238,8 +1224,7 @@ import java.util.concurrent.TimeoutException;
                 /* requestedContentPositionUs= */ playbackInfo.positionUs,
                 /* totalBufferedDurationUs= */ maskedBufferedPositionUs - playbackInfo.positionUs,
                 playbackInfo.trackGroups,
-                playbackInfo.trackSelectorResult,
-                playbackInfo.staticMetadata);
+                playbackInfo.trackSelectorResult);
         playbackInfo = playbackInfo.copyWithLoadingMediaPeriodId(newPeriodId);
         playbackInfo.bufferedPositionUs = maskedBufferedPositionUs;
       }
@@ -1261,8 +1246,7 @@ import java.util.concurrent.TimeoutException;
               /* requestedContentPositionUs= */ newContentPositionUs,
               maskedTotalBufferedDurationUs,
               playbackInfo.trackGroups,
-              playbackInfo.trackSelectorResult,
-              playbackInfo.staticMetadata);
+              playbackInfo.trackSelectorResult);
       playbackInfo.bufferedPositionUs = maskedBufferedPositionUs;
     }
     return playbackInfo;
@@ -1369,13 +1353,11 @@ import java.util.concurrent.TimeoutException;
     private final boolean isLoadingChanged;
     private final boolean timelineChanged;
     private final boolean trackSelectorResultChanged;
-    private final boolean staticMetadataChanged;
     private final boolean playWhenReadyChanged;
     private final boolean playbackSuppressionReasonChanged;
     private final boolean isPlayingChanged;
     private final boolean playbackParametersChanged;
     private final boolean offloadSchedulingEnabledChanged;
-    private final boolean sleepingForOffloadChanged;
 
     public PlaybackInfoUpdate(
         PlaybackInfo playbackInfo,
@@ -1409,8 +1391,6 @@ import java.util.concurrent.TimeoutException;
       timelineChanged = !previousPlaybackInfo.timeline.equals(playbackInfo.timeline);
       trackSelectorResultChanged =
           previousPlaybackInfo.trackSelectorResult != playbackInfo.trackSelectorResult;
-      staticMetadataChanged =
-          !previousPlaybackInfo.staticMetadata.equals(playbackInfo.staticMetadata);
       playWhenReadyChanged = previousPlaybackInfo.playWhenReady != playbackInfo.playWhenReady;
       playbackSuppressionReasonChanged =
           previousPlaybackInfo.playbackSuppressionReason != playbackInfo.playbackSuppressionReason;
@@ -1419,8 +1399,6 @@ import java.util.concurrent.TimeoutException;
           !previousPlaybackInfo.playbackParameters.equals(playbackInfo.playbackParameters);
       offloadSchedulingEnabledChanged =
           previousPlaybackInfo.offloadSchedulingEnabled != playbackInfo.offloadSchedulingEnabled;
-      sleepingForOffloadChanged =
-          previousPlaybackInfo.sleepingForOffload != playbackInfo.sleepingForOffload;
     }
 
     @SuppressWarnings("deprecation")
@@ -1451,11 +1429,6 @@ import java.util.concurrent.TimeoutException;
             listener ->
                 listener.onTracksChanged(
                     playbackInfo.trackGroups, playbackInfo.trackSelectorResult.selections));
-      }
-      if (staticMetadataChanged) {
-        invokeAll(
-            listenerSnapshot,
-            listener -> listener.onStaticMetadataChanged(playbackInfo.staticMetadata));
       }
       if (isLoadingChanged) {
         invokeAll(
@@ -1507,12 +1480,6 @@ import java.util.concurrent.TimeoutException;
             listener ->
                 listener.onExperimentalOffloadSchedulingEnabledChanged(
                     playbackInfo.offloadSchedulingEnabled));
-      }
-      if (sleepingForOffloadChanged) {
-        invokeAll(
-            listenerSnapshot,
-            listener ->
-                listener.onExperimentalSleepingForOffloadChanged(playbackInfo.sleepingForOffload));
       }
     }
 

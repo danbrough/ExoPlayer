@@ -18,7 +18,6 @@ package com.google.android.exoplayer2.source.dash.manifest;
 import static com.google.common.truth.Truth.assertThat;
 
 import android.net.Uri;
-import androidx.annotation.Nullable;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.offline.StreamKey;
@@ -41,13 +40,9 @@ public class DashManifestTest {
   @Test
   public void copy() {
     Representation[][][] representations = newRepresentations(3, 2, 3);
-    ServiceDescriptionElement serviceDescriptionElement =
-        new ServiceDescriptionElement(
-            /* targetOffsetMs= */ 20, /* minPlaybackSpeed= */ 0.9f, /* maxPlaybackSpeed= */ 1.1f);
     DashManifest sourceManifest =
         newDashManifest(
             10,
-            serviceDescriptionElement,
             newPeriod(
                 "1",
                 1,
@@ -83,7 +78,6 @@ public class DashManifestTest {
     DashManifest expectedManifest =
         newDashManifest(
             10,
-            serviceDescriptionElement,
             newPeriod(
                 "1",
                 1,
@@ -108,7 +102,6 @@ public class DashManifestTest {
     DashManifest sourceManifest =
         newDashManifest(
             10,
-            /* serviceDescription= */ null,
             newPeriod("1", 1, newAdaptationSet(2, representations[0][0])),
             newPeriod("4", 4, newAdaptationSet(5, representations[1][0])));
 
@@ -118,7 +111,6 @@ public class DashManifestTest {
     DashManifest expectedManifest =
         newDashManifest(
             10,
-            /* serviceDescription= */ null,
             newPeriod("1", 1, newAdaptationSet(2, representations[0][0])),
             newPeriod("4", 4, newAdaptationSet(5, representations[1][0])));
     assertManifestEquals(expectedManifest, copyManifest);
@@ -130,7 +122,6 @@ public class DashManifestTest {
     DashManifest sourceManifest =
         newDashManifest(
             10,
-            /* serviceDescription= */ null,
             newPeriod(
                 "1",
                 1,
@@ -160,7 +151,6 @@ public class DashManifestTest {
     DashManifest expectedManifest =
         newDashManifest(
             7,
-            /* serviceDescription= */ null,
             newPeriod(
                 "1",
                 1,
@@ -187,7 +177,6 @@ public class DashManifestTest {
     assertThat(actual.utcTiming).isEqualTo(expected.utcTiming);
     assertThat(actual.location).isEqualTo(expected.location);
     assertThat(actual.getPeriodCount()).isEqualTo(expected.getPeriodCount());
-    assertThat(actual.serviceDescription).isEqualTo(expected.serviceDescription);
     for (int i = 0; i < expected.getPeriodCount(); i++) {
       Period expectedPeriod = expected.getPeriod(i);
       Period actualPeriod = actual.getPeriod(i);
@@ -228,8 +217,7 @@ public class DashManifestTest {
     return Representation.newInstance(/* revisionId= */ 0, FORMAT, /* baseUrl= */ "", SEGMENT_BASE);
   }
 
-  private static DashManifest newDashManifest(
-      int duration, @Nullable ServiceDescriptionElement serviceDescription, Period... periods) {
+  private static DashManifest newDashManifest(int duration, Period... periods) {
     return new DashManifest(
         /* availabilityStartTimeMs= */ 0,
         duration,
@@ -241,7 +229,6 @@ public class DashManifestTest {
         /* publishTimeMs= */ 12345,
         /* programInformation= */ null,
         UTC_TIMING,
-        serviceDescription,
         Uri.EMPTY,
         Arrays.asList(periods));
   }

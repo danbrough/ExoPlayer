@@ -29,7 +29,9 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.concurrent.TimeoutException;
 
-/** Thrown when a non locally recoverable playback failure occurs. */
+/**
+ * Thrown when a non-recoverable playback failure occurs.
+ */
 public final class ExoPlaybackException extends Exception {
 
   /**
@@ -83,17 +85,16 @@ public final class ExoPlaybackException extends Exception {
 
   /**
    * The operation which produced the timeout error. One of {@link #TIMEOUT_OPERATION_RELEASE},
-   * {@link #TIMEOUT_OPERATION_SET_FOREGROUND_MODE}, {@link #TIMEOUT_OPERATION_DETACH_SURFACE} or
-   * {@link #TIMEOUT_OPERATION_UNDEFINED}. Note that new operations may be added in the future and
-   * error handling should handle unknown operation values.
+   * {@link #TIMEOUT_OPERATION_SET_FOREGROUND_MODE} or {@link #TIMEOUT_OPERATION_UNDEFINED}. Note
+   * that new operations may be added in the future and error handling should handle unknown
+   * operation values.
    */
   @Documented
   @Retention(RetentionPolicy.SOURCE)
   @IntDef({
     TIMEOUT_OPERATION_UNDEFINED,
     TIMEOUT_OPERATION_RELEASE,
-    TIMEOUT_OPERATION_SET_FOREGROUND_MODE,
-    TIMEOUT_OPERATION_DETACH_SURFACE
+    TIMEOUT_OPERATION_SET_FOREGROUND_MODE
   })
   public @interface TimeoutOperation {}
 
@@ -103,8 +104,6 @@ public final class ExoPlaybackException extends Exception {
   public static final int TIMEOUT_OPERATION_RELEASE = 1;
   /** The error occurred in {@link ExoPlayer#setForegroundMode}. */
   public static final int TIMEOUT_OPERATION_SET_FOREGROUND_MODE = 2;
-  /** The error occurred while detaching a surface from the player. */
-  public static final int TIMEOUT_OPERATION_DETACH_SURFACE = 3;
 
   /** If {@link #type} is {@link #TYPE_RENDERER}, this is the name of the renderer. */
   @Nullable public final String rendererName;
@@ -139,17 +138,6 @@ public final class ExoPlaybackException extends Exception {
    */
   @Nullable public final MediaSource.MediaPeriodId mediaPeriodId;
 
-  /**
-   * Whether the error may be recoverable.
-   *
-   * <p>This is only used internally by ExoPlayer to try to recover from some errors and should not
-   * be used by apps.
-   *
-   * <p>If the {@link #type} is {@link #TYPE_RENDERER}, it may be possible to recover from the error
-   * by disabling and re-enabling the renderers.
-   */
-  /* package */ final boolean isRecoverable;
-
   @Nullable private final Throwable cause;
 
   /**
@@ -179,34 +167,6 @@ public final class ExoPlaybackException extends Exception {
       int rendererIndex,
       @Nullable Format rendererFormat,
       @FormatSupport int rendererFormatSupport) {
-    return createForRenderer(
-        cause,
-        rendererName,
-        rendererIndex,
-        rendererFormat,
-        rendererFormatSupport,
-        /* isRecoverable= */ false);
-  }
-
-  /**
-   * Creates an instance of type {@link #TYPE_RENDERER}.
-   *
-   * @param cause The cause of the failure.
-   * @param rendererIndex The index of the renderer in which the failure occurred.
-   * @param rendererFormat The {@link Format} the renderer was using at the time of the exception,
-   *     or null if the renderer wasn't using a {@link Format}.
-   * @param rendererFormatSupport The {@link FormatSupport} of the renderer for {@code
-   *     rendererFormat}. Ignored if {@code rendererFormat} is null.
-   * @param isRecoverable If the failure can be recovered by disabling and re-enabling the renderer.
-   * @return The created instance.
-   */
-  public static ExoPlaybackException createForRenderer(
-      Exception cause,
-      String rendererName,
-      int rendererIndex,
-      @Nullable Format rendererFormat,
-      @FormatSupport int rendererFormatSupport,
-      boolean isRecoverable) {
     return new ExoPlaybackException(
         TYPE_RENDERER,
         cause,
@@ -215,8 +175,7 @@ public final class ExoPlaybackException extends Exception {
         rendererIndex,
         rendererFormat,
         rendererFormat == null ? RendererCapabilities.FORMAT_HANDLED : rendererFormatSupport,
-        TIMEOUT_OPERATION_UNDEFINED,
-        isRecoverable);
+        TIMEOUT_OPERATION_UNDEFINED);
   }
 
   /**
@@ -266,8 +225,7 @@ public final class ExoPlaybackException extends Exception {
         /* rendererIndex= */ C.INDEX_UNSET,
         /* rendererFormat= */ null,
         /* rendererFormatSupport= */ RendererCapabilities.FORMAT_HANDLED,
-        timeoutOperation,
-        /* isRecoverable= */ false);
+        timeoutOperation);
   }
 
   private ExoPlaybackException(@Type int type, Throwable cause) {
@@ -279,8 +237,7 @@ public final class ExoPlaybackException extends Exception {
         /* rendererIndex= */ C.INDEX_UNSET,
         /* rendererFormat= */ null,
         /* rendererFormatSupport= */ RendererCapabilities.FORMAT_HANDLED,
-        TIMEOUT_OPERATION_UNDEFINED,
-        /* isRecoverable= */ false);
+        TIMEOUT_OPERATION_UNDEFINED);
   }
 
   private ExoPlaybackException(@Type int type, String message) {
@@ -292,8 +249,7 @@ public final class ExoPlaybackException extends Exception {
         /* rendererIndex= */ C.INDEX_UNSET,
         /* rendererFormat= */ null,
         /* rendererFormatSupport= */ RendererCapabilities.FORMAT_HANDLED,
-        /* timeoutOperation= */ TIMEOUT_OPERATION_UNDEFINED,
-        /* isRecoverable= */ false);
+        /* timeoutOperation= */ TIMEOUT_OPERATION_UNDEFINED);
   }
 
   private ExoPlaybackException(
@@ -304,8 +260,7 @@ public final class ExoPlaybackException extends Exception {
       int rendererIndex,
       @Nullable Format rendererFormat,
       @FormatSupport int rendererFormatSupport,
-      @TimeoutOperation int timeoutOperation,
-      boolean isRecoverable) {
+      @TimeoutOperation int timeoutOperation) {
     this(
         deriveMessage(
             type,
@@ -322,8 +277,7 @@ public final class ExoPlaybackException extends Exception {
         rendererFormatSupport,
         /* mediaPeriodId= */ null,
         timeoutOperation,
-        /* timestampMs= */ SystemClock.elapsedRealtime(),
-        isRecoverable);
+        /* timestampMs= */ SystemClock.elapsedRealtime());
   }
 
   private ExoPlaybackException(
@@ -336,8 +290,7 @@ public final class ExoPlaybackException extends Exception {
       @FormatSupport int rendererFormatSupport,
       @Nullable MediaSource.MediaPeriodId mediaPeriodId,
       @TimeoutOperation int timeoutOperation,
-      long timestampMs,
-      boolean isRecoverable) {
+      long timestampMs) {
     super(message, cause);
     this.type = type;
     this.cause = cause;
@@ -348,7 +301,6 @@ public final class ExoPlaybackException extends Exception {
     this.mediaPeriodId = mediaPeriodId;
     this.timeoutOperation = timeoutOperation;
     this.timestampMs = timestampMs;
-    this.isRecoverable = isRecoverable;
   }
 
   /**
@@ -408,7 +360,7 @@ public final class ExoPlaybackException extends Exception {
    * @return The copied exception.
    */
   @CheckResult
-  /* package */ ExoPlaybackException copyWithMediaPeriodId(
+  /* package= */ ExoPlaybackException copyWithMediaPeriodId(
       @Nullable MediaSource.MediaPeriodId mediaPeriodId) {
     return new ExoPlaybackException(
         getMessage(),
@@ -420,8 +372,7 @@ public final class ExoPlaybackException extends Exception {
         rendererFormatSupport,
         mediaPeriodId,
         timeoutOperation,
-        timestampMs,
-        isRecoverable);
+        timestampMs);
   }
 
   @Nullable

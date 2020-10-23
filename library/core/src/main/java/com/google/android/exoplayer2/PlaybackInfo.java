@@ -18,12 +18,9 @@ package com.google.android.exoplayer2;
 import androidx.annotation.CheckResult;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.Player.PlaybackSuppressionReason;
-import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.source.MediaSource.MediaPeriodId;
 import com.google.android.exoplayer2.source.TrackGroupArray;
 import com.google.android.exoplayer2.trackselection.TrackSelectorResult;
-import com.google.common.collect.ImmutableList;
-import java.util.List;
 
 /**
  * Information about an ongoing playback.
@@ -60,8 +57,6 @@ import java.util.List;
   public final TrackGroupArray trackGroups;
   /** The result of the current track selection. */
   public final TrackSelectorResult trackSelectorResult;
-  /** The current static metadata of the track selections. */
-  public final List<Metadata> staticMetadata;
   /** The {@link MediaPeriodId} of the currently loading media period in the {@link #timeline}. */
   public final MediaPeriodId loadingMediaPeriodId;
   /** Whether playback should proceed when {@link #playbackState} == {@link Player#STATE_READY}. */
@@ -72,8 +67,6 @@ import java.util.List;
   public final PlaybackParameters playbackParameters;
   /** Whether offload scheduling is enabled for the main player loop. */
   public final boolean offloadSchedulingEnabled;
-  /** Whether the main player loop is sleeping, while using offload scheduling. */
-  public final boolean sleepingForOffload;
 
   /**
    * Position up to which media is buffered in {@link #loadingMediaPeriodId) relative to the start
@@ -109,7 +102,6 @@ import java.util.List;
         /* isLoading= */ false,
         TrackGroupArray.EMPTY,
         emptyTrackSelectorResult,
-        /* staticMetadata= */ ImmutableList.of(),
         PLACEHOLDER_MEDIA_PERIOD_ID,
         /* playWhenReady= */ false,
         Player.PLAYBACK_SUPPRESSION_REASON_NONE,
@@ -117,8 +109,7 @@ import java.util.List;
         /* bufferedPositionUs= */ 0,
         /* totalBufferedDurationUs= */ 0,
         /* positionUs= */ 0,
-        /* offloadSchedulingEnabled= */ false,
-        /* sleepingForOffload= */ false);
+        /* offloadSchedulingEnabled= */ false);
   }
 
   /**
@@ -132,7 +123,6 @@ import java.util.List;
    * @param isLoading See {@link #isLoading}.
    * @param trackGroups See {@link #trackGroups}.
    * @param trackSelectorResult See {@link #trackSelectorResult}.
-   * @param staticMetadata See {@link #staticMetadata}.
    * @param loadingMediaPeriodId See {@link #loadingMediaPeriodId}.
    * @param playWhenReady See {@link #playWhenReady}.
    * @param playbackSuppressionReason See {@link #playbackSuppressionReason}.
@@ -141,7 +131,6 @@ import java.util.List;
    * @param totalBufferedDurationUs See {@link #totalBufferedDurationUs}.
    * @param positionUs See {@link #positionUs}.
    * @param offloadSchedulingEnabled See {@link #offloadSchedulingEnabled}.
-   * @param sleepingForOffload See {@link #sleepingForOffload}.
    */
   public PlaybackInfo(
       Timeline timeline,
@@ -152,7 +141,6 @@ import java.util.List;
       boolean isLoading,
       TrackGroupArray trackGroups,
       TrackSelectorResult trackSelectorResult,
-      List<Metadata> staticMetadata,
       MediaPeriodId loadingMediaPeriodId,
       boolean playWhenReady,
       @PlaybackSuppressionReason int playbackSuppressionReason,
@@ -160,8 +148,7 @@ import java.util.List;
       long bufferedPositionUs,
       long totalBufferedDurationUs,
       long positionUs,
-      boolean offloadSchedulingEnabled,
-      boolean sleepingForOffload) {
+      boolean offloadSchedulingEnabled) {
     this.timeline = timeline;
     this.periodId = periodId;
     this.requestedContentPositionUs = requestedContentPositionUs;
@@ -170,7 +157,6 @@ import java.util.List;
     this.isLoading = isLoading;
     this.trackGroups = trackGroups;
     this.trackSelectorResult = trackSelectorResult;
-    this.staticMetadata = staticMetadata;
     this.loadingMediaPeriodId = loadingMediaPeriodId;
     this.playWhenReady = playWhenReady;
     this.playbackSuppressionReason = playbackSuppressionReason;
@@ -179,7 +165,6 @@ import java.util.List;
     this.totalBufferedDurationUs = totalBufferedDurationUs;
     this.positionUs = positionUs;
     this.offloadSchedulingEnabled = offloadSchedulingEnabled;
-    this.sleepingForOffload = sleepingForOffload;
   }
 
   /** Returns a placeholder period id for an empty timeline. */
@@ -198,8 +183,6 @@ import java.util.List;
    * @param trackGroups The track groups for the new position. See {@link #trackGroups}.
    * @param trackSelectorResult The track selector result for the new position. See {@link
    *     #trackSelectorResult}.
-   * @param staticMetadata The static metadata for the track selections. See {@link
-   *     #staticMetadata}.
    * @return Copied playback info with new playing position.
    */
   @CheckResult
@@ -209,8 +192,7 @@ import java.util.List;
       long requestedContentPositionUs,
       long totalBufferedDurationUs,
       TrackGroupArray trackGroups,
-      TrackSelectorResult trackSelectorResult,
-      List<Metadata> staticMetadata) {
+      TrackSelectorResult trackSelectorResult) {
     return new PlaybackInfo(
         timeline,
         periodId,
@@ -220,7 +202,6 @@ import java.util.List;
         isLoading,
         trackGroups,
         trackSelectorResult,
-        staticMetadata,
         loadingMediaPeriodId,
         playWhenReady,
         playbackSuppressionReason,
@@ -228,8 +209,7 @@ import java.util.List;
         bufferedPositionUs,
         totalBufferedDurationUs,
         positionUs,
-        offloadSchedulingEnabled,
-        sleepingForOffload);
+        offloadSchedulingEnabled);
   }
 
   /**
@@ -249,7 +229,6 @@ import java.util.List;
         isLoading,
         trackGroups,
         trackSelectorResult,
-        staticMetadata,
         loadingMediaPeriodId,
         playWhenReady,
         playbackSuppressionReason,
@@ -257,8 +236,7 @@ import java.util.List;
         bufferedPositionUs,
         totalBufferedDurationUs,
         positionUs,
-        offloadSchedulingEnabled,
-        sleepingForOffload);
+        offloadSchedulingEnabled);
   }
 
   /**
@@ -278,7 +256,6 @@ import java.util.List;
         isLoading,
         trackGroups,
         trackSelectorResult,
-        staticMetadata,
         loadingMediaPeriodId,
         playWhenReady,
         playbackSuppressionReason,
@@ -286,8 +263,7 @@ import java.util.List;
         bufferedPositionUs,
         totalBufferedDurationUs,
         positionUs,
-        offloadSchedulingEnabled,
-        sleepingForOffload);
+        offloadSchedulingEnabled);
   }
 
   /**
@@ -307,7 +283,6 @@ import java.util.List;
         isLoading,
         trackGroups,
         trackSelectorResult,
-        staticMetadata,
         loadingMediaPeriodId,
         playWhenReady,
         playbackSuppressionReason,
@@ -315,8 +290,7 @@ import java.util.List;
         bufferedPositionUs,
         totalBufferedDurationUs,
         positionUs,
-        offloadSchedulingEnabled,
-        sleepingForOffload);
+        offloadSchedulingEnabled);
   }
 
   /**
@@ -336,7 +310,6 @@ import java.util.List;
         isLoading,
         trackGroups,
         trackSelectorResult,
-        staticMetadata,
         loadingMediaPeriodId,
         playWhenReady,
         playbackSuppressionReason,
@@ -344,8 +317,7 @@ import java.util.List;
         bufferedPositionUs,
         totalBufferedDurationUs,
         positionUs,
-        offloadSchedulingEnabled,
-        sleepingForOffload);
+        offloadSchedulingEnabled);
   }
 
   /**
@@ -365,7 +337,6 @@ import java.util.List;
         isLoading,
         trackGroups,
         trackSelectorResult,
-        staticMetadata,
         loadingMediaPeriodId,
         playWhenReady,
         playbackSuppressionReason,
@@ -373,8 +344,7 @@ import java.util.List;
         bufferedPositionUs,
         totalBufferedDurationUs,
         positionUs,
-        offloadSchedulingEnabled,
-        sleepingForOffload);
+        offloadSchedulingEnabled);
   }
 
   /**
@@ -398,7 +368,6 @@ import java.util.List;
         isLoading,
         trackGroups,
         trackSelectorResult,
-        staticMetadata,
         loadingMediaPeriodId,
         playWhenReady,
         playbackSuppressionReason,
@@ -406,8 +375,7 @@ import java.util.List;
         bufferedPositionUs,
         totalBufferedDurationUs,
         positionUs,
-        offloadSchedulingEnabled,
-        sleepingForOffload);
+        offloadSchedulingEnabled);
   }
 
   /**
@@ -427,7 +395,6 @@ import java.util.List;
         isLoading,
         trackGroups,
         trackSelectorResult,
-        staticMetadata,
         loadingMediaPeriodId,
         playWhenReady,
         playbackSuppressionReason,
@@ -435,8 +402,7 @@ import java.util.List;
         bufferedPositionUs,
         totalBufferedDurationUs,
         positionUs,
-        offloadSchedulingEnabled,
-        sleepingForOffload);
+        offloadSchedulingEnabled);
   }
 
   /**
@@ -457,7 +423,6 @@ import java.util.List;
         isLoading,
         trackGroups,
         trackSelectorResult,
-        staticMetadata,
         loadingMediaPeriodId,
         playWhenReady,
         playbackSuppressionReason,
@@ -465,36 +430,6 @@ import java.util.List;
         bufferedPositionUs,
         totalBufferedDurationUs,
         positionUs,
-        offloadSchedulingEnabled,
-        sleepingForOffload);
-  }
-
-  /**
-   * Copies playback info with new sleepingForOffload.
-   *
-   * @param sleepingForOffload New main player loop sleeping state. See {@link #sleepingForOffload}.
-   * @return Copied playback info with new main player loop sleeping state.
-   */
-  @CheckResult
-  public PlaybackInfo copyWithSleepingForOffload(boolean sleepingForOffload) {
-    return new PlaybackInfo(
-        timeline,
-        periodId,
-        requestedContentPositionUs,
-        playbackState,
-        playbackError,
-        isLoading,
-        trackGroups,
-        trackSelectorResult,
-        staticMetadata,
-        loadingMediaPeriodId,
-        playWhenReady,
-        playbackSuppressionReason,
-        playbackParameters,
-        bufferedPositionUs,
-        totalBufferedDurationUs,
-        positionUs,
-        offloadSchedulingEnabled,
-        sleepingForOffload);
+        offloadSchedulingEnabled);
   }
 }

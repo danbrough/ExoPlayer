@@ -173,7 +173,14 @@ public class MediaItemTest {
                 Uri.parse(URI_STRING + "/de"),
                 MimeTypes.APPLICATION_TTML,
                 /* language= */ null,
-                C.SELECTION_FLAG_DEFAULT));
+                C.SELECTION_FLAG_DEFAULT),
+            new MediaItem.Subtitle(
+                Uri.parse(URI_STRING + "/fr"),
+                MimeTypes.APPLICATION_SUBRIP,
+                /* language= */ "fr",
+                C.SELECTION_FLAG_DEFAULT,
+                C.ROLE_FLAG_ALTERNATE,
+                "label"));
 
     MediaItem mediaItem =
         new MediaItem.Builder().setUri(URI_STRING).setSubtitles(subtitles).build();
@@ -288,30 +295,6 @@ public class MediaItemTest {
   }
 
   @Test
-  public void builderSetLiveTargetLatencyMs_setsLiveTargetLatencyMs() {
-    MediaItem mediaItem =
-        new MediaItem.Builder().setUri(URI_STRING).setLiveTargetOffsetMs(10_000).build();
-
-    assertThat(mediaItem.liveConfiguration.targetLiveOffsetMs).isEqualTo(10_000);
-  }
-
-  @Test
-  public void builderSetMinLivePlaybackSpeed_setsMinLivePlaybackSpeed() {
-    MediaItem mediaItem =
-        new MediaItem.Builder().setUri(URI_STRING).setLiveMinPlaybackSpeed(.9f).build();
-
-    assertThat(mediaItem.liveConfiguration.minPlaybackSpeed).isEqualTo(.9f);
-  }
-
-  @Test
-  public void builderSetMaxLivePlaybackSpeed_setsMaxLivePlaybackSpeed() {
-    MediaItem mediaItem =
-        new MediaItem.Builder().setUri(URI_STRING).setLiveMaxPlaybackSpeed(1.1f).build();
-
-    assertThat(mediaItem.liveConfiguration.maxPlaybackSpeed).isEqualTo(1.1f);
-  }
-
-  @Test
   public void buildUpon_equalsToOriginal() {
     MediaItem mediaItem =
         new MediaItem.Builder()
@@ -341,10 +324,10 @@ public class MediaItemTest {
                     new MediaItem.Subtitle(
                         Uri.parse(URI_STRING + "/en"),
                         MimeTypes.APPLICATION_TTML,
-                        /* language= */ "en")))
-            .setLiveTargetOffsetMs(20_000)
-            .setLiveMinPlaybackSpeed(.9f)
-            .setLiveMaxPlaybackSpeed(1.1f)
+                        /* language= */ "en",
+                        C.SELECTION_FLAG_FORCED,
+                        C.ROLE_FLAG_ALTERNATE,
+                        "label")))
             .setTag(new Object())
             .build();
 

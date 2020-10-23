@@ -19,29 +19,13 @@ FFMPEG_EXT_PATH=$1
 NDK_PATH=$2
 HOST_PLATFORM=$3
 ENABLED_DECODERS=("${@:4}")
-#    --disable-programs
-#    --disable-everything
-
-EXTRAS="
-	--enable-parser=opus
-	--enable-parser=flac
-	--enable-parser=vorbis
-	--enable-decoder=flac
-	--enable-decoder=opus
-	--enable-decoder=vorbis
-	--enable-decoder=mp3
-	--enable-demuxer=mp3
-	--enable-demuxer=ogg
-	--enable-demuxer=flac
-
-"
-
 COMMON_OPTIONS="
     --target-os=android
     --disable-static
     --enable-shared
-    --disable-everything
     --disable-doc
+    --disable-programs
+    --disable-everything
     --disable-avdevice
     --disable-avformat
     --disable-swscale
@@ -55,10 +39,8 @@ COMMON_OPTIONS="
 TOOLCHAIN_PREFIX="${NDK_PATH}/toolchains/llvm/prebuilt/${HOST_PLATFORM}/bin"
 for decoder in "${ENABLED_DECODERS[@]}"
 do
-    COMMON_OPTIONS="${COMMON_OPTIONS} --enable-decoder=${decoder} $EXTRAS"
+    COMMON_OPTIONS="${COMMON_OPTIONS} --enable-decoder=${decoder}"
 done
-
-echo COMMON_OPTIONS $COMMON_OPTIONS 
 cd "${FFMPEG_EXT_PATH}/jni/ffmpeg"
 ./configure \
     --libdir=android-libs/armeabi-v7a \

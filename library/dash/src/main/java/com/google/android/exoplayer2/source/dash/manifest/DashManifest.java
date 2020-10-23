@@ -82,9 +82,6 @@ public class DashManifest implements FilterableManifest<DashManifest> {
    */
   @Nullable public final UtcTimingElement utcTiming;
 
-  /** The {@link ServiceDescriptionElement}, or null if not present. */
-  @Nullable public final ServiceDescriptionElement serviceDescription;
-
   /** The location of this manifest, or null if not present. */
   @Nullable public final Uri location;
 
@@ -95,7 +92,7 @@ public class DashManifest implements FilterableManifest<DashManifest> {
 
   /**
    * @deprecated Use {@link #DashManifest(long, long, long, boolean, long, long, long, long,
-   *     ProgramInformation, UtcTimingElement, ServiceDescriptionElement, Uri, List)}.
+   *     ProgramInformation, UtcTimingElement, Uri, List)}.
    */
   @Deprecated
   public DashManifest(
@@ -121,7 +118,6 @@ public class DashManifest implements FilterableManifest<DashManifest> {
         publishTimeMs,
         /* programInformation= */ null,
         utcTiming,
-        /* serviceDescription= */ null,
         location,
         periods);
   }
@@ -137,7 +133,6 @@ public class DashManifest implements FilterableManifest<DashManifest> {
       long publishTimeMs,
       @Nullable ProgramInformation programInformation,
       @Nullable UtcTimingElement utcTiming,
-      @Nullable ServiceDescriptionElement serviceDescription,
       @Nullable Uri location,
       List<Period> periods) {
     this.availabilityStartTimeMs = availabilityStartTimeMs;
@@ -151,7 +146,6 @@ public class DashManifest implements FilterableManifest<DashManifest> {
     this.programInformation = programInformation;
     this.utcTiming = utcTiming;
     this.location = location;
-    this.serviceDescription = serviceDescription;
     this.periods = periods == null ? Collections.emptyList() : periods;
   }
 
@@ -209,7 +203,6 @@ public class DashManifest implements FilterableManifest<DashManifest> {
         publishTimeMs,
         programInformation,
         utcTiming,
-        serviceDescription,
         location,
         copyPeriods);
   }

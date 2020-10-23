@@ -257,7 +257,7 @@ public abstract class DecoderAudioRenderer<
       try {
         audioSink.playToEndOfStream();
       } catch (AudioSink.WriteException e) {
-        throw createRendererException(e, inputFormat, e.isRecoverable);
+        throw createRendererException(e, inputFormat);
       }
       return;
     }
@@ -296,12 +296,11 @@ public abstract class DecoderAudioRenderer<
         while (drainOutputBuffer()) {}
         while (feedInputBuffer()) {}
         TraceUtil.endSection();
-      } catch (DecoderException | AudioSink.ConfigurationException e) {
+      } catch (DecoderException
+          | AudioSink.ConfigurationException
+          | AudioSink.InitializationException
+          | AudioSink.WriteException e) {
         throw createRendererException(e, inputFormat);
-      } catch (AudioSink.InitializationException e) {
-        throw createRendererException(e, inputFormat, e.isRecoverable);
-      } catch (AudioSink.WriteException e) {
-        throw createRendererException(e, inputFormat, e.isRecoverable);
       }
       decoderCounters.ensureUpdated();
     }
@@ -384,7 +383,7 @@ public abstract class DecoderAudioRenderer<
         try {
           processEndOfStream();
         } catch (AudioSink.WriteException e) {
-          throw createRendererException(e, getOutputFormat(decoder), e.isRecoverable);
+          throw createRendererException(e, getOutputFormat(decoder));
         }
       }
       return false;
@@ -723,11 +722,6 @@ public abstract class DecoderAudioRenderer<
     @Override
     public void onSkipSilenceEnabledChanged(boolean skipSilenceEnabled) {
       eventDispatcher.skipSilenceEnabledChanged(skipSilenceEnabled);
-    }
-
-    @Override
-    public void onAudioSinkError(Exception audioSinkError) {
-      eventDispatcher.audioSinkError(audioSinkError);
     }
   }
 }

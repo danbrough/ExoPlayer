@@ -9,7 +9,7 @@ VERSION=$(( $VERSION + 1 ))
 echo VERSION $VERSION
 echo $VERSION > .version
 
-VERSION_NAME=`printf '2.12.0-dan%02d'  $VERSION`
+VERSION_NAME=`printf '2.12.1-dan%02d'  $VERSION`
 echo VERSION_NAME $VERSION_NAME
 sed -i  constants.gradle -e 's:releaseVersion =.*:releaseVersion = "'$VERSION_NAME'":g'
 git commit -am "$VERSION_NAME"

@@ -19,7 +19,7 @@ dependencies {
     implementation project(modulePrefix + 'library-core')
     implementation 'androidx.collection:collection:' + androidxCollectionVersion
     implementation 'androidx.concurrent:concurrent-futures:1.1.0'
-    api 'androidx.media2:media2-session:1.1.0-beta01'
+    api 'androidx.media2:media2-session:1.1.0-rc01'
     compileOnly 'org.checkerframework:checker-compat-qual:' + checkerframeworkCompatVersion
     compileOnly 'org.checkerframework:checker-qual:' + checkerframeworkVersion
     compileOnly 'org.jetbrains.kotlin:kotlin-annotations-jvm:' + kotlinAnnotationsVersion

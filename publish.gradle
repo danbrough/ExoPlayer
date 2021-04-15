@@ -24,7 +24,10 @@ afterEvaluate {
             release(MavenPublication) {
                 from components.release
                 artifact androidSourcesJar
-                groupId = 'com.google.android.exoplayer'
+                groupId = 'com.github.danbrough.exoplayer'
+     		//userOrg = 'danbrough'
+		//website = 'https://github.com/danbrough/ExoPlayer'
+
                 artifactId = releaseArtifact
                 version releaseVersion
                 pom {

@@ -21,3 +21,8 @@ git push origin --delete "$VERSION_NAME"
 git push origin "$VERSION_NAME"
 
 curl https://jitpack.io/com/github/danbrough/ExoPlayer/${VERSION_NAME}/build.log
+
+find ~/.m2/repository/com/github/danbrough/exoplayer/ -type f -name 'maven-metadata-local.xml'  | \
+	while read n; do mv "$n"  "$(echo $n | sed  -e 's:-local::g')"; done
+
+rsync -avHSx /home/dan/.m2/repository/com/github/danbrough/ h1:/srv/https/maven/com/github/danbrough/

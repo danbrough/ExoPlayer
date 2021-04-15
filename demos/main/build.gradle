@@ -79,7 +79,7 @@ dependencies {
     implementation project(modulePrefix + 'extension-cronet')
     implementation project(modulePrefix + 'extension-ima')
     withDecoderExtensionsImplementation project(modulePrefix + 'extension-av1')
-    withDecoderExtensionsImplementation project(modulePrefix + 'extension-ffmpeg')
+//    withDecoderExtensionsImplementation project(modulePrefix + 'extension-ffmpeg')
     withDecoderExtensionsImplementation project(modulePrefix + 'extension-flac')
     withDecoderExtensionsImplementation project(modulePrefix + 'extension-opus')
     withDecoderExtensionsImplementation project(modulePrefix + 'extension-vp9')

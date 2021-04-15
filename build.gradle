@@ -36,3 +36,8 @@ allprojects {
 }
 
 apply from: 'javadoc_combined.gradle'
+tasks.create("listProjects") {
+  doLast {
+    println(subprojects.forEach { println(it.name) })
+  }
+}

@@ -22,6 +22,7 @@ git push origin "$VERSION_NAME"
 
 curl https://jitpack.io/com/github/danbrough/ExoPlayer/${VERSION_NAME}/build.log
 
+./gradlew publishToMavenLocal || exit 1
 find ~/.m2/repository/com/github/danbrough/exoplayer/ -type f -name 'maven-metadata-local.xml'  | \
 	while read n; do mv "$n"  "$(echo $n | sed  -e 's:-local::g')"; done
 

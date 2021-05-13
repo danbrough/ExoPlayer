@@ -19,8 +19,8 @@ android {
     compileSdkVersion project.ext.compileSdkVersion
 
     defaultConfig {
-	//ndkVersion '22.0.7026061'
-	ndkVersion '21.1.6352462'
+	ndkVersion '22.0.7026061'
+//	ndkVersion '21.1.6352462'
         minSdkVersion project.ext.minSdkVersion
         targetSdkVersion project.ext.targetSdkVersion
         consumerProguardFiles 'proguard-rules.txt'

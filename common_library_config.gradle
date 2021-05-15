@@ -17,10 +17,11 @@ apply plugin: 'com.android.library'
 
 android {
     compileSdkVersion project.ext.compileSdkVersion
-
+    //def ndk = ''
+    //if ( "$System.env.JITPACK" == "true" )
     defaultConfig {
-	ndkVersion '22.0.7026061'
-//	ndkVersion '21.1.6352462'
+	ndkVersion  "$System.env.JITPACK" == "true"  ?  '21.1.6352462' :  '22.0.7026061'
+
         minSdkVersion project.ext.minSdkVersion
         targetSdkVersion project.ext.targetSdkVersion
         consumerProguardFiles 'proguard-rules.txt'

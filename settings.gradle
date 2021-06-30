@@ -18,6 +18,12 @@ if (gradle.ext.has('exoplayerModulePrefix')) {
     modulePrefix += gradle.ext.exoplayerModulePrefix
 }
 
+if ( "$System.env.JITPACK" != "true" ) {
+
+    include modulePrefix + 'demo'
+    project(modulePrefix + 'demo').projectDir = new File(rootDir, 'demos/main')
+}
+
 /*
 include modulePrefix + 'demo'
 include modulePrefix + 'demo-cast'
